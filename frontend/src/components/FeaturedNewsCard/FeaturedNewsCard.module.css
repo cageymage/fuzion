@@ -1,0 +1,74 @@
+.card {
+  display: flex;
+  gap: 18px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 720px) {
+  .card {
+    flex-direction: column;
+  }
+}
+
+.thumbnail {
+  position: relative;
+  width: 210px;
+  height: 130px;
+  flex-shrink: 0;
+  border-radius: var(--radius-media);
+  overflow: hidden;
+  background: linear-gradient(135deg, #2a1f38, #120e1c);
+}
+
+@media (max-width: 720px) {
+  .thumbnail {
+    width: 100%;
+  }
+}
+
+.thumbnailImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholderTrend {
+  position: absolute;
+  inset: 0;
+  opacity: 0.55;
+}
+
+.expandBadge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.body {
+  flex: 1;
+}
+
+.title {
+  margin: 9px 0 6px;
+  font-size: 18px;
+}
+
+.excerpt {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 9px;
+}

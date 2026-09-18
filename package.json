@@ -1,0 +1,21 @@
+{
+  "name": "fuzion",
+  "private": true,
+  "scripts": {
+    "dev": "docker compose up -d --wait db && concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "dotenv -e .env -e .env.example -- nodemon --watch backend --ext go,sql --exec \"go run -C backend ./cmd/api\"",
+    "dev:web": "npm --prefix frontend run dev",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down",
+    "db:seed": "docker compose exec -T db psql -U fuzion -d fuzion -v ON_ERROR_STOP=1 < backend/seed/dev_seed.sql",
+    "test": "npm run test:api && npm run test:web",
+    "test:api": "go test -C backend ./...",
+    "test:web": "npm --prefix frontend test",
+    "postinstall": "npm --prefix frontend install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "dotenv-cli": "^8.0.0",
+    "nodemon": "^3.1.14"
+  }
+}
