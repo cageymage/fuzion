@@ -57,7 +57,7 @@ Docker (see [CLAUDE.md](CLAUDE.md) for why nothing is mocked).
 
 | Tool          | Version | Check                       |
 | ------------- | ------- | --------------------------- |
-| Node.js + npm | 20+     | `node --version`            |
+| Node.js + npm | 23.5.0+ | `node --version`            |
 | Go            | 1.25+   | `go version`                |
 | Docker        | any recent, with Compose v2 | `docker compose version` |
 
