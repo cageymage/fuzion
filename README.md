@@ -13,7 +13,7 @@ Once the [prerequisites](#prerequisites) below are installed:
 git clone https://github.com/cageymage/fuzion.git
 cd fuzion
 npm install     # root tooling + frontend deps (postinstall)
-npm run dev     # Postgres via docker compose, Go API on :8080, Vite on :5173
+npm run dev     # Postgres via docker compose, Go API on 127.0.0.1:8080, Vite on :5173
 npm run db:seed # sample news/raid/stream rows so the home page has content
 ```
 
@@ -134,6 +134,15 @@ daemon, and there are two reasons that happens:
 
    This is per-machine config, not something to commit.
 
+### Windows Firewall keeps asking about `api.exe`
+
+Windows only prompts for listeners bound to all interfaces, and `go run`
+builds to a fresh temp path every restart, so a `:8080` bind means a new
+prompt every time nodemon restarts the API. [.env.example](.env.example)
+sets `ADDR=127.0.0.1:8080` to avoid this — loopback binds never prompt.
+If you override `ADDR` in `.env`, keep the `127.0.0.1` prefix. Deployed
+builds leave `ADDR` unset and bind all interfaces on Render's `PORT`.
+
 ### Port already in use
 
 `npm run dev` needs 5173 (Vite), 8080 (API) and 5432 (Postgres) free. A local
@@ -168,3 +177,31 @@ overrides (or real secrets, later) in `.env` — it is gitignored.
 Migrations under `backend/migrations/` are embedded in the API binary and
 applied on startup, so there is no separate migrate step. To start from a
 clean database: `docker compose down -v` then `npm run dev` again.
+
+## Deploying
+
+Production is three Render services declared in [render.yaml](render.yaml):
+a static site for the frontend, a Docker web service for the API, and a
+managed Postgres. Render deploys `main` on push; GitHub Actions
+([test.yml](.github/workflows/test.yml)) runs the test suites on PRs.
+
+The static site rewrites `/api/*` to the API service, so the browser only
+ever talks to one origin — the same as the Vite proxy locally. No CORS
+config or `VITE_API_BASE_URL` is needed in prod.
+
+First-time setup:
+
+1. Render dashboard → **New → Blueprint**, pick this repo. Render creates
+   all three services from `render.yaml` and wires `DATABASE_URL`.
+2. Check the API's hostname in the dashboard. If it isn't
+   `fuzion-api.onrender.com` (the name was taken), update the `/api/*`
+   rewrite destination in `render.yaml` and push.
+3. Open the static site's URL; `/api/health` should return `{"status":"ok"}`
+   and the home page should load (empty until there's content).
+4. The prod DB starts empty. Until there's an admin UI, load content with
+   `psql "<external connection string from the dashboard>" -f backend/seed/dev_seed.sql`
+   (swap in real content first).
+
+Free-tier caveats: the Postgres expires after 30 days, and the free web
+service sleeps after 15 minutes idle with a slow cold start. Budget for
+paid instances of both (~$13/mo) once people are actually using the site.

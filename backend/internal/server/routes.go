@@ -27,8 +27,9 @@ func New(deps Deps) *chi.Mux {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 
-	// Credentials are on so the session cookie survives the cross-subdomain
-	// hop between app.fuzion.gg and api.fuzion.gg.
+	// In both local dev (Vite proxy) and prod (Render rewrite) the browser
+	// sees the API as same-origin, so this only matters when a frontend is
+	// pointed at the API directly via VITE_API_BASE_URL.
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   deps.AllowedOrigins,
 		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodOptions},

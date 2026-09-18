@@ -21,6 +21,10 @@ func loadConfig() (config, error) {
 	addr := os.Getenv("ADDR")
 	if addr == "" {
 		addr = ":8080"
+		// Render injects PORT rather than letting the service pick its own.
+		if port := os.Getenv("PORT"); port != "" {
+			addr = ":" + port
+		}
 	}
 
 	allowedOrigins := []string{"http://localhost:5173"}
