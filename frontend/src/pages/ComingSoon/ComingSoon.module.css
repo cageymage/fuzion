@@ -1,0 +1,14 @@
+.section {
+  padding: 60px var(--gutter);
+}
+
+.title {
+  font-size: 32px;
+  margin: 10px 0 6px;
+}
+
+.note {
+  color: var(--muted);
+  font-size: 15px;
+  font-style: italic;
+}

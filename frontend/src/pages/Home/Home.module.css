@@ -1,0 +1,78 @@
+.hero {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 40px;
+  padding: 40px var(--gutter) 30px;
+}
+
+.title {
+  margin: 10px 0 6px;
+  font-size: 52px;
+}
+
+@media (max-width: 720px) {
+  .title {
+    font-size: 38px;
+  }
+}
+
+.tagline {
+  color: var(--muted);
+  font-size: 16px;
+  font-style: italic;
+}
+
+.divider {
+  height: 1px;
+  margin: 0 var(--gutter);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border) 20%,
+    var(--border) 80%,
+    transparent
+  );
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 32px;
+  padding: 28px var(--gutter) 0;
+}
+
+@media (max-width: 960px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 14px;
+}
+
+.sectionTitle {
+  font-size: 21px;
+  margin: 0;
+}
+
+.viewAll {
+  font-size: 13px;
+}
+
+.notice {
+  padding: 20px 26px;
+  min-width: 270px;
+}
+
+.noticeText {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 8px 0 0;
+}

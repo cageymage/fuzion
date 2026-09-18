@@ -1,0 +1,87 @@
+:root {
+  --bg: #15100b;
+  --surface: #201811;
+  --border: #3c2d1e;
+  --text: #f1e6d6;
+  --muted: #a8977f;
+  --gold: #d3a24d;
+  --gold-hover: #e8c27a;
+  --gold-soft: #3a2c17;
+  --epic: #b98af0;
+  --epic-soft: #2a2038;
+  --legendary: #ff9d3d;
+  --legendary-soft: #3d2513;
+  --live: #c23b3b;
+
+  --font-display: 'Cinzel', Georgia, serif;
+  --font-body: 'Crimson Pro', Georgia, serif;
+
+  --gutter: 56px;
+  --radius-card: 6px;
+  --radius-media: 4px;
+  --radius-chip: 3px;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --gutter: 16px;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+
+a {
+  color: var(--gold);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--gold-hover);
+}
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.eyebrow-muted {
+  color: var(--muted);
+}
+
+.display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}

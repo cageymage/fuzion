@@ -1,0 +1,25 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: var(--radius-chip);
+}
+
+.gold {
+  color: var(--gold);
+  background: var(--gold-soft);
+}
+
+.epic {
+  color: var(--epic);
+  background: var(--epic-soft);
+}
+
+.legendary {
+  color: var(--legendary);
+  background: var(--legendary-soft);
+}

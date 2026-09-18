@@ -1,0 +1,47 @@
+.header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 22px var(--gutter);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text);
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: 0.08em;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+}
+
+.navLink {
+  font-size: 13.5px;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  padding-bottom: 6px;
+  border-bottom: 2px solid transparent;
+}
+
+.navLink:hover {
+  color: var(--gold-hover);
+}
+
+.active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
