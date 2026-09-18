@@ -34,11 +34,11 @@ This is a deliberate tradeoff, not an oversight: it's what makes "automated test
 
 ## Hosting
 
-All three pieces live on **Render**, under one dashboard/account, deployed from the same GitHub repo:
+All three pieces live on **Render**, under one dashboard/account, deployed from the same GitHub repo and declared in [render.yaml](../render.yaml) (a Render Blueprint):
 
-- **Frontend** — Render Static Site, built from `frontend/` (`npm run build`, publish `dist/`). Auto-deploys on push to `main`, PR previews available.
-- **Backend** — Render Web Service, built from `backend/`'s Dockerfile. Auto-deploys on push to `main`.
-- **Database** — Render managed Postgres instance, connected to the backend service via an internal connection string (env var). Free tier for the first 90 days, then a paid instance (~$7/mo) — worth budgeting for up front so nothing breaks unexpectedly later.
+- **Frontend** — Render Static Site, built from `frontend/` (`npm run build`, publish `dist/`). Auto-deploys on push to `main`, PR previews available. A rewrite rule proxies `/api/*` to the backend service, so the browser only ever talks to the frontend's origin — the same shape as the Vite dev proxy. No CORS in prod, and no cross-subdomain cookie handling (see decision 5).
+- **Backend** — Render Web Service, built from `backend/`'s Dockerfile. Auto-deploys on push to `main`. Binds to Render's injected `PORT`.
+- **Database** — Render managed Postgres instance, connected to the backend service via an internal connection string (env var). The free tier expires after 30 days, after which it needs a paid instance (~$6/mo) — worth budgeting for up front so nothing breaks unexpectedly later. The free web service also spins down after 15 minutes idle (~30–60s cold start), so a paid Starter instance (~$7/mo) is the realistic floor once people are actually using it.
 
 CI/CD is just Render's native GitHub integration (build + deploy on push) — no separate GitHub Actions deploy step needed, keeping the "push and forget" workflow you liked from Netlify. GitHub Actions is still used, but only for running the test suites (Vitest, Go tests, Playwright) as a required check before merge — deploys themselves are handled by Render, not the Actions workflow.
 
@@ -113,7 +113,7 @@ backend/
 ├── internal/
 │   ├── server/
 │   │   ├── server.go          # http.Server + router setup, takes dependencies via struct
-│   │   └── routes.go          # also wires CORS middleware (credentialed cross-subdomain requests — see Auth section)
+│   │   └── routes.go          # also wires CORS middleware (only used when a frontend hits the API directly, not via the dev/prod proxy)
 │   ├── roster/
 │   │   ├── handler.go         # HTTP handlers
 │   │   ├── service.go         # business logic
@@ -164,7 +164,7 @@ Runs against the full stack via `docker-compose.yml` (real Postgres, real Go bac
 2. **Auth: Discord OAuth first, Battle.net OAuth added later if wanted.** The `internal/auth` package should define a small provider-agnostic interface (exchange code → get user identity) so a second provider is a new implementation, not a rewrite. Only Discord ships in the initial scaffold.
 3. **MSW usage clarified:** MSW's Node server (`mocks/server.ts`) is used only inside the Vitest suite to intercept HTTP in sociable page tests. Local development (`npm run dev` / debugging) always talks to the real Go backend via `docker-compose.yml`, matching prod behavior — no browser-mode MSW mock server is scaffolded.
 4. **DB access: `sqlx`.** Closest Go equivalent to Dapper — raw SQL, results scanned onto structs via `db:"..."` tags at runtime, no ORM query builder and no code-generation build step. Chosen over `sqlc` (build-time codegen, more type-safe but an extra tooling step) and `GORM` (full ORM, more magic, less idiomatic Go).
-5. **Domain: custom domain planned** (e.g. `app.fuzion.gg` for the frontend, `api.fuzion.gg` for the backend). This means the session cookie can be scoped to the shared parent domain (`Domain=.fuzion.gg`) and sent cross-subdomain with `SameSite=Lax` (or `None; Secure` if needed) — a normal httpOnly session cookie, not a JWT-in-header scheme. Until the custom domain + DNS is set up, the Render default `onrender.com` subdomains won't share cookies, so **local/staging on default Render subdomains should be treated as temporary**, not the long-term auth model.
+5. **Single origin via proxy; custom domain is optional.** The Render static site rewrites `/api/*` to the backend service, so the browser never sees a second origin. The session cookie is a plain `httpOnly; SameSite=Lax` cookie on the site's own host — no `Domain=` attribute, no CORS credentials dance. A custom domain (e.g. `fuzion.gg`) is still planned for vanity, but it's a DNS change, not a prerequisite for auth; the original cross-subdomain plan (`app.` / `api.` with `Domain=.fuzion.gg`) was dropped in favour of this because it removes a whole class of cookie/CORS problems for the cost of one proxy hop.
 6. **GitHub repo: private.**
 
 ## Auth (Discord OAuth)
@@ -176,7 +176,7 @@ backend/
         ├── provider.go     # Provider interface: AuthURL(state), Exchange(ctx, code) (Identity, error)
         ├── discord.go      # Discord OAuth implementation
         ├── handler.go      # /auth/login, /auth/callback, /auth/logout HTTP handlers
-        ├── session.go      # issues httpOnly session cookie (Domain=.fuzion.gg once custom domain is live)
+        ├── session.go      # issues httpOnly SameSite=Lax session cookie (same-origin via the proxy, no Domain= attribute)
         └── auth_test.go    # sociable test against httptest.Server standing in for Discord's OAuth endpoints
 ```
 
