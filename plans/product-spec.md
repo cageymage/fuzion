@@ -50,11 +50,11 @@ Guild name used throughout this spec: **Fuzion**, realm `Emberreach`, region `us
 | **PvP**                    | Rated BG ratings pulled from the Blizzard API, guild leaderboard. Optional: may not be included, depending on guild interest                                                           | Public                                             |
 | **Streams**                | Grid of member Twitch/YouTube channels; featured "who's live" widget                                                                                                                   | Public                                             |
 | **Member Dashboard**       | Manage linked characters/alts, notification prefs, stream channel                                                                                                                      | Members                                            |
-| **Officer Console**        | Manual roster & profession edits, application review, event management, news editor, sync health — admins additionally get a members/permissions panel (officer-status overrides, admin grants) | Officers (admin panel: Admins only)                |
+| **Officer Console**        | Manual roster & profession edits, application review, event management, news editor, sync health — admins additionally get a members/permissions panel (officer and admin grants) | Officers (admin panel: Admins only)                |
 
 > **Home hero widget:** a raid isn't always imminent and no one's always live, so the Home page's top hero slot is a candidate for a rotating widget that cycles between Next Raid countdown, Raid Progress (current tier boss-kill order), and a Recruitment call-to-action, rather than hard-coding the countdown as the permanent hero. The live-stream widget correspondingly moves to a secondary spot (sidebar card or floating corner widget) and only renders when someone's actually streaming. Not yet a final decision.
 
-> **Applications → Discord notification:** submitting the recruiting form writes an `Application` row (status `pending`) and separately fires an outbound webhook posting a summary (class/role/availability) to a specific Discord recruiting channel — the same one-way outbound-webhook shape as the News cross-post (§4), not a hosted bot, so it needs no OAuth and carries only RARE risk (§7). A failed Discord post shouldn't fail the submission — the application is still saved; the notification is a best-effort mirror of it. The **officer review queue**, however, needs officer auth to gate it: that's satisfiable by Discord login alone once an admin grants `officer_override` manually (§3), so the review queue doesn't have to wait on the Blizzard roster sync (LEGENDARY risk) the way the automatic `is_officer` sync does.
+> **Applications → Discord notification:** submitting the recruiting form writes an `Application` row (status `pending`) and separately fires an outbound webhook posting a summary (class/role/availability) to a specific Discord recruiting channel — the same one-way outbound-webhook shape as the News cross-post (§4), not a hosted bot, so it needs no OAuth and carries only RARE risk (§7). A failed Discord post shouldn't fail the submission — the application is still saved; the notification is a best-effort mirror of it. The **officer review queue**, however, needs officer auth to gate it: that's satisfiable by Discord login alone once an admin grants `is_officer` manually (§3), with no dependency on the Blizzard roster sync (LEGENDARY risk).
 
 ## 3. Accounts & identity
 
@@ -69,12 +69,12 @@ A member will eventually be able to link both to one account. This project needs
 
 ### Roles: member / officer / admin
 
-> **Open question (§9):** whether `is_officer` is worth syncing from the Blizzard rank at all, versus dropping the sync entirely and making officer status purely a manual `is_admin`/`officer_override`-style grant once someone has a Discord-linked account. The design below describes the rank-sync version; if that question resolves toward manual-only, `is_officer` and its sync go away and every member starts as non-officer until an admin grants `officer_override`.
+> **Decision (#6):** officer status is granted manually by admins, not derived from in-game guild rank. Revocation would lag behind the roster sync (someone removed after an incident could keep access until the next run), not every in-game officer wants site access, tying site permissions to a Blizzard rank widens the attack surface, and it couples permissions to Blizzard's API (and to WoW specifically). Roles change rarely in a guild this size, so the automation buys little. Guild rank from the roster sync (§5) is display data only. This can be revisited later.
 
-- **`is_officer`** is synced from the member's in-game guild rank as part of the Blizzard roster sync (§5) — a character's guild rank on `Emberreach` maps onto their linked User.
-- **`officer_override`** (nullable: force-officer / force-not-officer / follow sync) — settable only by admins, in the Officer Console's admin panel. The roster sync must read but never overwrite this field, so an admin's call sticks across future syncs.
-- **`is_admin`** (boolean) — fully manual, granted by an existing admin, independent of in-game rank entirely. Admins get officer-level access regardless of their own `is_officer`/`officer_override` values, plus the members/permissions panel.
-- Effective permission: `isOfficer() = is_admin || (officer_override ?? synced rank)`; admin-only actions check `is_admin` alone.
+- **`is_officer`** (boolean): fully manual, granted and revoked by admins in the Officer Console's admin panel. Defaults to `false`, so every member starts as a non-officer until an admin grants access. Requires a Discord-linked account, which every user has at launch.
+- **`is_admin`** (boolean): fully manual, granted by an existing admin. Admins get officer-level access regardless of their own `is_officer` value, plus the members/permissions panel.
+- Effective permission: `isOfficer() = is_admin || is_officer`; admin-only actions check `is_admin` alone.
+- Neither flag is ever written by a sync job, so the roster sync has no way to grant or revoke site access.
 
 ## 4. News & announcements
 
@@ -180,7 +180,7 @@ You asked for full-featured at launch, so that's the target below — but a bran
 
 Core entities, kept deliberately simple for v1 and built fresh in this project's own database:
 
-- **User** — id, name, email, discord_id, battlenet_id, is_officer (synced from in-game guild rank — see the open question on whether this sync happens at all, §9), officer_override (nullable: force-officer/force-not-officer), is_admin (manual, independent of rank)
+- **User** — id, name, email, discord_id, battlenet_id, is_officer (manual, admin-granted), is_admin (manual, admin-granted)
 - **Character** — id, user_id (nullable), name, realm, class, spec, role, is_main
 - **RaidTeam** — id, name, raid_night_schedule
 - **Event** — id, raid_helper_event_id, type, starts_at, raid_team_id — created/updated by the Raid-Helper webhook
@@ -197,12 +197,11 @@ Core entities, kept deliberately simple for v1 and built fresh in this project's
 - Will Blizzard expose both the Game Data API (guild roster) and the Profile API (gear/spec/professions) for Forever at or near launch, and will realm/region slugs match retail conventions? Assumed to mirror retail/classic in shape (§5); timing for a day-one game is still unconfirmed.
 - Will WarcraftLogs add Forever support on day one, in the first weeks, or not at all?
 - Raid-Helper's docs site renders via JS and couldn't be fully verified by automated fetch — confirm the exact webhook payload shape and signing scheme (and whether event creation via API exists on a paid tier) directly in a browser before building the integration.
-- Should admin changes to `officer_override` be logged/audited? Deferred for now, not blocking launch.
+- Should admin changes to `is_officer` / `is_admin` be logged/audited? Deferred for now, not blocking launch.
 - News image upload storage: Render web-service disk is ephemeral (wiped on redeploy), so this likely needs object storage (e.g. an S3-compatible bucket) rather than local disk — not yet decided.
 - Sync job scheduling mechanism: §6 proposes Render Cron Job services per source; not yet confirmed.
 - News Markdown editor: no frontend library or exact autosave/dirty-check implementation chosen yet — §4 describes required behavior only.
 - Discord webhook URL(s) for the Applications recruiting-channel cross-post (§2): same channel/webhook as the News cross-post, or a separate one? Needs a webhook URL created in the target Discord server either way, stored as an env var (never committed).
-- Is `is_officer` worth syncing from the Blizzard in-game guild rank (§3) at all, or should officer status just be a manual, admin-granted flag once someone has a Discord-linked account? The Blizzard-synced version is LEGENDARY risk (§7) and adds a second officer source (rank sync vs. `officer_override`) to reconcile; the manual-only version drops that risk entirely at the cost of officers having to be granted access by hand rather than it following their in-game promotion automatically.
 
 ## 10. Next steps
 
