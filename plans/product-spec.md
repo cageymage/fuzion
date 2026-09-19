@@ -1,13 +1,13 @@
 # Fuzion Guild Portal — Build Spec
 
-A build spec for a semi-hardcore guild's home base: roster, raid progress, crafting, PvP, recruiting, and streams — backed by Battle.net/Discord login and live data from Blizzard, WarcraftLogs, Raider.io, and Twitch.
+A build spec for a semi-hardcore guild's home base: roster, raid progress, crafting, PvP, recruiting, and streams — backed by Battle.net/Discord login and live data from Blizzard, WarcraftLogs, and Twitch.
 
-|                   |                                   |
-| ----------------- | --------------------------------- |
-| **Game**          | World of Warcraft: Forever        |
-| **Guild**         | Fuzion                            |
-| **Guild focus**   | Raiding, M+, crafting, PvP        |
-| **Target launch** | ~4 weeks (with game launch)       |
+|                   |                                        |
+| ----------------- | -------------------------------------- |
+| **Game**          | World of Warcraft: Forever             |
+| **Guild**         | Fuzion                                 |
+| **Guild focus**   | Raiding, dungeons, crafting, community |
+| **Target launch** | ~4 weeks (with game launch)            |
 | **Stack**         | Go (chi) + React/TS + Postgres — see [project-structure.md](project-structure.md) |
 | **Hosting**       | Render (static site + web service + managed Postgres) |
 
@@ -47,7 +47,7 @@ Guild name used throughout this spec: **Fuzion**, realm `Emberreach`, region `us
 | **Calendar & Events**      | Mirrors Raid-Helper events & signups from Discord in real time; resolves signups to characters for raid comp view                                                                      | Public (view) · created via Raid-Helper in Discord |
 | **Applications**           | Recruiting form (class/role/availability); submission posts a notification to a Discord recruiting channel; officer review queue                                                     | Public form / Officer review                       |
 | **Professions & Crafting** | Searchable directory: who crafts what, at what skill level — synced per character via the Blizzard Profile API (§5) for linked characters, officer-entered otherwise                  | Public                                             |
-| **PvP**                    | Rated BG ratings pulled from the Blizzard API, guild leaderboard                                                                                                                       | Public                                             |
+| **PvP**                    | Rated BG ratings pulled from the Blizzard API, guild leaderboard. Optional: may not be included, depending on guild interest                                                           | Public                                             |
 | **Streams**                | Grid of member Twitch/YouTube channels; featured "who's live" widget                                                                                                                   | Public                                             |
 | **Member Dashboard**       | Manage linked characters/alts, notification prefs, stream channel                                                                                                                      | Members                                            |
 | **Officer Console**        | Manual roster & profession edits, application review, event management, news editor, sync health — admins additionally get a members/permissions panel (officer-status overrides, admin grants) | Officers (admin panel: Admins only)                |
@@ -108,11 +108,12 @@ Each external source is polled on its own schedule and cached in Postgres, so a 
 | Blizzard Game Data API (app token)     | Guild roster membership: name, class, level, rank        | `GET /data/wow/guild/{realm}/{guild}/roster`                                            | Hourly cron                    | LEGENDARY   |
 | Blizzard Profile API (per-character OAuth token) | Gear, spec, professions & skill level — linked characters only | `GET /profile/wow/character/{realm}/{name}/equipment` · `/specializations` · `/professions` | On link + periodic refresh     | LEGENDARY   |
 | WarcraftLogs API v2       | Raid parses, kill logs                | `POST /api/v2/client` (GraphQL)                                                | Hourly / on new report                | LEGENDARY   |
-| Raider.io API             | M+ score, PvP rating                  | `GET /api/v1/characters/profile`                                               | Hourly cron                           | LEGENDARY   |
 | Twitch Helix API          | Live channel detection                | `GET /helix/streams?game_id={retail_id}`                                       | Poll every 60s                        | RARE        |
 | YouTube                   | Live badge (manual)                   | No reliable "live in category" filter — member self-toggles "I'm live" instead | —                                     | UNCOMMON    |
 
-The LEGENDARY risk above is purely whether Blizzard, WarcraftLogs, and Raider.io expose matching endpoints for Forever at launch, not execution risk on this project's side — see §6 for how the sync jobs themselves are proposed to run.
+The LEGENDARY risk above is purely whether Blizzard and WarcraftLogs expose matching endpoints for Forever at launch, not execution risk on this project's side — see §6 for how the sync jobs themselves are proposed to run.
+
+> **Raider.io is not used.** It was considered for dungeon score and PvP rating, but it is no longer needed: there will be no dungeon score to track, and PvP rating can be acquired from Blizzard (see the PvP page in §2).
 
 **Professions & Crafting is a Profile API feed, not a Game Data API one.** Assuming Forever's Blizzard API surface matches retail and classic (both already expose `GET /profile/wow/character/{realm}/{name}/professions`), profession/skill-level data is available — but, like gear and spec, only per character and only once that character's owner has authorized the app via Battle.net (the same per-character OAuth token used for claiming, §3). There's no app-level "give me professions for the whole guild" call the way there is for guild roster membership. So the **Professions & Crafting** page (§2) is populated the same way Roster's self-service side is: automatically for linked characters, with officers able to hand-enter a character's professions in the Officer Console as the day-one fallback before Battle.net linking exists (mirroring the Roster fallback in §3).
 
@@ -135,12 +136,11 @@ flowchart TB
     Sync["Sync jobs<br/>proposed, see below"] -->|"hourly · app token"| BlizzardRoster["Blizzard Game Data API<br/>guild roster"]
     Sync -->|"on link + periodic · per-character token"| BlizzardProfile["Blizzard Profile API<br/>gear, spec, professions"]
     Sync -->|"hourly / on new report"| WCL["WarcraftLogs<br/>raid parses"]
-    Sync -->|"hourly"| RaiderIO["Raider.io<br/>M+ & PvP scores"]
     Sync -->|"poll · every 60s"| Twitch["Twitch Helix<br/>live channel check"]
     Sync -->|writes| PG
 ```
 
-_The React frontend only ever talks to its own origin; Render's static-site rewrite proxies `/api/*` to the Go backend ([project-structure.md](project-structure.md) decision 5), so there's no CORS or cross-subdomain cookie handling. The backend owns OAuth (Discord at launch, Battle.net fast-follow) and the Raid-Helper webhook. The read-only external sources (Blizzard, WarcraftLogs, Raider.io, Twitch) are pulled by separate scheduled sync jobs rather than on the request path, so a slow or failing third-party API never blocks a page load._
+_The React frontend only ever talks to its own origin; Render's static-site rewrite proxies `/api/*` to the Go backend ([project-structure.md](project-structure.md) decision 5), so there's no CORS or cross-subdomain cookie handling. The backend owns OAuth (Discord at launch, Battle.net fast-follow) and the Raid-Helper webhook. The read-only external sources (Blizzard, WarcraftLogs, Twitch) are pulled by separate scheduled sync jobs rather than on the request path, so a slow or failing third-party API never blocks a page load._
 
 ### Sync job scheduling (proposed)
 
@@ -163,15 +163,15 @@ You asked for full-featured at launch, so that's the target below — but a bran
 - UNCOMMON — Manual roster entry by officers (day-one safety net; only path for character data until Battle.net linking lands)
 - UNCOMMON — Manual profession entry by officers (same day-one safety net, same reason — see §5)
 - RARE — Twitch "who's live" widget (filtered to the retail `world-of-warcraft` category — see §5)
-- LEGENDARY — Attempt: Blizzard guild-roster sync (app token), WarcraftLogs & Raider.io widgets
+- LEGENDARY — Attempt: Blizzard guild-roster sync (app token), WarcraftLogs widgets
 
 **Fast-follow (as APIs land / as scoped)**
 
 - RARE — Battle.net OAuth + alt/character claiming ([project-structure.md](project-structure.md) decision 2)
 - LEGENDARY — Automatic Blizzard guild-roster sync goes live
-- LEGENDARY — Automatic Blizzard Profile API sync (gear, spec, professions) goes live per linked character — blocked on Battle.net OAuth shipping first (the RARE item above), not just on Blizzard API availability, so this can't be attempted at launch the way guild-roster/WarcraftLogs/Raider.io can
+- LEGENDARY — Automatic Blizzard Profile API sync (gear, spec, professions) goes live per linked character — blocked on Battle.net OAuth shipping first (the RARE item above), not just on Blizzard API availability, so this can't be attempted at launch the way guild-roster/WarcraftLogs can
 - LEGENDARY — Raid Progress page switches from manual entry to live WarcraftLogs data
-- LEGENDARY — PvP leaderboard switches to live Raider.io/Blizzard data
+- LEGENDARY — PvP leaderboard and tracking switch to live Blizzard data (may not be included, depending on guild interest)
 - POOR — YouTube live auto-detection (deferred indefinitely; manual toggle stays)
 
 ## 8. Data model
@@ -195,7 +195,7 @@ Core entities, kept deliberately simple for v1 and built fresh in this project's
 ## 9. Open questions
 
 - Will Blizzard expose both the Game Data API (guild roster) and the Profile API (gear/spec/professions) for Forever at or near launch, and will realm/region slugs match retail conventions? Assumed to mirror retail/classic in shape (§5); timing for a day-one game is still unconfirmed.
-- Will WarcraftLogs and Raider.io add Forever support on day one, in the first weeks, or not at all?
+- Will WarcraftLogs add Forever support on day one, in the first weeks, or not at all?
 - Raid-Helper's docs site renders via JS and couldn't be fully verified by automated fetch — confirm the exact webhook payload shape and signing scheme (and whether event creation via API exists on a paid tier) directly in a browser before building the integration.
 - Should admin changes to `officer_override` be logged/audited? Deferred for now, not blocking launch.
 - News image upload storage: Render web-service disk is ephemeral (wiped on redeploy), so this likely needs object storage (e.g. an S3-compatible bucket) rather than local disk — not yet decided.
@@ -210,9 +210,9 @@ Core entities, kept deliberately simple for v1 and built fresh in this project's
 2. Wire up Discord OAuth (`internal/auth`) and the guild-membership session gate.
 3. Register a Raid-Helper webhook endpoint (verify signatures) and map Discord user IDs to site accounts so signups resolve to characters.
 4. Stand up the three Render services from `render.yaml` (static site, web service, managed Postgres) and confirm the `/api/*` proxy and the GitHub Actions test gate are green before the first real deploy.
-5. Build each sync job (Blizzard, WarcraftLogs, Raider.io, Twitch) behind a feature flag that no-ops gracefully until that source confirms Forever support.
+5. Build each sync job (Blizzard, WarcraftLogs, Twitch) behind a feature flag that no-ops gracefully until that source confirms Forever support.
 6. Add Battle.net OAuth + character claiming once scoped (fast-follow, [project-structure.md](project-structure.md) decision 2).
 
 ---
 
-_Working spec — update as Blizzard, WarcraftLogs, Raider.io, and Twitch confirm support for World of Warcraft: Forever._
+_Working spec — update as Blizzard, WarcraftLogs, and Twitch confirm support for World of Warcraft: Forever._
