@@ -54,6 +54,8 @@ const liveStreams: LiveStream[] = [
 ]
 
 export const handlers = [
+  http.get('/api/auth/me', () => HttpResponse.json({ error: 'login required' }, { status: 401 })),
+  http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/news', () => HttpResponse.json(newsPosts)),
   http.get('/api/raids/next', () => HttpResponse.json(nextRaid)),
   http.get('/api/streams/live', () => HttpResponse.json(liveStreams)),

@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/cageymage/fuzion/backend/internal/auth"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/raids"
 	"github.com/cageymage/fuzion/backend/internal/server"
@@ -45,7 +48,15 @@ func run() error {
 	}
 	defer db.Close()
 
+	discord := auth.NewDiscord(auth.DiscordConfig{
+		ClientID:     cfg.discord.clientID,
+		ClientSecret: cfg.discord.clientSecret,
+		RedirectURL:  cfg.discord.redirectURL,
+		BaseURL:      auth.DiscordAPIBaseURL,
+	}, &http.Client{Timeout: 10 * time.Second})
+
 	router := server.New(server.Deps{
+		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db))),
