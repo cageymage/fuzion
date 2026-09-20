@@ -1,5 +1,8 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, NavLink } from 'react-router-dom'
+import { loginUrl, logout } from '../../api/auth'
 import { navItems } from '../../app/navigation'
+import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
 import styles from './AppHeader.module.css'
 
 export function AppHeader() {
@@ -26,6 +29,53 @@ export function AppHeader() {
           </NavLink>
         ))}
       </nav>
+      <AccountMenu />
     </header>
+  )
+}
+
+function AccountMenu() {
+  const currentUser = useCurrentUser()
+  const queryClient = useQueryClient()
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: currentUserQueryKey }),
+  })
+
+  if (currentUser.isPending) {
+    return <div className={styles.account} aria-hidden="true" />
+  }
+
+  if (!currentUser.data) {
+    // A plain anchor, not a router Link: the server has to answer this one so it can redirect to Discord.
+    return (
+      <div className={styles.account}>
+        <a href={loginUrl} className={styles.loginLink}>
+          Log in with Discord
+        </a>
+      </div>
+    )
+  }
+
+  const user = currentUser.data
+  return (
+    <div className={styles.account}>
+      {user.avatarUrl ? (
+        <img src={user.avatarUrl} alt="" className={styles.avatar} />
+      ) : (
+        <span className={styles.avatarFallback} aria-hidden="true">
+          {user.username.slice(0, 1).toUpperCase()}
+        </span>
+      )}
+      <span className={styles.username}>{user.username}</span>
+      <button
+        type="button"
+        className={styles.logoutButton}
+        onClick={() => logoutMutation.mutate()}
+        disabled={logoutMutation.isPending}
+      >
+        Log out
+      </button>
+    </div>
   )
 }

@@ -32,6 +32,15 @@ services:
         fromDatabase:
           name: fuzion-db
           property: connectionString
+      # Discord OAuth app credentials; Render prompts for these on first deploy.
+      # DISCORD_REDIRECT_URL must be registered on the Discord application and
+      # point at the static site, not the API: https://<fuzion-web host>/api/auth/callback
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_REDIRECT_URL
+        sync: false
 
 databases:
   - name: fuzion-db

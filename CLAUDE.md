@@ -68,3 +68,8 @@ Pattern: **`<feature/endpoint> should <expected behavior> when <discriminating c
 - Don't mock Postgres or any internal package to make a backend test pass — fix the seam (dependency injection into the service/repo) instead.
 - Don't add auth/session logic ad hoc in handlers — route it through `internal/auth`.
 - Don't hand-roll `.env` parsing per package — one config load in `cmd/api/main.go`, passed down via structs.
+
+## Git workflow
+
+- Never `git commit` unless explicitly told to in that message. Finishing a task, passing tests, or a plan that ends in "then commit" is not permission — leave the work staged/unstaged and say it's ready.
+- Never `git push` or open a PR unless explicitly told to. "One PR is fine" describes the shape of the deliverable, not a go-ahead to create it; ask first.

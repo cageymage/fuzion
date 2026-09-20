@@ -45,3 +45,72 @@
   color: var(--gold);
   border-bottom-color: var(--gold);
 }
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+  font-size: 13.5px;
+}
+
+.loginLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-chip);
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.loginLink:hover {
+  background: var(--gold-soft);
+  color: var(--gold-hover);
+}
+
+.avatar,
+.avatarFallback {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+}
+
+.avatarFallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 13px;
+}
+
+.username {
+  color: var(--text);
+}
+
+.logoutButton {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.logoutButton:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold-hover);
+}
+
+.logoutButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

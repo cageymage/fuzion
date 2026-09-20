@@ -174,6 +174,24 @@ All run from the repo root.
 fresh clone runs with the compose defaults and nothing to copy. Put
 overrides (or real secrets, later) in `.env` — it is gitignored.
 
+### Discord login
+
+Logging in needs the guild's Discord application, managed at
+<https://discord.com/developers/applications/1551029986117292143/information>
+(ask an officer for access). On its **OAuth2** tab, copy the Client ID and
+Client Secret into `.env`:
+
+```
+DISCORD_CLIENT_ID=...
+DISCORD_CLIENT_SECRET=...
+```
+
+The secret is only shown once when generated; if nobody has it, **Reset
+Secret** and share the new one — the app's redirect
+`http://localhost:5173/api/auth/callback` is already registered and works for
+every dev's machine, so nothing else on the Discord side changes. The default
+`DISCORD_REDIRECT_URL` in [.env.example](.env.example) matches it.
+
 Migrations under `backend/migrations/` are embedded in the API binary and
 applied on startup, so there is no separate migrate step. To start from a
 clean database: `docker compose down -v` then `npm run dev` again.
