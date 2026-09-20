@@ -46,7 +46,13 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, expiredCookie(r, stateCookieName))
 
 	stateCookie, err := r.Cookie(stateCookieName)
-	if err != nil || subtle.ConstantTimeCompare([]byte(stateCookie.Value), []byte(r.URL.Query().Get("state"))) != 1 {
+	if err != nil {
+		slog.WarnContext(r.Context(), "login callback without state cookie", "host", r.Host, "has_code", r.URL.Query().Has("code"))
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "login state mismatch"})
+		return
+	}
+	if subtle.ConstantTimeCompare([]byte(stateCookie.Value), []byte(r.URL.Query().Get("state"))) != 1 {
+		slog.WarnContext(r.Context(), "login callback state differs from cookie", "host", r.Host)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "login state mismatch"})
 		return
 	}
