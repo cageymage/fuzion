@@ -34,7 +34,10 @@ services:
           property: connectionString
       # Discord OAuth app credentials; Render prompts for these on first deploy.
       # DISCORD_REDIRECT_URL must be registered on the Discord application and
-      # point at the static site, not the API: https://<fuzion-web host>/api/auth/callback
+      # use the hostname people actually browse the site on (the custom domain,
+      # not fuzion-web.onrender.com and not the API): the OAuth state cookie is
+      # per-host, so a callback on any other host fails with "state mismatch".
+      # e.g. https://fuziongaming.gg/api/auth/callback
       - key: DISCORD_CLIENT_ID
         sync: false
       - key: DISCORD_CLIENT_SECRET
