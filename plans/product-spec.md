@@ -91,7 +91,7 @@ The feed is entirely manual — every post is written by an officer or admin, in
 
 **Editor:** officers and admins write posts in a Markdown editor. No specific frontend library is chosen yet (see Open Questions) — behavior below is a requirement, not an implementation.
 
-- **Images:** an upload control inserts standard Markdown image syntax (`![alt](url)`). Backing storage is unresolved — see Open Questions — but needs to stay self-hosted-equivalent (not a hard dependency on a third-party CDN). On render, the Markdown-to-HTML pipeline post-processes `<img>` tags into clickable thumbnails that open the full-size image in a lightbox/modal — enough for boss-kill screenshots without pulling in a heavy JS dependency.
+- **Images:** an upload control inserts standard Markdown image syntax (`![alt](url)`). Images are stored in Postgres (decided in issue #7): the upload handler re-encodes each image to WebP as a full-size variant (2560 px long edge, quality 90) and a thumbnail (800 px, quality 80), served from `/api/images/{id}` and `/api/images/{id}/thumb`. Markdown only ever holds `/api/images/{id}`. On render, the Markdown-to-HTML pipeline rewrites each image into a lazy-loaded thumbnail wrapped in a link to the full-size image, which opens in a lightbox/modal — enough for boss-kill screenshots without pulling in a heavy JS dependency.
 - **Autosave:** while editing a draft, changes save periodically (debounced a few seconds after the user stops typing) via a background API call, with no explicit "Save" click needed. Publishing stays an explicit, separate action.
 - **Dirty check / navigation guard:** a client-side dirty flag warns on tab close/refresh via `beforeunload`, and separately intercepts in-app React Router navigation so navigating within the SPA also prompts before discarding unsaved edits — `beforeunload` alone won't catch client-side route changes.
 
@@ -186,7 +186,8 @@ Core entities, kept deliberately simple for v1 and built fresh in this project's
 - **Event** — id, raid_helper_event_id, type, starts_at, raid_team_id — created/updated by the Raid-Helper webhook
 - **EventSignup** — id, event_id, discord_user_id, character_id (resolved via linked Discord account), status
 - **Application** — id, user_id (nullable — applicant likely has no account yet), character_id (nullable, same reason), applicant_name, class, role, availability, notes, status, submitted_at
-- **Post** — id, author_user_id, title, body (Markdown, may embed uploaded image references — storage mechanism TBD, see Open Questions), pinned, published_at
+- **Post** — id, author_user_id, title, body (Markdown, may embed uploaded images by `/api/images/{id}` URL), pinned, published_at
+- **Image** — id, content_type, width, height, full_bytes, thumb_bytes, created_at — WebP variants stored in Postgres and served by the backend; referenced from Post bodies by `/api/images/{id}` (issue #7)
 - **Topic** — id, name — many-to-many with Post; doubles as the News category system
 - **Profession** — id, character_id, profession, skill_level
 - **StreamChannel** — id, user_id, platform, channel_id, is_manual_live
@@ -198,7 +199,6 @@ Core entities, kept deliberately simple for v1 and built fresh in this project's
 - Will WarcraftLogs add Forever support on day one, in the first weeks, or not at all?
 - Raid-Helper's docs site renders via JS and couldn't be fully verified by automated fetch — confirm the exact webhook payload shape and signing scheme (and whether event creation via API exists on a paid tier) directly in a browser before building the integration.
 - Should admin changes to `is_officer` / `is_admin` be logged/audited? Deferred for now, not blocking launch.
-- News image upload storage: Render web-service disk is ephemeral (wiped on redeploy), so this likely needs object storage (e.g. an S3-compatible bucket) rather than local disk — not yet decided.
 - Sync job scheduling mechanism: §6 proposes Render Cron Job services per source; not yet confirmed.
 - News Markdown editor: no frontend library or exact autosave/dirty-check implementation chosen yet — §4 describes required behavior only.
 - Discord webhook URL(s) for the Applications recruiting-channel cross-post (§2): same channel/webhook as the News cross-post, or a separate one? Needs a webhook URL created in the target Discord server either way, stored as an env var (never committed).
