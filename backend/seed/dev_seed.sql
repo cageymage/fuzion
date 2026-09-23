@@ -1,7 +1,7 @@
 -- Sample content for local development so the home page renders with data.
 -- Never run against a real environment.
 
-TRUNCATE news_posts, raids, streams;
+TRUNCATE news_posts, raids, streams, characters;
 
 INSERT INTO news_posts (id, title, excerpt, category, image_url, author_name, published_at)
 VALUES
@@ -27,3 +27,12 @@ INSERT INTO streams (id, streamer_name, game_name, viewer_count, thumbnail_url, 
 VALUES
     ('c1111111-1111-1111-1111-111111111111',
      'Thundermane', 'World of Warcraft: Forever', 1240, NULL, 'https://twitch.tv/thundermane', true);
+
+INSERT INTO characters (id, name, realm, class, spec, role, is_main, raid_team)
+VALUES
+    ('d1111111-1111-1111-1111-111111111111', 'Thundermane', 'Emberreach', 'Warrior', 'Protection', 'tank', true, 'Team 1'),
+    ('d2222222-2222-2222-2222-222222222222', 'Aeliana', 'Emberreach', 'Priest', 'Holy', 'healer', true, 'Team 1'),
+    ('d3333333-3333-3333-3333-333333333333', 'Brannor', 'Emberreach', 'Druid', 'Balance', 'dps', true, 'Team 1'),
+    ('d4444444-4444-4444-4444-444444444444', 'Zephyrion', 'Emberreach', 'Mage', 'Frost', 'dps', true, 'Team 1'),
+    ('d5555555-5555-5555-5555-555555555555', 'Yorick', 'Emberreach', 'Rogue', 'Assassination', 'dps', true, 'Team 2'),
+    ('d6666666-6666-6666-6666-666666666666', 'Thunderalt', 'Emberreach', 'Paladin', 'Protection', 'tank', false, NULL);
