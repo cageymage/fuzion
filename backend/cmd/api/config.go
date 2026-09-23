@@ -8,10 +8,11 @@ import (
 )
 
 type config struct {
-	addr           string
-	databaseURL    string
-	allowedOrigins []string
-	discord        discordConfig
+	addr                    string
+	databaseURL             string
+	allowedOrigins          []string
+	discord                 discordConfig
+	bootstrapAdminDiscordID string
 }
 
 type discordConfig struct {
@@ -45,7 +46,13 @@ func loadConfig() (config, error) {
 		return config{}, err
 	}
 
-	return config{addr: addr, databaseURL: databaseURL, allowedOrigins: allowedOrigins, discord: discord}, nil
+	return config{
+		addr:                    addr,
+		databaseURL:             databaseURL,
+		allowedOrigins:          allowedOrigins,
+		discord:                 discord,
+		bootstrapAdminDiscordID: os.Getenv("BOOTSTRAP_ADMIN_DISCORD_ID"),
+	}, nil
 }
 
 // A mis-deployed API should refuse to start rather than 500 on every login attempt.
