@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/cageymage/fuzion/backend/internal/applications"
 	"github.com/cageymage/fuzion/backend/internal/auth"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/raids"
@@ -15,7 +16,8 @@ import (
 )
 
 type Deps struct {
-	Auth           *auth.Handler
+	Applications   *applications.Handler
+	Auth          *auth.Handler
 	News           *news.Handler
 	Raids          *raids.Handler
 	Streams        *streams.Handler
@@ -43,6 +45,7 @@ func New(deps Deps) *chi.Mux {
 	r.Route("/api", func(api chi.Router) {
 		api.Use(deps.Auth.Middleware)
 		api.Get("/health", health)
+		deps.Applications.Register(api)
 		deps.Auth.Register(api)
 		deps.News.Register(api)
 		deps.Raids.Register(api)

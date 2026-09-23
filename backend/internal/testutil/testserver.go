@@ -8,12 +8,14 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 
+	"github.com/cageymage/fuzion/backend/internal/applications"
 	"github.com/cageymage/fuzion/backend/internal/auth"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/raids"
@@ -41,6 +43,7 @@ func NewServer(t *testing.T, db *sqlx.DB) *Server {
 	}, discord.Client())
 
 	router := server.New(server.Deps{
+		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db))),
 		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
@@ -146,6 +149,17 @@ func (s *Server) Post(t *testing.T, path string, body any) Response {
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	return s.do(t, req)
+}
+
+func (s *Server) PostRaw(t *testing.T, path, body string) Response {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodPost, s.URL+path, strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("build POST %s: %v", path, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
 	return s.do(t, req)
 }
 

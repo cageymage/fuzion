@@ -72,7 +72,7 @@ func DB(t *testing.T) *sqlx.DB {
 	if sharedDB == nil {
 		t.Fatal("testutil.Run must wrap TestMain before a test asks for the database")
 	}
-	if _, err := sharedDB.Exec(`TRUNCATE news_posts, raids, streams, sessions, users`); err != nil {
+	if _, err := sharedDB.Exec(`TRUNCATE applications, news_posts, raids, streams, sessions, users`); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 	return sharedDB
