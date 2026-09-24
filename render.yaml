@@ -46,8 +46,11 @@ services:
         sync: false
 
 databases:
+  # Deliberately not the free plan: a free database expires after 30 days, and
+  # losing it would empty the users table, which hands admin to whoever signs
+  # in next (the first account created is made an admin — spec §3).
   - name: fuzion-db
-    plan: free
+    plan: 0.1c-256mb
     databaseName: fuzion
     user: fuzion
     postgresMajorVersion: "16"

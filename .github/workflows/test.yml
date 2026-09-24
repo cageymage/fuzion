@@ -33,3 +33,60 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+
+  # A dev or production database records the highest migration it has applied,
+  # so a branch that numbers a new migration at or below what already landed on
+  # main has it skipped forever rather than applied. Each branch's own test run
+  # starts from an empty database and never sees that, so it has to be checked
+  # against main directly.
+  migrations:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: New migrations must be numbered above main's highest
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE"
+          base_ref="origin/${BASE}"
+
+          migration_numbers() {
+            git ls-tree --name-only "$1" backend/migrations/ |
+              sed -n 's#^backend/migrations/\([0-9]\{6\}\)_.*\.up\.sql$#\1#p'
+          }
+
+          failed=0
+
+          duplicates=$(migration_numbers HEAD | sort | uniq -d)
+          if [ -n "$duplicates" ]; then
+            echo "Two migrations share a version number: $duplicates"
+            failed=1
+          fi
+
+          base_max=$(migration_numbers "$base_ref" | sort -n | tail -1)
+          base_max=${base_max:-000000}
+
+          for path in $(git ls-tree --name-only "$base_ref" backend/migrations/ | grep '\.sql$'); do
+            if ! git rev-parse --quiet --verify "HEAD:$path" >/dev/null; then
+              echo "$path was removed or renamed, but it has already been applied on ${BASE}"
+              failed=1
+            elif [ "$(git rev-parse "$base_ref:$path")" != "$(git rev-parse "HEAD:$path")" ]; then
+              echo "$path was edited, but it has already been applied on ${BASE}"
+              failed=1
+            fi
+          done
+
+          for path in $(git ls-tree --name-only HEAD backend/migrations/ | grep '\.up\.sql$'); do
+            git rev-parse --quiet --verify "$base_ref:$path" >/dev/null && continue
+            number=$(echo "$path" | sed -n 's#^backend/migrations/\([0-9]\{6\}\)_.*#\1#p')
+            if [ "$number" -le "$base_max" ]; then
+              echo "$path is numbered at or below ${base_max}, the highest already on ${BASE}; renumber it above ${base_max}"
+              failed=1
+            fi
+          done
+
+          exit $failed
