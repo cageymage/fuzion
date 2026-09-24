@@ -42,29 +42,36 @@ func NewRepo(db *sqlx.DB) *Repo {
 }
 
 // UpsertUserByDiscordID inserts or refreshes a user from their Discord identity.
-// makeAdmin only ever promotes (it ORs into the existing flag) so a login
-// never demotes an admin granted through other means.
-func (r *Repo) UpsertUserByDiscordID(ctx context.Context, identity Identity, makeAdmin bool) (User, error) {
+// The first account ever created becomes the admin, because nothing else can
+// grant the first one. The conflict branch never writes is_admin, so a repeat
+// login can neither re-trigger that nor demote an admin granted in the panel.
+// The bool reports that this call was what granted that first admin.
+func (r *Repo) UpsertUserByDiscordID(ctx context.Context, identity Identity) (User, bool, error) {
+	// xmax is zero only on a row this statement inserted, which is how an
+	// upsert distinguishes a brand new account from a returning login.
 	const query = `
 		INSERT INTO users (id, discord_id, username, avatar_url, is_admin)
-		VALUES ($1, $2, $3, $4, $5)
+		VALUES ($1, $2, $3, $4, NOT EXISTS (SELECT 1 FROM users))
 		ON CONFLICT (discord_id) DO UPDATE
 			SET username = EXCLUDED.username,
 			    avatar_url = EXCLUDED.avatar_url,
-			    last_seen_at = now(),
-			    is_admin = users.is_admin OR EXCLUDED.is_admin
-		RETURNING id, discord_id, username, avatar_url, is_admin, is_officer, created_at, last_seen_at`
+			    last_seen_at = now()
+		RETURNING id, discord_id, username, avatar_url, is_admin, is_officer, created_at, last_seen_at,
+		          (xmax = 0 AND is_admin) AS granted_first_admin`
 
 	var avatarURL *string
 	if identity.AvatarURL != "" {
 		avatarURL = &identity.AvatarURL
 	}
 
-	var user User
-	if err := r.db.GetContext(ctx, &user, query, uuid.New(), identity.ProviderUserID, identity.Username, avatarURL, makeAdmin); err != nil {
-		return User{}, fmt.Errorf("upsert user by discord id: %w", err)
+	var row struct {
+		User
+		GrantedFirstAdmin bool `db:"granted_first_admin"`
 	}
-	return user.utc(), nil
+	if err := r.db.GetContext(ctx, &row, query, uuid.New(), identity.ProviderUserID, identity.Username, avatarURL); err != nil {
+		return User{}, false, fmt.Errorf("upsert user by discord id: %w", err)
+	}
+	return row.User.utc(), row.GrantedFirstAdmin, nil
 }
 
 func (r *Repo) ListUsers(ctx context.Context) ([]User, error) {

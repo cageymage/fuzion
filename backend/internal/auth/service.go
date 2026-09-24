@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,13 +15,12 @@ const sessionTTL = 30 * 24 * time.Hour
 var ErrCannotRemoveOwnAdmin = errors.New("cannot remove your own admin access")
 
 type Service struct {
-	provider                Provider
-	repo                    *Repo
-	bootstrapAdminDiscordID string
+	provider Provider
+	repo     *Repo
 }
 
-func NewService(provider Provider, repo *Repo, bootstrapAdminDiscordID string) *Service {
-	return &Service{provider: provider, repo: repo, bootstrapAdminDiscordID: bootstrapAdminDiscordID}
+func NewService(provider Provider, repo *Repo) *Service {
+	return &Service{provider: provider, repo: repo}
 }
 
 func (s *Service) AuthURL(state string) string {
@@ -33,10 +33,15 @@ func (s *Service) Login(ctx context.Context, code string) (User, string, error) 
 	if err != nil {
 		return User{}, "", fmt.Errorf("login: %w", err)
 	}
-	makeAdmin := s.bootstrapAdminDiscordID != "" && identity.ProviderUserID == s.bootstrapAdminDiscordID
-	user, err := s.repo.UpsertUserByDiscordID(ctx, identity, makeAdmin)
+	user, grantedFirstAdmin, err := s.repo.UpsertUserByDiscordID(ctx, identity)
 	if err != nil {
 		return User{}, "", fmt.Errorf("login: %w", err)
+	}
+	// Should happen exactly once in a database's life. Seeing it on a live site
+	// means the users table was empty when it shouldn't have been.
+	if grantedFirstAdmin {
+		slog.WarnContext(ctx, "granted admin to the first account created on this site",
+			"user_id", user.ID, "username", user.Username, "discord_id", user.DiscordID)
 	}
 	token, err := newSessionToken()
 	if err != nil {

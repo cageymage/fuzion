@@ -161,44 +161,71 @@ func TestAuthMe_ReturnsEffectiveOfficerAccess_WhenUserIsAdminButNotManuallyGrant
 	}
 }
 
-func TestBootstrapAdmin_GrantsAdminOnFirstLogin_WhenDiscordIdMatches(t *testing.T) {
-	// given a server configured with a bootstrap admin discord id
+func TestAuthCallback_GrantsAdmin_WhenNoUserExistsYet(t *testing.T) {
+	// given a site with no users at all
 	db := testutil.DB(t)
-	srv := testutil.NewServer(t, db, testutil.WithBootstrapAdmin("80351110224678912"))
+	srv := testutil.NewServer(t, db)
 	state := startLogin(t, srv)
 	srv.Discord.GrantCode("code-1", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane"})
 
-	// when that discord id logs in for the first time
+	// when the first person signs in
 	resp := srv.Get(t, "/api/auth/callback?code=code-1&state="+state)
 
-	// then I expect the user to be an admin
+	// then I expect them to be an admin
 	resp.RequireStatus(t, 302)
 	var isAdmin bool
 	if err := db.Get(&isAdmin, `SELECT is_admin FROM users WHERE discord_id = '80351110224678912'`); err != nil {
 		t.Fatalf("select user: %v", err)
 	}
 	if !isAdmin {
-		t.Error("expected the bootstrap discord id to be granted admin on login")
+		t.Error("expected the first user to sign in to be granted admin")
 	}
 }
 
-func TestBootstrapAdmin_DoesNotGrantAdmin_WhenDiscordIdDoesNotMatch(t *testing.T) {
-	// given a server configured with a bootstrap admin discord id that does not match the logging-in user
+func TestAuthCallback_DoesNotGrantAdmin_WhenAnotherUserAlreadyExists(t *testing.T) {
+	// given a site that already has a user
 	db := testutil.DB(t)
-	srv := testutil.NewServer(t, db, testutil.WithBootstrapAdmin("80351110224678912"))
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO users (id, discord_id, username)
+		VALUES ('11111111-1111-1111-1111-111111111111', '11111111111111111', 'firstmember')`)
 	state := startLogin(t, srv)
-	srv.Discord.GrantCode("code-1", testutil.DiscordUser{ID: "99999999999999999", Username: "someoneelse"})
+	srv.Discord.GrantCode("code-1", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane"})
 
-	// when a different discord id logs in
+	// when a second person signs in
 	resp := srv.Get(t, "/api/auth/callback?code=code-1&state="+state)
 
-	// then I expect the user to not be an admin
+	// then I expect them to be an ordinary member
 	resp.RequireStatus(t, 302)
 	var isAdmin bool
-	if err := db.Get(&isAdmin, `SELECT is_admin FROM users WHERE discord_id = '99999999999999999'`); err != nil {
+	if err := db.Get(&isAdmin, `SELECT is_admin FROM users WHERE discord_id = '80351110224678912'`); err != nil {
 		t.Fatalf("select user: %v", err)
 	}
 	if isAdmin {
-		t.Error("expected a non-matching discord id to not be granted admin")
+		t.Error("expected a later signup to not be granted admin")
+	}
+}
+
+func TestAuthCallback_KeepsAdmin_WhenAnExistingAdminLogsInAgain(t *testing.T) {
+	// given an admin who has logged in before
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO users (id, discord_id, username, is_admin)
+		VALUES ('11111111-1111-1111-1111-111111111111', '80351110224678912', 'thundermane', true)`)
+	state := startLogin(t, srv)
+	srv.Discord.GrantCode("code-1", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane"})
+
+	// when they log in again
+	resp := srv.Get(t, "/api/auth/callback?code=code-1&state="+state)
+
+	// then I expect them to still be an admin
+	resp.RequireStatus(t, 302)
+	var isAdmin bool
+	if err := db.Get(&isAdmin, `SELECT is_admin FROM users WHERE discord_id = '80351110224678912'`); err != nil {
+		t.Fatalf("select user: %v", err)
+	}
+	if !isAdmin {
+		t.Error("expected a repeat login to leave an existing admin's access alone")
 	}
 }

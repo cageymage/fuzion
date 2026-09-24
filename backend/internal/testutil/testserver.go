@@ -30,25 +30,8 @@ type Server struct {
 	client *http.Client
 }
 
-type ServerOption func(*serverOptions)
-
-type serverOptions struct {
-	bootstrapAdminDiscordID string
-}
-
-// WithBootstrapAdmin makes discordID promote to admin on its first login, the
-// same as the BOOTSTRAP_ADMIN_DISCORD_ID env var does in production.
-func WithBootstrapAdmin(discordID string) ServerOption {
-	return func(o *serverOptions) { o.bootstrapAdminDiscordID = discordID }
-}
-
-func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
+func NewServer(t *testing.T, db *sqlx.DB) *Server {
 	t.Helper()
-
-	var options serverOptions
-	for _, opt := range opts {
-		opt(&options)
-	}
 
 	discord := NewFakeDiscord(t)
 	provider := auth.NewDiscord(auth.DiscordConfig{
@@ -59,7 +42,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	}, discord.Client())
 
 	router := server.New(server.Deps{
-		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), options.bootstrapAdminDiscordID)),
+		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db))),
@@ -137,7 +120,7 @@ func NewMiddlewareProbeServer(t *testing.T, db *sqlx.DB) *Server {
 		RedirectURL:  DiscordRedirectURL,
 		BaseURL:      discord.URL,
 	}, discord.Client())
-	authHandler := auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), ""))
+	authHandler := auth.NewHandler(auth.NewService(provider, auth.NewRepo(db)))
 
 	r := chi.NewRouter()
 	r.Use(authHandler.Middleware)

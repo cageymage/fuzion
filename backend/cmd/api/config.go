@@ -8,11 +8,10 @@ import (
 )
 
 type config struct {
-	addr                    string
-	databaseURL             string
-	allowedOrigins          []string
-	discord                 discordConfig
-	bootstrapAdminDiscordID string
+	addr           string
+	databaseURL    string
+	allowedOrigins []string
+	discord        discordConfig
 }
 
 type discordConfig struct {
@@ -47,11 +46,10 @@ func loadConfig() (config, error) {
 	}
 
 	return config{
-		addr:                    addr,
-		databaseURL:             databaseURL,
-		allowedOrigins:          allowedOrigins,
-		discord:                 discord,
-		bootstrapAdminDiscordID: os.Getenv("BOOTSTRAP_ADMIN_DISCORD_ID"),
+		addr:           addr,
+		databaseURL:    databaseURL,
+		allowedOrigins: allowedOrigins,
+		discord:        discord,
 	}, nil
 }
 

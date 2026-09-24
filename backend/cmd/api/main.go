@@ -56,7 +56,7 @@ func run() error {
 	}, &http.Client{Timeout: 10 * time.Second})
 
 	router := server.New(server.Deps{
-		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db), cfg.bootstrapAdminDiscordID)),
+		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db))),
