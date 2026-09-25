@@ -17,6 +17,7 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) Register(r chi.Router) {
+	r.Get("/raids", h.listUpcoming)
 	r.Get("/raids/next", h.nextRaid)
 }
 
@@ -30,6 +31,16 @@ func (h *Handler) nextRaid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, raid)
+}
+
+func (h *Handler) listUpcoming(w http.ResponseWriter, r *http.Request) {
+	raids, err := h.service.UpcomingRaids(r.Context())
+	if err != nil {
+		slog.ErrorContext(r.Context(), "list upcoming raids", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "upcoming raids could not be loaded"})
+		return
+	}
+	writeJSON(w, http.StatusOK, raids)
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

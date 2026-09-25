@@ -69,3 +69,61 @@ func TestGetNextRaid_ReturnsNull_WhenEveryRaidHasAlreadyStarted(t *testing.T) {
 		t.Errorf("expected a null body, got %q", got)
 	}
 }
+
+func TestListRaids_ReturnsUpcomingRaidsSoonestFirst(t *testing.T) {
+	// given a finished raid and two upcoming ones inserted out of order
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO raids (id, difficulty, instance_name, starts_at, progress_summary)
+		VALUES
+			('11111111-1111-1111-1111-111111111111', 'Heroic', 'Amirdrassil', now() - interval '2 days', '9/9 Heroic cleared'),
+			('22222222-2222-2222-2222-222222222222', 'Heroic', 'Nerubar Palace', '2099-01-02T20:00:00Z', 'Alt run'),
+			('33333333-3333-3333-3333-333333333333', 'Mythic', 'Liberation of Undermine', '2099-01-01T20:00:00Z', '8/8 Heroic cleared')`)
+
+	// when I list the upcoming raids
+	resp := srv.Get(t, "/api/raids")
+
+	// then I expect a 200 with only the future raids, soonest first
+	resp.RequireStatus(t, 200)
+	var raids []raidJSON
+	resp.DecodeJSON(t, &raids)
+
+	want := []raidJSON{
+		{
+			ID:              "33333333-3333-3333-3333-333333333333",
+			Difficulty:      "Mythic",
+			InstanceName:    "Liberation of Undermine",
+			StartsAt:        "2099-01-01T20:00:00Z",
+			ProgressSummary: "8/8 Heroic cleared",
+		},
+		{
+			ID:              "22222222-2222-2222-2222-222222222222",
+			Difficulty:      "Heroic",
+			InstanceName:    "Nerubar Palace",
+			StartsAt:        "2099-01-02T20:00:00Z",
+			ProgressSummary: "Alt run",
+		},
+	}
+	if diff := cmp.Diff(want, raids); diff != "" {
+		t.Errorf("unexpected upcoming raids (-want +got):\n%s", diff)
+	}
+}
+
+func TestListRaids_ReturnsEmptyArray_WhenNothingIsScheduled(t *testing.T) {
+	// given only raids whose start time has passed
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO raids (id, difficulty, instance_name, starts_at, progress_summary)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Heroic', 'Amirdrassil', now() - interval '1 hour', '9/9 Heroic cleared')`)
+
+	// when I list the upcoming raids
+	resp := srv.Get(t, "/api/raids")
+
+	// then I expect a 200 with an empty JSON array, not null
+	resp.RequireStatus(t, 200)
+	if got := string(resp.Body); got != "[]\n" {
+		t.Errorf("expected an empty array body, got %q", got)
+	}
+}
