@@ -20,3 +20,11 @@ func (s *Service) NextRaid(ctx context.Context) (*Raid, error) {
 	}
 	return raid, nil
 }
+
+func (s *Service) UpcomingRaids(ctx context.Context) ([]Raid, error) {
+	raids, err := s.repo.ListUpcoming(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("upcoming raids: %w", err)
+	}
+	return raids, nil
+}
