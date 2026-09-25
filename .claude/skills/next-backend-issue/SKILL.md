@@ -1,6 +1,6 @@
 ---
 name: next-backend-issue
-description: Use when the user asks to find, pick up, or work on the next backend issue in the Fuzion repo. Finds an unblocked issue, assigns it, branches, implements with tests, verifies against a real running API, then asks before commit, push and PR.
+description: Use when the user asks to find, pick up, or work on the next backend issue in the Fuzion repo, or says "next backend issue".
 ---
 
 # Next backend issue

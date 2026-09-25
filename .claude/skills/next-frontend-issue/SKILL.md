@@ -1,6 +1,6 @@
 ---
 name: next-frontend-issue
-description: Use when the user asks to find, pick up, or work on the next frontend issue in the Fuzion repo. Finds an unblocked issue, assigns it, branches, implements with tests, verifies in the running app, then asks before commit, push and PR.
+description: Use when the user asks to find, pick up, or work on the next frontend issue in the Fuzion repo, or says "next frontend issue".
 ---
 
 # Next frontend issue
