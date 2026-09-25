@@ -220,6 +220,13 @@ First-time setup:
    `psql "<external connection string from the dashboard>" -f backend/seed/dev_seed.sql`
    (swap in real content first).
 
-Free-tier caveats: the Postgres expires after 30 days, and the free web
-service sleeps after 15 minutes idle with a slow cold start. Budget for
-paid instances of both (~$13/mo) once people are actually using the site.
+Postgres runs on the paid Basic plan (`0.1c-256mb`, $6/mo), not the free
+tier. That is deliberate: a free database expires after 30 days, and losing
+the database would take the admin account with it — the first account to
+sign in is made an admin (see §3 of [plans/product-spec.md](plans/product-spec.md)),
+so an empty `users` table on a live site hands admin to the next person
+through the door. Keep the database on a paid plan.
+
+The API is still a free web service, so it sleeps after 15 minutes idle
+with a slow cold start. Budget ~$7/mo more for a paid instance once people
+are actually using the site.

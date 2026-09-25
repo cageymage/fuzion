@@ -20,6 +20,7 @@ type streamJSON struct {
 	ViewerCount  int     `json:"viewerCount"`
 	ThumbnailURL *string `json:"thumbnailUrl"`
 	ChannelURL   string  `json:"channelUrl"`
+	IsLive       bool    `json:"isLive"`
 }
 
 func TestListLiveStreams_ReturnsLiveStreamersOrderedByViewerCount(t *testing.T) {
@@ -49,6 +50,7 @@ func TestListLiveStreams_ReturnsLiveStreamersOrderedByViewerCount(t *testing.T) 
 			ViewerCount:  1240,
 			ThumbnailURL: &thumbnailURL,
 			ChannelURL:   "https://twitch.tv/thundermane",
+			IsLive:       true,
 		},
 		{
 			ID:           "11111111-1111-1111-1111-111111111111",
@@ -57,6 +59,7 @@ func TestListLiveStreams_ReturnsLiveStreamersOrderedByViewerCount(t *testing.T) 
 			ViewerCount:  310,
 			ThumbnailURL: nil,
 			ChannelURL:   "https://twitch.tv/emberfist",
+			IsLive:       true,
 		},
 	}
 	if diff := cmp.Diff(want, live); diff != "" {
@@ -88,6 +91,9 @@ func TestListLiveStreams_ExcludesStreamersWhoAreOffline(t *testing.T) {
 	if live[0].StreamerName != "Thundermane" {
 		t.Errorf("expected Thundermane to be the only live streamer, got %q", live[0].StreamerName)
 	}
+	if !live[0].IsLive {
+		t.Errorf("expected Thundermane to be marked live")
+	}
 }
 
 func TestListLiveStreams_ReturnsEmptyArray_WhenNobodyIsLive(t *testing.T) {
@@ -100,6 +106,64 @@ func TestListLiveStreams_ReturnsEmptyArray_WhenNobodyIsLive(t *testing.T) {
 
 	// when I ask who is live
 	resp := srv.Get(t, "/api/streams/live")
+
+	// then I expect a 200 with an empty JSON array rather than null
+	resp.RequireStatus(t, 200)
+	if got := string(resp.Body); got != "[]\n" {
+		t.Errorf("expected an empty JSON array, got %q", got)
+	}
+}
+
+func TestListStreams_ReturnsLiveChannelsBeforeOfflineOnes(t *testing.T) {
+	// given one offline streamer and one live streamer, inserted out of alphabetical order
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, viewer_count, thumbnail_url, channel_url, is_live)
+		VALUES
+			('11111111-1111-1111-1111-111111111111', 'Aelith', '', 0, NULL, 'https://twitch.tv/aelith', false),
+			('22222222-2222-2222-2222-222222222222', 'Thundermane', 'World of Warcraft: Forever', 1240, NULL, 'https://twitch.tv/thundermane', true)`)
+
+	// when I ask for every stream channel
+	resp := srv.Get(t, "/api/streams")
+
+	// then I expect the live channel first, then the offline one
+	resp.RequireStatus(t, 200)
+	var all []streamJSON
+	resp.DecodeJSON(t, &all)
+
+	want := []streamJSON{
+		{
+			ID:           "22222222-2222-2222-2222-222222222222",
+			StreamerName: "Thundermane",
+			GameName:     "World of Warcraft: Forever",
+			ViewerCount:  1240,
+			ThumbnailURL: nil,
+			ChannelURL:   "https://twitch.tv/thundermane",
+			IsLive:       true,
+		},
+		{
+			ID:           "11111111-1111-1111-1111-111111111111",
+			StreamerName: "Aelith",
+			GameName:     "",
+			ViewerCount:  0,
+			ThumbnailURL: nil,
+			ChannelURL:   "https://twitch.tv/aelith",
+			IsLive:       false,
+		},
+	}
+	if diff := cmp.Diff(want, all); diff != "" {
+		t.Errorf("unexpected streams (-want +got):\n%s", diff)
+	}
+}
+
+func TestListStreams_ReturnsEmptyArray_WhenNoChannelsExist(t *testing.T) {
+	// given a guild with no stream channels registered
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when I ask for every stream channel
+	resp := srv.Get(t, "/api/streams")
 
 	// then I expect a 200 with an empty JSON array rather than null
 	resp.RequireStatus(t, 200)

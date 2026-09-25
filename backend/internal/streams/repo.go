@@ -15,6 +15,7 @@ type Stream struct {
 	ViewerCount  int       `db:"viewer_count"  json:"viewerCount"`
 	ThumbnailURL *string   `db:"thumbnail_url" json:"thumbnailUrl"`
 	ChannelURL   string    `db:"channel_url"   json:"channelUrl"`
+	IsLive       bool      `db:"is_live"       json:"isLive"`
 }
 
 type Repo struct {
@@ -27,7 +28,7 @@ func NewRepo(db *sqlx.DB) *Repo {
 
 func (r *Repo) ListLive(ctx context.Context) ([]Stream, error) {
 	const query = `
-		SELECT id, streamer_name, game_name, viewer_count, thumbnail_url, channel_url
+		SELECT id, streamer_name, game_name, viewer_count, thumbnail_url, channel_url, is_live
 		FROM streams
 		WHERE is_live
 		ORDER BY viewer_count DESC`
@@ -37,4 +38,17 @@ func (r *Repo) ListLive(ctx context.Context) ([]Stream, error) {
 		return nil, fmt.Errorf("select live streams: %w", err)
 	}
 	return live, nil
+}
+
+func (r *Repo) ListAll(ctx context.Context) ([]Stream, error) {
+	const query = `
+		SELECT id, streamer_name, game_name, viewer_count, thumbnail_url, channel_url, is_live
+		FROM streams
+		ORDER BY is_live DESC, streamer_name ASC`
+
+	all := []Stream{}
+	if err := r.db.SelectContext(ctx, &all, query); err != nil {
+		return nil, fmt.Errorf("select all streams: %w", err)
+	}
+	return all, nil
 }

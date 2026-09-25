@@ -73,3 +73,5 @@ Pattern: **`<feature/endpoint> should <expected behavior> when <discriminating c
 
 - Never `git commit` unless explicitly told to in that message. Finishing a task, passing tests, or a plan that ends in "then commit" is not permission — leave the work staged/unstaged and say it's ready.
 - Never `git push` or open a PR unless explicitly told to. "One PR is fine" describes the shape of the deliverable, not a go-ahead to create it; ask first.
+- Commit subjects and PR titles use Conventional Commits prefixes: `feat:` (new functionality), `fix:` (bug fix), `docs:` (docs/spec-only changes, including decision tickets), `chore:` (deps, tooling, config), `refactor:` (no behavior change), `test:` (test-only changes), `ci:` (CI/deploy config). A scope is optional (`feat(roster): ...`) — add one when it clarifies, skip it when the type alone is clear.
+- Decision-ticket commits/PRs (issues labeled `decision`) use `docs: Issue #N - <short summary>` as the subject/title — see #6, #7, #9.

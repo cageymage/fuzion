@@ -45,7 +45,12 @@ func loadConfig() (config, error) {
 		return config{}, err
 	}
 
-	return config{addr: addr, databaseURL: databaseURL, allowedOrigins: allowedOrigins, discord: discord}, nil
+	return config{
+		addr:           addr,
+		databaseURL:    databaseURL,
+		allowedOrigins: allowedOrigins,
+		discord:        discord,
+	}, nil
 }
 
 // A mis-deployed API should refuse to start rather than 500 on every login attempt.

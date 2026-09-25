@@ -44,3 +44,35 @@ func RequireUser(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// RequireOfficer gates a route to officers and admins: 401 anonymous, 403 member.
+func RequireOfficer(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := UserFrom(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "login required"})
+			return
+		}
+		if !user.HasOfficerAccess() {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "officer access required"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireAdmin gates a route to admins only: 401 anonymous, 403 non-admin.
+func RequireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := UserFrom(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "login required"})
+			return
+		}
+		if !user.IsAdmin {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "admin access required"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
