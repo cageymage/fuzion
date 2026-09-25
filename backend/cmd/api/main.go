@@ -14,6 +14,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/cageymage/fuzion/backend/internal/applications"
 	"github.com/cageymage/fuzion/backend/internal/auth"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/raids"
@@ -57,6 +58,7 @@ func run() error {
 	}, &http.Client{Timeout: 10 * time.Second})
 
 	router := server.New(server.Deps{
+		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db))),
 		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
