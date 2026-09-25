@@ -14,6 +14,8 @@ Issues labeled `backend`. Issues labeled both `backend` and `frontend` are fine:
 ## Implementation notes (step 6)
 
 - Go, chi, sqlx, Postgres. Structure and rules: CLAUDE.md and `plans/project-structure.md`.
+- Before writing, read a comparable existing package (`internal/roster` or `internal/news`: `handler.go`, `service.go`, `repo.go`, the test file) and match its layout, handler shape, and error-to-status mapping.
+- Go checklist for the self-review: `gofmt -l` is clean, every returned error is wrapped with `%w`, sentinel errors are matched with `errors.Is`/`errors.As`, SQL uses placeholders (never string-built values), and new migrations have a matching `.down.sql`.
 - One test file per feature package, real `httptest.Server` over router, service, repo and a testcontainers Postgres. Only Discord, Battle.net and Blizzard clients are faked.
 - Officer-only routes are wrapped with `auth.RequireOfficer`. Do not add auth logic in handlers.
 - Validation lives in `service.go`. Handlers decode JSON and map errors to status codes.

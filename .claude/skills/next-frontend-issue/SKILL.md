@@ -14,6 +14,8 @@ Issues labeled `frontend`. Issues labeled both `backend` and `frontend` are fine
 ## Implementation notes (step 6)
 
 - React 18, TypeScript, Vite, TanStack Query, react-router-dom, Vitest, RTL, MSW. Structure: `plans/project-structure.md`. Look at existing pages and `src/api/` modules and match them.
+- Before writing, read the `Home` page, its data hook (`useHomeData.ts`), and its test, plus the matching `src/api/` module and `mocks/handlers.ts`. Reuse existing components (`Chip`, `NewsCard`, `LiveStreamCard`, and so on) before creating new ones.
+- React checklist for the self-review: server data goes through TanStack Query (no ad hoc `useEffect` fetching), types live in `src/types/`, no `any`, tests query by role or label (`getByRole`) and use `userEvent`, and loading, empty, and error states are all rendered and tested.
 - Page tests render the full page with real router context, real children and real hooks, and intercept only HTTP with MSW. Never mock hooks, contexts or child components.
 - MSW handlers default to the happy path in `mocks/handlers.ts`; individual tests override with `server.use(...)`.
 - Test names follow: `<feature> should <expected behavior> when <criteria>`.

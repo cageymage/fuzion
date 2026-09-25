@@ -46,13 +46,26 @@ gh issue edit N --add-assignee @me
 - Create `N-short-slug` (existing examples: `21-middleware`, `11-raids-list-api`).
 - If the issue adds a migration, check the highest number on `main` and in open PRs (`git ls-tree origin/main backend/migrations/`, `gh pr diff`). CI fails a PR numbered at or below main's highest. The number in the issue body is a suggestion; use the next free one and say if it changed.
 
-## 6. Implement
+## 6. Clarify, then implement
+
+**Ask before writing any code** if anything is unclear or underspecified: ambiguous requirements, conflicting statements between the issue and the spec, an open question the issue itself flags (for example "ask in the issue"), a JSON shape or status code the issue does not pin down, or a soft dependency on unmerged work. Batch the questions into one message with a recommended answer for each. Do not guess and proceed. If everything is clear, say so in one line and continue.
+
+Then read one existing, comparable feature (the calling skill names where) and match its file layout, naming, and idiom before writing anything new.
 
 Use the issue's "What to build", "Acceptance criteria" and "Tests to write" sections as the spec. Write the tests first (test-driven), watch them fail, then implement. Use the test names the issue lists. Keep changes inside the scope of the issue.
 
-## 7. Verify
+## 7. Self-review, then verify
 
-Run the calling skill's verify step. Report results faithfully, including failures. If anything fails, fix it or stop and report; do not proceed to commit on a failing or skipped check without saying so.
+Reread your own diff against CLAUDE.md before verifying, and fix what you find:
+
+- No comments that explain what the code does (only non-obvious why).
+- No speculative helpers, interfaces, or config for hypothetical needs.
+- No mocks of Postgres, hooks, or internal packages.
+- Errors are wrapped with context and never swallowed.
+- Test names follow `<feature> should <expected behavior> when <criteria>`, one "when" per test.
+- Nothing outside the issue's scope changed.
+
+Then run the calling skill's verify step. Report results faithfully, including failures. If anything fails, fix it or stop and report; do not proceed to commit on a failing or skipped check without saying so.
 
 ## 8. Ask before committing
 
