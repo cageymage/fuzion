@@ -27,14 +27,16 @@ func NewRepo(db *sqlx.DB) *Repo {
 	return &Repo{db: db}
 }
 
-func (r *Repo) ListPosts(ctx context.Context) ([]Post, error) {
+func (r *Repo) ListPosts(ctx context.Context, limit int) ([]Post, error) {
+	// LIMIT NULL means no limit, so a zero limit returns every post.
 	const query = `
 		SELECT id, title, excerpt, category, image_url, author_name, published_at
 		FROM news_posts
-		ORDER BY published_at DESC`
+		ORDER BY published_at DESC
+		LIMIT NULLIF($1, 0)`
 
 	posts := []Post{}
-	if err := r.db.SelectContext(ctx, &posts, query); err != nil {
+	if err := r.db.SelectContext(ctx, &posts, query, limit); err != nil {
 		return nil, fmt.Errorf("select news posts: %w", err)
 	}
 	// pgx hands back timestamptz in the process-local zone; the API always emits UTC.
