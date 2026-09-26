@@ -242,6 +242,16 @@ func (s *Server) Patch(t *testing.T, path string, body any) Response {
 	return s.do(t, req)
 }
 
+func (s *Server) Delete(t *testing.T, path string) Response {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodDelete, s.URL+path, nil)
+	if err != nil {
+		t.Fatalf("build DELETE %s: %v", path, err)
+	}
+	return s.do(t, req)
+}
+
 func (s *Server) do(t *testing.T, req *http.Request) Response {
 	t.Helper()
 
