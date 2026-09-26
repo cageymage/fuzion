@@ -1,6 +1,10 @@
-import type { NextRaid } from '../types/raids'
+import type { Raid } from '../types/raids'
 import { apiGet } from './client'
 
-export function fetchNextRaid(): Promise<NextRaid | null> {
-  return apiGet<NextRaid | null>('/raids/next')
+export function fetchNextRaid(): Promise<Raid | null> {
+  return apiGet<Raid | null>('/raids/next')
+}
+
+export function fetchUpcomingRaids(): Promise<Raid[]> {
+  return apiGet<Raid[]>('/raids')
 }
