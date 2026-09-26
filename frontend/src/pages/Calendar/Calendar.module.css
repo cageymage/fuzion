@@ -1,0 +1,54 @@
+.page {
+  padding: 40px var(--gutter);
+}
+
+.title {
+  margin: 0 0 24px;
+  font-size: 38px;
+}
+
+.notice {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.day {
+  margin-bottom: 28px;
+}
+
+.dayHeading {
+  margin: 0 0 12px;
+  font-size: 18px;
+  color: var(--gold);
+}
+
+.raidList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.raid {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 22px;
+}
+
+.time {
+  min-width: 80px;
+  font-weight: 700;
+}
+
+.raidName {
+  font-size: 15px;
+}
+
+.progress {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
