@@ -91,3 +91,107 @@ func TestListNews_ReturnsEmptyArray_WhenNoPostsExist(t *testing.T) {
 		t.Errorf("expected an empty JSON array, got %q", got)
 	}
 }
+
+func TestListNews_ReturnsOnlyTheNewestPosts_WhenLimitIsSet(t *testing.T) {
+	// given three news posts published on different days
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO news_posts (id, title, excerpt, category, image_url, author_name, published_at)
+		VALUES
+			('11111111-1111-1111-1111-111111111111', 'Welcome our newest officers', 'Two promotions from the raid team.', 'guild-news', NULL, 'Officer', '2026-09-11T18:00:00Z'),
+			('22222222-2222-2222-2222-222222222222', 'Fuzion defeated Queen Ansurek on Mythic', '8/8 down after weeks on the enrage.', 'raid-progress', NULL, 'Officer', '2026-09-15T18:00:00Z'),
+			('33333333-3333-3333-3333-333333333333', 'Now recruiting: Restoration Druid', 'One raid spot open.', 'recruitment', NULL, 'Officer', '2026-09-13T18:00:00Z')`)
+
+	// when I ask for the news list with a limit of two
+	resp := srv.Get(t, "/api/news?limit=2")
+
+	// then I expect a 200 with only the two newest posts, newest first
+	resp.RequireStatus(t, 200)
+	var posts []newsPostJSON
+	resp.DecodeJSON(t, &posts)
+
+	want := []newsPostJSON{
+		{
+			ID:          "22222222-2222-2222-2222-222222222222",
+			Title:       "Fuzion defeated Queen Ansurek on Mythic",
+			Excerpt:     "8/8 down after weeks on the enrage.",
+			Category:    "raid-progress",
+			ImageURL:    nil,
+			AuthorName:  "Officer",
+			PublishedAt: "2026-09-15T18:00:00Z",
+		},
+		{
+			ID:          "33333333-3333-3333-3333-333333333333",
+			Title:       "Now recruiting: Restoration Druid",
+			Excerpt:     "One raid spot open.",
+			Category:    "recruitment",
+			ImageURL:    nil,
+			AuthorName:  "Officer",
+			PublishedAt: "2026-09-13T18:00:00Z",
+		},
+	}
+	if diff := cmp.Diff(want, posts); diff != "" {
+		t.Errorf("unexpected news posts (-want +got):\n%s", diff)
+	}
+}
+
+func TestListNews_ReturnsEveryPost_WhenLimitExceedsThePostCount(t *testing.T) {
+	// given a single news post
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO news_posts (id, title, excerpt, category, image_url, author_name, published_at)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Welcome our newest officers', 'Two promotions from the raid team.', 'guild-news', NULL, 'Officer', '2026-09-11T18:00:00Z')`)
+
+	// when I ask for the news list with a limit of ten
+	resp := srv.Get(t, "/api/news?limit=10")
+
+	// then I expect a 200 with that one post
+	resp.RequireStatus(t, 200)
+	var posts []newsPostJSON
+	resp.DecodeJSON(t, &posts)
+
+	want := []newsPostJSON{
+		{
+			ID:          "11111111-1111-1111-1111-111111111111",
+			Title:       "Welcome our newest officers",
+			Excerpt:     "Two promotions from the raid team.",
+			Category:    "guild-news",
+			ImageURL:    nil,
+			AuthorName:  "Officer",
+			PublishedAt: "2026-09-11T18:00:00Z",
+		},
+	}
+	if diff := cmp.Diff(want, posts); diff != "" {
+		t.Errorf("unexpected news posts (-want +got):\n%s", diff)
+	}
+}
+
+func TestListNews_ReturnsBadRequest_WhenLimitIsNotAPositiveInteger(t *testing.T) {
+	for name, limit := range map[string]string{
+		"limit is not a number": "abc",
+		"limit is zero":         "0",
+		"limit is negative":     "-1",
+		"limit is empty":        "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			// given a running server
+			db := testutil.DB(t)
+			srv := testutil.NewServer(t, db)
+
+			// when I ask for the news list with an invalid limit
+			resp := srv.Get(t, "/api/news?limit="+limit)
+
+			// then I expect a 400 explaining the limit rule
+			resp.RequireStatus(t, 400)
+			var body struct {
+				Error string `json:"error"`
+			}
+			resp.DecodeJSON(t, &body)
+			if want := "limit: must be a positive integer"; body.Error != want {
+				t.Errorf("error = %q, want %q", body.Error, want)
+			}
+		})
+	}
+}
