@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import type { NewsPost } from '../types/news'
-import type { NextRaid } from '../types/raids'
+import type { Raid } from '../types/raids'
 import type { LiveStream } from '../types/streams'
 
 const newsPosts: NewsPost[] = [
@@ -34,13 +34,44 @@ const newsPosts: NewsPost[] = [
   },
 ]
 
-const nextRaid: NextRaid = {
+const nextRaid: Raid = {
   id: 'raid-1',
   difficulty: 'Mythic',
   instanceName: "Nerub'ar Palace",
   startsAt: new Date(Date.now() + 2 * 3_600_000 + 14 * 60_000 + 30_000).toISOString(),
   progressSummary: '8/8 Heroic cleared',
 }
+
+const atLocalTime = (daysAhead: number, hour: number): string => {
+  const date = new Date()
+  date.setDate(date.getDate() + daysAhead)
+  date.setHours(hour, 0, 0, 0)
+  return date.toISOString()
+}
+
+const upcomingRaids: Raid[] = [
+  {
+    id: 'raid-1',
+    difficulty: 'Mythic',
+    instanceName: "Nerub'ar Palace",
+    startsAt: atLocalTime(2, 19),
+    progressSummary: '8/8 Heroic cleared',
+  },
+  {
+    id: 'raid-2',
+    difficulty: 'Heroic',
+    instanceName: "Nerub'ar Palace",
+    startsAt: atLocalTime(2, 21),
+    progressSummary: '8/8 Heroic cleared',
+  },
+  {
+    id: 'raid-3',
+    difficulty: 'Normal',
+    instanceName: 'Liberation of Undermine',
+    startsAt: atLocalTime(4, 20),
+    progressSummary: 'Not started',
+  },
+]
 
 const liveStreams: LiveStream[] = [
   {
@@ -57,6 +88,7 @@ export const handlers = [
   http.get('/api/auth/me', () => HttpResponse.json({ error: 'login required' }, { status: 401 })),
   http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/news', () => HttpResponse.json(newsPosts)),
+  http.get('/api/raids', () => HttpResponse.json(upcomingRaids)),
   http.get('/api/raids/next', () => HttpResponse.json(nextRaid)),
   http.get('/api/streams/live', () => HttpResponse.json(liveStreams)),
 ]

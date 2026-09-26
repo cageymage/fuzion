@@ -1,9 +1,9 @@
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NextRaid } from '../../types/raids'
+import type { Raid } from '../../types/raids'
 import { NextRaidCard } from './NextRaidCard'
 
-const raid: NextRaid = {
+const raid: Raid = {
   id: 'raid-1',
   difficulty: 'Mythic',
   instanceName: "Nerub'ar Palace",
