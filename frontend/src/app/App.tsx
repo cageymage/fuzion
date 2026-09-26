@@ -4,6 +4,7 @@ import { AppHeader } from '../components/AppHeader/AppHeader'
 import { Calendar } from '../pages/Calendar/Calendar'
 import { ComingSoon } from '../pages/ComingSoon/ComingSoon'
 import { Home } from '../pages/Home/Home'
+import { News } from '../pages/News/News'
 import styles from './App.module.css'
 import { navItems } from './navigation'
 
@@ -15,9 +16,10 @@ export function App() {
       <main className={styles.main}>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/news" element={<News />} />
           <Route path="/calendar" element={<Calendar />} />
           {navItems
-            .filter((item) => item.path !== '/' && item.path !== '/calendar')
+            .filter((item) => !['/', '/news', '/calendar'].includes(item.path))
             .map((item) => (
               <Route
                 key={item.path}

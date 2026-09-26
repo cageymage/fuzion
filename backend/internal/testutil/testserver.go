@@ -18,12 +18,16 @@ import (
 
 	"github.com/cageymage/fuzion/backend/internal/applications"
 	"github.com/cageymage/fuzion/backend/internal/auth"
+	"github.com/cageymage/fuzion/backend/internal/clock"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/raids"
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
 )
+
+// FixedNow is the instant every server built by NewServer reports as "now".
+var FixedNow = time.Date(2026, 3, 14, 20, 0, 0, 0, time.UTC)
 
 type Server struct {
 	*httptest.Server
@@ -45,7 +49,7 @@ func NewServer(t *testing.T, db *sqlx.DB) *Server {
 	}, discord.Client())
 
 	router := server.New(server.Deps{
-		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db))),
+		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow))),
 		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
@@ -238,6 +242,16 @@ func (s *Server) Patch(t *testing.T, path string, body any) Response {
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	return s.do(t, req)
+}
+
+func (s *Server) Delete(t *testing.T, path string) Response {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodDelete, s.URL+path, nil)
+	if err != nil {
+		t.Fatalf("build DELETE %s: %v", path, err)
 	}
 	return s.do(t, req)
 }
