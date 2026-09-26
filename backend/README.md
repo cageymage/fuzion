@@ -37,6 +37,7 @@ is no separate migrate step.
 | ------ | ------------------- | --------------------------------------------------- |
 | GET    | `/api/health`       | `{"status":"ok"}`                                   |
 | GET    | `/api/news`         | news posts, newest first (`[]` when none)           |
+| GET    | `/api/professions`  | crafting directory with each character embedded, sorted by profession, then skill; optional `?profession=` (case-insensitive, `[]` when nothing matches) |
 | GET    | `/api/raids/next`   | soonest upcoming raid, or `null` when none scheduled |
 | GET    | `/api/streams/live` | live streamers, most viewers first (`[]` when none) |
 | GET    | `/api/auth/login`    | 302 to Discord's consent screen; sets a short-lived state cookie |
