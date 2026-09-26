@@ -1,9 +1,9 @@
 import { formatViewerCount } from '../../lib/format'
-import type { LiveStream } from '../../types/streams'
+import type { Stream } from '../../types/streams'
 import styles from './LiveStreamCard.module.css'
 
 interface LiveStreamCardProps {
-  stream: LiveStream
+  stream: Stream
 }
 
 export function LiveStreamCard({ stream }: LiveStreamCardProps) {

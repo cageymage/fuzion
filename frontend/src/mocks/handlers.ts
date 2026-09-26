@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import type { NewsPost } from '../types/news'
 import type { NextRaid } from '../types/raids'
-import type { LiveStream } from '../types/streams'
+import type { Stream } from '../types/streams'
 
 const newsPosts: NewsPost[] = [
   {
@@ -42,7 +42,7 @@ const nextRaid: NextRaid = {
   progressSummary: '8/8 Heroic cleared',
 }
 
-const liveStreams: LiveStream[] = [
+const liveStreams: Stream[] = [
   {
     id: 'stream-1',
     streamerName: 'Thundermane',
@@ -50,6 +50,20 @@ const liveStreams: LiveStream[] = [
     viewerCount: 1_240,
     thumbnailUrl: null,
     channelUrl: 'https://twitch.tv/thundermane',
+    isLive: true,
+  },
+]
+
+const allStreams: Stream[] = [
+  ...liveStreams,
+  {
+    id: 'stream-2',
+    streamerName: 'Moonveil',
+    gameName: '',
+    viewerCount: 0,
+    thumbnailUrl: null,
+    channelUrl: 'https://twitch.tv/moonveil',
+    isLive: false,
   },
 ]
 
@@ -58,5 +72,6 @@ export const handlers = [
   http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/news', () => HttpResponse.json(newsPosts)),
   http.get('/api/raids/next', () => HttpResponse.json(nextRaid)),
+  http.get('/api/streams', () => HttpResponse.json(allStreams)),
   http.get('/api/streams/live', () => HttpResponse.json(liveStreams)),
 ]

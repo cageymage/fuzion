@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { FeaturedNewsCard } from '../../components/FeaturedNewsCard/FeaturedNewsCard'
 import { LiveStreamCard } from '../../components/LiveStreamCard/LiveStreamCard'
@@ -9,6 +10,10 @@ import { useHomeData } from './useHomeData'
 export function Home() {
   const { news, nextRaid, liveStreams } = useHomeData()
   const [featuredPost, ...remainingPosts] = news.data ?? []
+  const featuredStream = useMemo(
+    () => liveStreams.data?.[Math.floor(Math.random() * liveStreams.data.length)],
+    [liveStreams.data],
+  )
 
   return (
     <>
@@ -59,9 +64,7 @@ export function Home() {
           {liveStreams.isError && (
             <p className={styles.noticeText}>Live streams could not be loaded.</p>
           )}
-          {liveStreams.data?.map((stream) => (
-            <LiveStreamCard key={stream.id} stream={stream} />
-          ))}
+          {featuredStream && <LiveStreamCard stream={featuredStream} />}
           {liveStreams.isSuccess && liveStreams.data.length === 0 && (
             <p className={styles.noticeText}>Nobody is streaming right now.</p>
           )}

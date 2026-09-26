@@ -1,15 +1,16 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { LiveStream } from '../../types/streams'
+import type { Stream } from '../../types/streams'
 import { LiveStreamCard } from './LiveStreamCard'
 
-const stream: LiveStream = {
+const stream: Stream = {
   id: 'stream-1',
   streamerName: 'Thundermane',
   gameName: 'World of Warcraft: Forever',
   viewerCount: 1_240,
   thumbnailUrl: null,
   channelUrl: 'https://twitch.tv/thundermane',
+  isLive: true,
 }
 
 describe('LiveStreamCard', () => {

@@ -1,11 +1,26 @@
 import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { server } from '../../mocks/server'
 import { renderWithProviders } from '../../testUtils'
+import type { Stream } from '../../types/streams'
 import { Home } from './Home'
 
+const centrifuze: Stream = {
+  id: 'stream-2',
+  streamerName: 'Centrifuze',
+  gameName: 'World of Warcraft',
+  viewerCount: 87,
+  thumbnailUrl: null,
+  channelUrl: 'https://www.twitch.tv/centrifuze',
+  isLive: true,
+}
+
 describe('Home', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('should show the guild name, realm and tagline', async () => {
     renderWithProviders(<Home />)
 
@@ -64,6 +79,40 @@ describe('Home', () => {
 
     expect(await screen.findByText('Thundermane is live')).toBeInTheDocument()
     expect(screen.getByText('1.2K')).toBeInTheDocument()
+  })
+
+  it('should show only the first live stream when the random pick lands on the first', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    server.use(
+      http.get('/api/streams/live', () =>
+        HttpResponse.json([
+          { ...centrifuze, id: 'stream-1', streamerName: 'Thundermane' },
+          centrifuze,
+        ]),
+      ),
+    )
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByText('Thundermane is live')).toBeInTheDocument()
+    expect(screen.queryByText('Centrifuze is live')).not.toBeInTheDocument()
+  })
+
+  it('should show only the last live stream when the random pick lands on the last', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    server.use(
+      http.get('/api/streams/live', () =>
+        HttpResponse.json([
+          { ...centrifuze, id: 'stream-1', streamerName: 'Thundermane' },
+          centrifuze,
+        ]),
+      ),
+    )
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByText('Centrifuze is live')).toBeInTheDocument()
+    expect(screen.queryByText('Thundermane is live')).not.toBeInTheDocument()
   })
 
   it('should show a nobody-streaming message when no one is live', async () => {
