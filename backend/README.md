@@ -39,6 +39,9 @@ is no separate migrate step.
 | GET    | `/api/news`         | news posts, newest first (`[]` when none)           |
 | GET    | `/api/raids/next`   | soonest upcoming raid, or `null` when none scheduled |
 | GET    | `/api/streams/live` | live streamers, most viewers first (`[]` when none) |
+| GET    | `/api/applications`  | officer only: applications newest first, `?status=pending\|accepted\|declined` optional (400 on unknown) |
+| GET    | `/api/applications/{id}` | officer only: one application in full; 400 for a non-UUID id, 404 when unknown |
+| PATCH  | `/api/applications/{id}` | officer only: `{status: "accepted"\|"declined", reviewNote?}`; stamps `reviewedBy` and `reviewedAt`, re-reviewing overwrites |
 | GET    | `/api/auth/login`    | 302 to Discord's consent screen; sets a short-lived state cookie |
 | GET    | `/api/auth/callback` | Discord lands here; verifies state, upserts the user, sets `fuzion_session`, 302 to `/` |
 | POST   | `/api/auth/logout`   | deletes the session server-side, clears the cookie, 204 |
