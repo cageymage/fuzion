@@ -42,6 +42,21 @@ describe('Home', () => {
     expect(screen.getByRole('heading', { name: 'Welcome our newest officers' })).toBeInTheDocument()
   })
 
+  it('should request only the three most recent news posts', async () => {
+    let requestedLimit: string | null = null
+    server.use(
+      http.get('/api/news', ({ request }) => {
+        requestedLimit = new URL(request.url).searchParams.get('limit')
+        return HttpResponse.json([])
+      }),
+    )
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByText('No news posted yet.')).toBeInTheDocument()
+    expect(requestedLimit).toBe('3')
+  })
+
   it('should link the news section to the full news page', async () => {
     renderWithProviders(<Home />)
 

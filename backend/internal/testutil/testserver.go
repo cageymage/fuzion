@@ -18,6 +18,7 @@ import (
 
 	"github.com/cageymage/fuzion/backend/internal/applications"
 	"github.com/cageymage/fuzion/backend/internal/auth"
+	"github.com/cageymage/fuzion/backend/internal/clock"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/professions"
 	"github.com/cageymage/fuzion/backend/internal/raids"
@@ -25,6 +26,9 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
 )
+
+// FixedNow is the instant every server built by NewServer reports as "now".
+var FixedNow = time.Date(2026, 3, 14, 20, 0, 0, 0, time.UTC)
 
 type Server struct {
 	*httptest.Server
@@ -46,7 +50,7 @@ func NewServer(t *testing.T, db *sqlx.DB) *Server {
 	}, discord.Client())
 
 	router := server.New(server.Deps{
-		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db))),
+		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow))),
 		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db))),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),

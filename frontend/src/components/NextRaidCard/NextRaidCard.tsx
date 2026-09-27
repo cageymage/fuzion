@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { formatCountdown } from '../../lib/format'
-import type { NextRaid } from '../../types/raids'
+import type { Raid } from '../../types/raids'
 import styles from './NextRaidCard.module.css'
 
 interface NextRaidCardProps {
-  raid: NextRaid
+  raid: Raid
 }
 
 export function NextRaidCard({ raid }: NextRaidCardProps) {
