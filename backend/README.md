@@ -27,6 +27,19 @@ Environment:
 | `DISCORD_CLIENT_ID`     | required | from the Discord developer portal (OAuth2 tab) |
 | `DISCORD_CLIENT_SECRET` | required | same place; never commit it        |
 | `DISCORD_REDIRECT_URL`  | required | must be registered on the Discord app; `http://localhost:5173/api/auth/callback` in dev |
+| `TWITCH_CLIENT_ID`      | optional | `cmd/sync` only; from a dev.twitch.tv app. The Twitch job skips itself unless both are set |
+| `TWITCH_CLIENT_SECRET`  | optional | same place; never commit it        |
+
+Background jobs run from `cmd/sync`, one job per invocation, once and exit
+(Render runs `/sync twitch` every minute). Locally, with the API already run
+once so migrations are applied:
+
+```
+npx dotenv -e .env -e .env.example -- go run -C backend ./cmd/sync twitch
+```
+
+The job reads `streams.twitch_login`, marks those channels live or offline, and
+writes a row to `sync_log` with the outcome.
 
 Migrations under `migrations/` are embedded and applied on startup, so there
 is no separate migrate step.
