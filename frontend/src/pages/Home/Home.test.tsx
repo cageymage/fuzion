@@ -10,8 +10,10 @@ const centrifuze: Stream = {
   id: 'stream-2',
   streamerName: 'Centrifuze',
   gameName: 'World of Warcraft',
+  title: 'Raid night prep',
   viewerCount: 87,
   thumbnailUrl: null,
+  avatarUrl: null,
   channelUrl: 'https://www.twitch.tv/centrifuze',
   isLive: true,
 }
@@ -128,6 +130,14 @@ describe('Home', () => {
 
     expect(await screen.findByText('Centrifuze is live')).toBeInTheDocument()
     expect(screen.queryByText('Thundermane is live')).not.toBeInTheDocument()
+  })
+
+  it('should show the title of the featured live stream', async () => {
+    server.use(http.get('/api/streams/live', () => HttpResponse.json([centrifuze])))
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByText('Raid night prep')).toBeInTheDocument()
   })
 
   it('should show a nobody-streaming message when no one is live', async () => {
