@@ -23,14 +23,14 @@ VALUES
     ('b1111111-1111-1111-1111-111111111111',
      'Mythic', 'Nerubar Palace', now() + interval '2 hours 14 minutes', '8/8 Heroic cleared');
 
-INSERT INTO streams (id, streamer_name, game_name, viewer_count, thumbnail_url, channel_url, is_live)
+INSERT INTO streams (id, streamer_name, game_name, viewer_count, thumbnail_url, channel_url, is_live, twitch_login)
 VALUES
     ('c1111111-1111-1111-1111-111111111111',
-     'Thundermane', 'World of Warcraft: Forever', 1240, NULL, 'https://twitch.tv/thundermane', true),
+     'Thundermane', 'World of Warcraft: Forever', 1240, NULL, 'https://twitch.tv/thundermane', true, 'thundermane'),
     ('c2222222-2222-2222-2222-222222222222',
-     'Centrifuze', 'World of Warcraft', 87, 'https://static-cdn.jtvnw.net/previews-ttv/live_user_centrifuze-440x248.jpg', 'https://www.twitch.tv/centrifuze', true),
+     'Centrifuze', 'World of Warcraft', 87, 'https://static-cdn.jtvnw.net/previews-ttv/live_user_centrifuze-440x248.jpg', 'https://www.twitch.tv/centrifuze', true, 'centrifuze'),
     ('c3333333-3333-3333-3333-333333333333',
-     'Moonveil', '', 0, NULL, 'https://twitch.tv/moonveil', false);
+     'Moonveil', '', 0, NULL, 'https://twitch.tv/moonveil', false, 'moonveil');
 
 INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, is_main, raid_team)
 VALUES

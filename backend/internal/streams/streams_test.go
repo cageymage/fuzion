@@ -18,7 +18,9 @@ type streamJSON struct {
 	StreamerName string  `json:"streamerName"`
 	GameName     string  `json:"gameName"`
 	ViewerCount  int     `json:"viewerCount"`
+	Title        string  `json:"title"`
 	ThumbnailURL *string `json:"thumbnailUrl"`
+	AvatarURL    *string `json:"avatarUrl"`
 	ChannelURL   string  `json:"channelUrl"`
 	IsLive       bool    `json:"isLive"`
 }
@@ -148,6 +150,73 @@ func TestListStreams_ReturnsLiveChannelsBeforeOfflineOnes(t *testing.T) {
 			GameName:     "",
 			ViewerCount:  0,
 			ThumbnailURL: nil,
+			ChannelURL:   "https://twitch.tv/aelith",
+			IsLive:       false,
+		},
+	}
+	if diff := cmp.Diff(want, all); diff != "" {
+		t.Errorf("unexpected streams (-want +got):\n%s", diff)
+	}
+}
+
+func TestListLiveStreams_ReturnsStreamTitle_WhenChannelIsLive(t *testing.T) {
+	// given a live streamer with a stream title
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, stream_title, viewer_count, thumbnail_url, channel_url, is_live)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Thundermane', 'World of Warcraft', 'Mythic Queen Ansurek progress', 1240, NULL, 'https://twitch.tv/thundermane', true)`)
+
+	// when I ask who is live
+	resp := srv.Get(t, "/api/streams/live")
+
+	// then I expect the stream title on the streamer
+	resp.RequireStatus(t, 200)
+	var live []streamJSON
+	resp.DecodeJSON(t, &live)
+
+	want := []streamJSON{
+		{
+			ID:           "11111111-1111-1111-1111-111111111111",
+			StreamerName: "Thundermane",
+			GameName:     "World of Warcraft",
+			Title:        "Mythic Queen Ansurek progress",
+			ViewerCount:  1240,
+			ThumbnailURL: nil,
+			ChannelURL:   "https://twitch.tv/thundermane",
+			IsLive:       true,
+		},
+	}
+	if diff := cmp.Diff(want, live); diff != "" {
+		t.Errorf("unexpected live streams (-want +got):\n%s", diff)
+	}
+}
+
+func TestListStreams_ReturnsAvatarUrl_WhenChannelHasAProfileImage(t *testing.T) {
+	// given an offline channel whose avatar has been synced
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, viewer_count, thumbnail_url, channel_url, is_live, profile_image_url)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aelith', '', 0, NULL, 'https://twitch.tv/aelith', false, 'https://cdn.example/aelith.png')`)
+
+	// when I ask for every stream channel
+	resp := srv.Get(t, "/api/streams")
+
+	// then I expect the channel to carry its avatar
+	resp.RequireStatus(t, 200)
+	var all []streamJSON
+	resp.DecodeJSON(t, &all)
+
+	avatarURL := "https://cdn.example/aelith.png"
+	want := []streamJSON{
+		{
+			ID:           "11111111-1111-1111-1111-111111111111",
+			StreamerName: "Aelith",
+			GameName:     "",
+			ViewerCount:  0,
+			ThumbnailURL: nil,
+			AvatarURL:    &avatarURL,
 			ChannelURL:   "https://twitch.tv/aelith",
 			IsLive:       false,
 		},
