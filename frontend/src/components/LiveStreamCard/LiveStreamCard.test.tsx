@@ -7,8 +7,10 @@ const stream: Stream = {
   id: 'stream-1',
   streamerName: 'Thundermane',
   gameName: 'World of Warcraft: Forever',
+  title: 'Mythic Queen Ansurek progress',
   viewerCount: 1_240,
   thumbnailUrl: null,
+  avatarUrl: null,
   channelUrl: 'https://twitch.tv/thundermane',
   isLive: true,
 }
@@ -21,10 +23,34 @@ describe('LiveStreamCard', () => {
     expect(screen.getByText('World of Warcraft: Forever')).toBeInTheDocument()
   })
 
+  it('should show the stream title', () => {
+    render(<LiveStreamCard stream={stream} />)
+
+    expect(screen.getByText('Mythic Queen Ansurek progress')).toBeInTheDocument()
+  })
+
   it('should show the viewer count abbreviated in thousands', () => {
     render(<LiveStreamCard stream={stream} />)
 
     expect(screen.getByText('1.2K')).toBeInTheDocument()
+  })
+
+  it('should show the streamer avatar next to the name when the streamer has one', () => {
+    const { container } = render(
+      <LiveStreamCard stream={{ ...stream, avatarUrl: 'https://cdn.example/thundermane.png' }} />,
+    )
+
+    expect(container.querySelector('img')).toHaveAttribute(
+      'src',
+      'https://cdn.example/thundermane.png',
+    )
+  })
+
+  it('should show the streamer initial when the streamer has no avatar', () => {
+    const { container } = render(<LiveStreamCard stream={stream} />)
+
+    expect(container.querySelector('img')).not.toBeInTheDocument()
+    expect(screen.getByText('T')).toBeInTheDocument()
   })
 
   it('should link to the channel in a new tab', () => {

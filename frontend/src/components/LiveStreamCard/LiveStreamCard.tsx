@@ -1,5 +1,6 @@
 import { formatViewerCount } from '../../lib/format'
 import type { Stream } from '../../types/streams'
+import { StreamerAvatar } from '../StreamerAvatar/StreamerAvatar'
 import styles from './LiveStreamCard.module.css'
 
 interface LiveStreamCardProps {
@@ -21,7 +22,15 @@ export function LiveStreamCard({ stream }: LiveStreamCardProps) {
           </svg>
         </span>
       </div>
-      <div className={styles.streamer}>{stream.streamerName} is live</div>
+      <div className={styles.streamer}>
+        <StreamerAvatar name={stream.streamerName} avatarUrl={stream.avatarUrl} size="small" />
+        <span>{stream.streamerName} is live</span>
+      </div>
+      {stream.title && (
+        <p className={styles.title} title={stream.title}>
+          {stream.title}
+        </p>
+      )}
       <div className={styles.game}>{stream.gameName}</div>
       <a className={styles.watchLink} href={stream.channelUrl} target="_blank" rel="noreferrer">
         Watch on Twitch →

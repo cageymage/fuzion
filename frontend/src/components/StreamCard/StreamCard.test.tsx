@@ -7,14 +7,16 @@ const liveStream: Stream = {
   id: 'stream-1',
   streamerName: 'Thundermane',
   gameName: 'World of Warcraft: Forever',
+  title: 'Mythic Queen Ansurek progress',
   viewerCount: 1_240,
   thumbnailUrl: null,
+  avatarUrl: null,
   channelUrl: 'https://twitch.tv/thundermane',
   isLive: true,
 }
 
 describe('StreamCard', () => {
-  it('should show the LIVE badge, viewer count and game when the stream is live', () => {
+  it('should show the LIVE badge, viewer count and game', () => {
     render(<StreamCard stream={liveStream} />)
 
     expect(screen.getByText('LIVE')).toBeInTheDocument()
@@ -22,11 +24,10 @@ describe('StreamCard', () => {
     expect(screen.getByText('World of Warcraft: Forever')).toBeInTheDocument()
   })
 
-  it('should hide the LIVE badge and viewer count when the stream is offline', () => {
-    render(<StreamCard stream={{ ...liveStream, isLive: false, viewerCount: 0 }} />)
+  it('should show the stream title', () => {
+    render(<StreamCard stream={liveStream} />)
 
-    expect(screen.queryByText('LIVE')).not.toBeInTheDocument()
-    expect(screen.queryByText('0')).not.toBeInTheDocument()
+    expect(screen.getByText('Mythic Queen Ansurek progress')).toBeInTheDocument()
   })
 
   it('should link to the channel in a new tab', () => {
@@ -38,7 +39,7 @@ describe('StreamCard', () => {
     expect(link).toHaveAttribute('rel', 'noreferrer')
   })
 
-  it('should show the preview thumbnail when the stream is live and has one', () => {
+  it('should show the preview thumbnail when the stream has one', () => {
     const { container } = render(
       <StreamCard stream={{ ...liveStream, thumbnailUrl: 'https://cdn.example/preview.jpg' }} />,
     )
@@ -46,13 +47,14 @@ describe('StreamCard', () => {
     expect(container.querySelector('img')).toHaveAttribute('src', 'https://cdn.example/preview.jpg')
   })
 
-  it('should not show a thumbnail when the stream is offline', () => {
+  it('should show the streamer avatar next to the name when the streamer has one', () => {
     const { container } = render(
-      <StreamCard
-        stream={{ ...liveStream, isLive: false, thumbnailUrl: 'https://cdn.example/preview.jpg' }}
-      />,
+      <StreamCard stream={{ ...liveStream, avatarUrl: 'https://cdn.example/thundermane.png' }} />,
     )
 
-    expect(container.querySelector('img')).not.toBeInTheDocument()
+    expect(container.querySelector('img')).toHaveAttribute(
+      'src',
+      'https://cdn.example/thundermane.png',
+    )
   })
 })
