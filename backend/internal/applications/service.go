@@ -7,11 +7,14 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+
+	"github.com/cageymage/fuzion/backend/internal/clock"
 )
 
 const (
 	maxDiscordHandleLength = 64
 	maxNotesLength         = 2000
+	maxReviewNoteLength    = 2000
 )
 
 type SubmitRequest struct {
@@ -24,6 +27,11 @@ type SubmitRequest struct {
 	Notes         string `json:"notes"`
 }
 
+type ReviewRequest struct {
+	Status     string `json:"status"`
+	ReviewNote string `json:"reviewNote"`
+}
+
 type ValidationError struct {
 	Field   string
 	Problem string
@@ -34,11 +42,12 @@ func (e *ValidationError) Error() string {
 }
 
 type Service struct {
-	repo *Repo
+	repo  *Repo
+	clock clock.Clock
 }
 
-func NewService(repo *Repo) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repo, clock clock.Clock) *Service {
+	return &Service{repo: repo, clock: clock}
 }
 
 func (s *Service) Submit(ctx context.Context, req SubmitRequest) (Submitted, error) {
@@ -61,6 +70,63 @@ func (s *Service) Submit(ctx context.Context, req SubmitRequest) (Submitted, err
 		return Submitted{}, fmt.Errorf("submit application: %w", err)
 	}
 	return submitted, nil
+}
+
+func (s *Service) List(ctx context.Context, status string) ([]Reviewable, error) {
+	switch status {
+	case "", "pending", "accepted", "declined":
+	default:
+		return nil, &ValidationError{Field: "status", Problem: "must be one of pending, accepted, declined"}
+	}
+
+	apps, err := s.repo.List(ctx, status)
+	if err != nil {
+		return nil, fmt.Errorf("list applications: %w", err)
+	}
+	return apps, nil
+}
+
+func (s *Service) Get(ctx context.Context, id string) (Reviewable, error) {
+	appID, err := parseID(id)
+	if err != nil {
+		return Reviewable{}, err
+	}
+
+	app, err := s.repo.Get(ctx, appID)
+	if err != nil {
+		return Reviewable{}, fmt.Errorf("get application: %w", err)
+	}
+	return app, nil
+}
+
+func (s *Service) Review(ctx context.Context, id string, reviewer uuid.UUID, req ReviewRequest) (Reviewable, error) {
+	appID, err := parseID(id)
+	if err != nil {
+		return Reviewable{}, err
+	}
+	note := strings.TrimSpace(req.ReviewNote)
+	switch req.Status {
+	case "accepted", "declined":
+	default:
+		return Reviewable{}, &ValidationError{Field: "status", Problem: "must be one of accepted, declined"}
+	}
+	if utf8.RuneCountInString(note) > maxReviewNoteLength {
+		return Reviewable{}, &ValidationError{Field: "reviewNote", Problem: fmt.Sprintf("must be at most %d characters", maxReviewNoteLength)}
+	}
+
+	app, err := s.repo.Review(ctx, appID, req.Status, note, reviewer, s.clock.Now())
+	if err != nil {
+		return Reviewable{}, fmt.Errorf("review application: %w", err)
+	}
+	return app, nil
+}
+
+func parseID(id string) (uuid.UUID, error) {
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return uuid.Nil, &ValidationError{Field: "id", Problem: "must be a valid UUID"}
+	}
+	return parsed, nil
 }
 
 func validate(app Application) error {

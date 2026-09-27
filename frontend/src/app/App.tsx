@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import { AppFooter } from '../components/AppFooter/AppFooter'
 import { AppHeader } from '../components/AppHeader/AppHeader'
+import { Calendar } from '../pages/Calendar/Calendar'
 import { ComingSoon } from '../pages/ComingSoon/ComingSoon'
 import { Home } from '../pages/Home/Home'
 import { News } from '../pages/News/News'
@@ -17,11 +18,10 @@ export function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/news" element={<News />} />
+          <Route path="/calendar" element={<Calendar />} />
           <Route path="/streams" element={<Streams />} />
           {navItems
-            .filter(
-              (item) => item.path !== '/' && item.path !== '/news' && item.path !== '/streams',
-            )
+            .filter((item) => !['/', '/news', '/calendar', '/streams'].includes(item.path))
             .map((item) => (
               <Route
                 key={item.path}
