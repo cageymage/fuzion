@@ -198,9 +198,10 @@ clean database: `docker compose down -v` then `npm run dev` again.
 
 ## Deploying
 
-Production is three Render services declared in [render.yaml](render.yaml):
-a static site for the frontend, a Docker web service for the API, and a
-managed Postgres. Render deploys `main` on push; GitHub Actions
+Production is four Render services declared in [render.yaml](render.yaml):
+a static site for the frontend, a Docker web service for the API, a cron
+job that syncs Twitch live status every minute (the API's image, run as
+`/sync twitch`), and a managed Postgres. Render deploys `main` on push; GitHub Actions
 ([test.yml](.github/workflows/test.yml)) runs the test suites on PRs.
 
 The static site rewrites `/api/*` to the API service, so the browser only
@@ -210,7 +211,9 @@ config or `VITE_API_BASE_URL` is needed in prod.
 First-time setup:
 
 1. Render dashboard → **New → Blueprint**, pick this repo. Render creates
-   all three services from `render.yaml` and wires `DATABASE_URL`.
+   all four services from `render.yaml` and wires `DATABASE_URL`. Later
+   additions to `render.yaml` are picked up when the Blueprint syncs, which
+   happens on push to `main` if the Blueprint's auto-sync is on.
 2. Check the API's hostname in the dashboard. If it isn't
    `fuzion-api.onrender.com` (the name was taken), update the `/api/*`
    rewrite destination in `render.yaml` and push.
@@ -219,6 +222,10 @@ First-time setup:
 4. The prod DB starts empty. Until there's an admin UI, load content with
    `psql "<external connection string from the dashboard>" -f backend/seed/dev_seed.sql`
    (swap in real content first).
+5. Set `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET` on `fuzion-sync-twitch`
+   (from a Confidential app at dev.twitch.tv/console). Until both are set,
+   each run logs that it skipped and exits 0. Once they are, every run
+   writes a row to `sync_log`.
 
 Postgres runs on the paid Basic plan (`0.1c-256mb`, $6/mo), not the free
 tier. That is deliberate: a free database expires after 30 days, and losing
