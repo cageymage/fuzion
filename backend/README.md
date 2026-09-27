@@ -36,6 +36,7 @@ is no separate migrate step.
 | Method | Path                | Response                                            |
 | ------ | ------------------- | --------------------------------------------------- |
 | GET    | `/api/health`       | `{"status":"ok"}`                                   |
+| GET    | `/api/professions`  | crafting directory with each character embedded, sorted by profession, then skill; optional `?profession=` (case-insensitive, `[]` when nothing matches) |
 | GET    | `/api/news`         | news posts, newest first (`[]` when none); optional `?limit=N` (positive integer, else 400) returns only the N newest |
 | GET    | `/api/raids/next`   | soonest upcoming raid, or `null` when none scheduled |
 | GET    | `/api/streams/live` | live streamers, most viewers first (`[]` when none) |
