@@ -1,5 +1,6 @@
 ALTER TABLE streams ADD COLUMN twitch_login text;
 ALTER TABLE streams ADD COLUMN profile_image_url text;
+ALTER TABLE streams ADD COLUMN stream_title text NOT NULL DEFAULT '';
 
 UPDATE streams
 SET twitch_login = lower(substring(channel_url from 'twitch\.tv/([^/?#]+)'));

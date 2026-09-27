@@ -15,6 +15,7 @@ type Stream struct {
 	ID           uuid.UUID `db:"id"            json:"id"`
 	StreamerName string    `db:"streamer_name" json:"streamerName"`
 	GameName     string    `db:"game_name"     json:"gameName"`
+	Title        string    `db:"stream_title"  json:"title"`
 	ViewerCount  int       `db:"viewer_count"  json:"viewerCount"`
 	ThumbnailURL *string   `db:"thumbnail_url" json:"thumbnailUrl"`
 	AvatarURL    *string   `db:"profile_image_url" json:"avatarUrl"`
@@ -32,7 +33,7 @@ func NewRepo(db *sqlx.DB) *Repo {
 
 func (r *Repo) ListLive(ctx context.Context) ([]Stream, error) {
 	const query = `
-		SELECT id, streamer_name, game_name, viewer_count, thumbnail_url, profile_image_url, channel_url, is_live
+		SELECT id, streamer_name, game_name, stream_title, viewer_count, thumbnail_url, profile_image_url, channel_url, is_live
 		FROM streams
 		WHERE is_live
 		ORDER BY viewer_count DESC`
@@ -72,17 +73,17 @@ func (r *Repo) UpdateLiveStatus(ctx context.Context, live map[string]twitch.Live
 	}
 
 	const markOffline = `
-		UPDATE streams SET is_live = false, viewer_count = 0
+		UPDATE streams SET is_live = false, viewer_count = 0, stream_title = ''
 		WHERE twitch_login IS NOT NULL AND NOT (twitch_login = ANY($1))`
 	if _, err := tx.ExecContext(ctx, markOffline, liveLogins); err != nil {
 		return fmt.Errorf("mark unreturned channels offline: %w", err)
 	}
 
 	const markLive = `
-		UPDATE streams SET is_live = true, viewer_count = $2, game_name = $3, thumbnail_url = $4
+		UPDATE streams SET is_live = true, viewer_count = $2, game_name = $3, thumbnail_url = $4, stream_title = $5
 		WHERE twitch_login = $1`
 	for login, stream := range live {
-		if _, err := tx.ExecContext(ctx, markLive, login, stream.ViewerCount, stream.GameName, stream.ThumbnailURL); err != nil {
+		if _, err := tx.ExecContext(ctx, markLive, login, stream.ViewerCount, stream.GameName, stream.ThumbnailURL, stream.Title); err != nil {
 			return fmt.Errorf("mark %s live: %w", login, err)
 		}
 	}
@@ -113,7 +114,7 @@ func (r *Repo) UpdateProfileImages(ctx context.Context, avatars map[string]strin
 
 func (r *Repo) ListAll(ctx context.Context) ([]Stream, error) {
 	const query = `
-		SELECT id, streamer_name, game_name, viewer_count, thumbnail_url, profile_image_url, channel_url, is_live
+		SELECT id, streamer_name, game_name, stream_title, viewer_count, thumbnail_url, profile_image_url, channel_url, is_live
 		FROM streams
 		ORDER BY is_live DESC, streamer_name ASC`
 

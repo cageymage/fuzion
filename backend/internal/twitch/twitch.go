@@ -33,6 +33,7 @@ type Config struct {
 type LiveStream struct {
 	Login        string
 	GameName     string
+	Title        string
 	ViewerCount  int
 	ThumbnailURL string
 }
@@ -150,6 +151,7 @@ func (c *Client) appToken(ctx context.Context) (string, error) {
 type helixStream struct {
 	UserLogin    string `json:"user_login"`
 	GameName     string `json:"game_name"`
+	Title        string `json:"title"`
 	ViewerCount  int    `json:"viewer_count"`
 	ThumbnailURL string `json:"thumbnail_url"`
 }
@@ -181,6 +183,7 @@ func (c *Client) fetchStreams(ctx context.Context, token string, logins []string
 		live = append(live, LiveStream{
 			Login:        strings.ToLower(s.UserLogin),
 			GameName:     s.GameName,
+			Title:        s.Title,
 			ViewerCount:  s.ViewerCount,
 			ThumbnailURL: strings.NewReplacer("{width}x{height}", thumbnailSize).Replace(s.ThumbnailURL),
 		})

@@ -95,6 +95,7 @@ func TestLiveStreams_ReturnsLiveChannels_WhenTwitchResponds(t *testing.T) {
 	fake.live = []map[string]any{{
 		"user_login":    "Thundermane",
 		"game_name":     "World of Warcraft",
+		"title":         "Mythic Queen Ansurek progress",
 		"viewer_count":  1240,
 		"thumbnail_url": "https://static-cdn.jtvnw.net/previews-ttv/live_user_thundermane-{width}x{height}.jpg",
 	}}
@@ -109,6 +110,7 @@ func TestLiveStreams_ReturnsLiveChannels_WhenTwitchResponds(t *testing.T) {
 	want := []twitch.LiveStream{{
 		Login:        "thundermane",
 		GameName:     "World of Warcraft",
+		Title:        "Mythic Queen Ansurek progress",
 		ViewerCount:  1240,
 		ThumbnailURL: "https://static-cdn.jtvnw.net/previews-ttv/live_user_thundermane-440x248.jpg",
 	}}

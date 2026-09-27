@@ -21,6 +21,7 @@ type streamRow struct {
 	IsLive          bool    `db:"is_live"`
 	ViewerCount     int     `db:"viewer_count"`
 	GameName        string  `db:"game_name"`
+	Title           string  `db:"stream_title"`
 	ThumbnailURL    *string `db:"thumbnail_url"`
 	ProfileImageURL *string `db:"profile_image_url"`
 }
@@ -34,7 +35,7 @@ type syncLogRow struct {
 func streamRows(t *testing.T, db *sqlx.DB) []streamRow {
 	t.Helper()
 	var rows []streamRow
-	if err := db.Select(&rows, `SELECT twitch_login, is_live, viewer_count, game_name, thumbnail_url, profile_image_url FROM streams ORDER BY twitch_login`); err != nil {
+	if err := db.Select(&rows, `SELECT twitch_login, is_live, viewer_count, game_name, stream_title, thumbnail_url, profile_image_url FROM streams ORDER BY twitch_login`); err != nil {
 		t.Fatalf("select streams: %v", err)
 	}
 	return rows
@@ -78,25 +79,25 @@ func TestUpdateLiveStatus_MarksReturnedChannelsLiveAndOthersOffline(t *testing.T
 	// given one channel that was live and one that was offline
 	db := testutil.DB(t)
 	db.MustExec(`
-		INSERT INTO streams (id, streamer_name, game_name, viewer_count, thumbnail_url, channel_url, is_live, twitch_login)
+		INSERT INTO streams (id, streamer_name, game_name, stream_title, viewer_count, thumbnail_url, channel_url, is_live, twitch_login)
 		VALUES
-			('11111111-1111-1111-1111-111111111111', 'Emberfist', 'World of Warcraft', 310, 'https://cdn.example/old.jpg', 'https://twitch.tv/emberfist', true, 'emberfist'),
-			('22222222-2222-2222-2222-222222222222', 'Thundermane', '', 0, NULL, 'https://twitch.tv/thundermane', false, 'thundermane')`)
+			('11111111-1111-1111-1111-111111111111', 'Emberfist', 'World of Warcraft', 'Old title', 310, 'https://cdn.example/old.jpg', 'https://twitch.tv/emberfist', true, 'emberfist'),
+			('22222222-2222-2222-2222-222222222222', 'Thundermane', '', '', 0, NULL, 'https://twitch.tv/thundermane', false, 'thundermane')`)
 
 	// when I apply a Twitch result in which only Thundermane is live
 	err := streams.NewRepo(db).UpdateLiveStatus(context.Background(), map[string]twitch.LiveStream{
-		"thundermane": {Login: "thundermane", GameName: "World of Warcraft", ViewerCount: 1240, ThumbnailURL: "https://cdn.example/new.jpg"},
+		"thundermane": {Login: "thundermane", GameName: "World of Warcraft", Title: "New title", ViewerCount: 1240, ThumbnailURL: "https://cdn.example/new.jpg"},
 	})
 
-	// then I expect Thundermane live with fresh details and Emberfist offline with no viewers
+	// then I expect Thundermane live with fresh details and Emberfist offline with no viewers or title
 	if err != nil {
 		t.Fatalf("UpdateLiveStatus: %v", err)
 	}
 	newThumbnail := "https://cdn.example/new.jpg"
 	oldThumbnail := "https://cdn.example/old.jpg"
 	want := []streamRow{
-		{Login: "emberfist", IsLive: false, ViewerCount: 0, GameName: "World of Warcraft", ThumbnailURL: &oldThumbnail},
-		{Login: "thundermane", IsLive: true, ViewerCount: 1240, GameName: "World of Warcraft", ThumbnailURL: &newThumbnail},
+		{Login: "emberfist", IsLive: false, ViewerCount: 0, GameName: "World of Warcraft", Title: "", ThumbnailURL: &oldThumbnail},
+		{Login: "thundermane", IsLive: true, ViewerCount: 1240, GameName: "World of Warcraft", Title: "New title", ThumbnailURL: &newThumbnail},
 	}
 	if diff := cmp.Diff(want, streamRows(t, db)); diff != "" {
 		t.Errorf("unexpected streams (-want +got):\n%s", diff)
@@ -137,6 +138,7 @@ func TestSyncTwitch_FlipsIsLiveAndWritesOkSyncLog_WhenTwitchReturnsLiveChannel(t
 	cfg := fakeTwitch(t, http.StatusOK, []map[string]any{{
 		"user_login":    "Thundermane",
 		"game_name":     "World of Warcraft",
+		"title":         "Mythic Queen Ansurek progress",
 		"viewer_count":  1240,
 		"thumbnail_url": "https://cdn.example/thumb-{width}x{height}.jpg",
 	}}, []map[string]any{
@@ -156,7 +158,7 @@ func TestSyncTwitch_FlipsIsLiveAndWritesOkSyncLog_WhenTwitchReturnsLiveChannel(t
 	moonveilAvatar := "https://cdn.example/moonveil-avatar.png"
 	wantStreams := []streamRow{
 		{Login: "moonveil", IsLive: false, ViewerCount: 0, GameName: "", ThumbnailURL: nil, ProfileImageURL: &moonveilAvatar},
-		{Login: "thundermane", IsLive: true, ViewerCount: 1240, GameName: "World of Warcraft", ThumbnailURL: &thumbnail, ProfileImageURL: &thundermaneAvatar},
+		{Login: "thundermane", IsLive: true, ViewerCount: 1240, GameName: "World of Warcraft", Title: "Mythic Queen Ansurek progress", ThumbnailURL: &thumbnail, ProfileImageURL: &thundermaneAvatar},
 	}
 	if diff := cmp.Diff(wantStreams, streamRows(t, db)); diff != "" {
 		t.Errorf("unexpected streams (-want +got):\n%s", diff)
@@ -171,8 +173,8 @@ func TestSyncTwitch_WritesErrorSyncLog_WhenTwitchIsDown(t *testing.T) {
 	// given a live channel and a Twitch that answers 500
 	db := testutil.DB(t)
 	db.MustExec(`
-		INSERT INTO streams (id, streamer_name, game_name, viewer_count, thumbnail_url, channel_url, is_live, twitch_login)
-		VALUES ('11111111-1111-1111-1111-111111111111', 'Thundermane', 'World of Warcraft', 1240, NULL, 'https://twitch.tv/thundermane', true, 'thundermane')`)
+		INSERT INTO streams (id, streamer_name, game_name, stream_title, viewer_count, thumbnail_url, channel_url, is_live, twitch_login)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Thundermane', 'World of Warcraft', 'Still here', 1240, NULL, 'https://twitch.tv/thundermane', true, 'thundermane')`)
 	cfg := fakeTwitch(t, http.StatusInternalServerError, nil, nil)
 
 	// when the Twitch sync runs
@@ -186,7 +188,7 @@ func TestSyncTwitch_WritesErrorSyncLog_WhenTwitchIsDown(t *testing.T) {
 	if len(rows) != 1 || rows[0].Source != "twitch" || rows[0].Status != "error" || rows[0].Message == "" {
 		t.Errorf("expected one twitch error sync_log row with a message, got %+v", rows)
 	}
-	wantStreams := []streamRow{{Login: "thundermane", IsLive: true, ViewerCount: 1240, GameName: "World of Warcraft", ThumbnailURL: nil}}
+	wantStreams := []streamRow{{Login: "thundermane", IsLive: true, ViewerCount: 1240, GameName: "World of Warcraft", Title: "Still here", ThumbnailURL: nil}}
 	if diff := cmp.Diff(wantStreams, streamRows(t, db)); diff != "" {
 		t.Errorf("expected streams to be untouched (-want +got):\n%s", diff)
 	}
