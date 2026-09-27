@@ -34,3 +34,15 @@ export function formatRelativeDate(isoDate: string, now: number = Date.now()): s
   }
   return `${days} days ago`
 }
+
+export function formatRaidDay(isoDate: string): string {
+  return new Date(isoDate).toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+export function formatRaidTime(isoDate: string): string {
+  return new Date(isoDate).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+}
