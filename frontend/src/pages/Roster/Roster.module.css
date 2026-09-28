@@ -1,0 +1,104 @@
+.page {
+  padding: 28px var(--gutter) 40px;
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: 38px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.roleFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.filter[aria-pressed='true'] {
+  color: var(--gold);
+  background: var(--gold-soft);
+  border-color: var(--gold);
+}
+
+.classField,
+.altsField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.altsCheckbox {
+  accent-color: var(--gold);
+}
+
+.classSelect {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  padding: 6px 10px;
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.count {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
+.noticeText {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 8px 0 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table th {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.table tbody tr:nth-child(even) {
+  background: var(--surface);
+}
+
+.table tbody tr:hover {
+  background: var(--gold-soft);
+}
