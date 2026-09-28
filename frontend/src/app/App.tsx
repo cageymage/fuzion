@@ -5,6 +5,7 @@ import { Calendar } from '../pages/Calendar/Calendar'
 import { ComingSoon } from '../pages/ComingSoon/ComingSoon'
 import { Home } from '../pages/Home/Home'
 import { News } from '../pages/News/News'
+import { Roster } from '../pages/Roster/Roster'
 import { Streams } from '../pages/Streams/Streams'
 import styles from './App.module.css'
 import { navItems } from './navigation'
@@ -18,10 +19,11 @@ export function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/news" element={<News />} />
+          <Route path="/roster" element={<Roster />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/streams" element={<Streams />} />
           {navItems
-            .filter((item) => !['/', '/news', '/calendar', '/streams'].includes(item.path))
+            .filter((item) => !['/', '/news', '/roster', '/calendar', '/streams'].includes(item.path))
             .map((item) => (
               <Route
                 key={item.path}

@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import type { NewsPost } from '../types/news'
 import type { Raid } from '../types/raids'
+import type { Character } from '../types/roster'
 import type { Stream } from '../types/streams'
 
 const newsPosts: NewsPost[] = [
@@ -113,12 +114,88 @@ const allStreams: Stream[] = [
   },
 ]
 
+const rosterCharacters: Character[] = [
+  {
+    id: 'char-1',
+    name: 'Ragnok',
+    secondaryName: '',
+    realm: 'Emberreach',
+    class: 'Warrior',
+    spec: 'Protection',
+    role: 'tank',
+    isMain: true,
+    raidTeam: 'Team Alpha',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'char-2',
+    name: 'Korrath',
+    secondaryName: '',
+    realm: 'Emberreach',
+    class: 'Paladin',
+    spec: 'Protection',
+    role: 'tank',
+    isMain: true,
+    raidTeam: 'Team Beta',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'char-3',
+    name: 'Selene',
+    secondaryName: '',
+    realm: 'Emberreach',
+    class: 'Priest',
+    spec: 'Holy',
+    role: 'healer',
+    isMain: true,
+    raidTeam: 'Team Alpha',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'char-4',
+    name: 'Mirelle',
+    secondaryName: '',
+    realm: 'Emberreach',
+    class: 'Druid',
+    spec: 'Restoration',
+    role: 'healer',
+    isMain: true,
+    raidTeam: 'Team Beta',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'char-5',
+    name: 'Zaldrin',
+    secondaryName: '',
+    realm: 'Emberreach',
+    class: 'Mage',
+    spec: 'Fire',
+    role: 'dps',
+    isMain: true,
+    raidTeam: 'Team Alpha',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'char-6',
+    name: 'Zaldrix',
+    secondaryName: '',
+    realm: 'Emberreach',
+    class: 'Warlock',
+    spec: 'Affliction',
+    role: 'dps',
+    isMain: false,
+    raidTeam: null,
+    createdAt: new Date().toISOString(),
+  },
+]
+
 export const handlers = [
   http.get('/api/auth/me', () => HttpResponse.json({ error: 'login required' }, { status: 401 })),
   http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/news', () => HttpResponse.json(newsPosts)),
   http.get('/api/raids', () => HttpResponse.json(upcomingRaids)),
   http.get('/api/raids/next', () => HttpResponse.json(nextRaid)),
+  http.get('/api/roster', () => HttpResponse.json(rosterCharacters)),
   http.get('/api/streams', () => HttpResponse.json(allStreams)),
   http.get('/api/streams/live', () => HttpResponse.json(liveStreams)),
 ]
