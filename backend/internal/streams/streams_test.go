@@ -240,3 +240,44 @@ func TestListStreams_ReturnsEmptyArray_WhenNoChannelsExist(t *testing.T) {
 		t.Errorf("expected an empty JSON array, got %q", got)
 	}
 }
+
+func TestStreamsInsert_GeneratesId_WhenIdIsOmitted(t *testing.T) {
+	// given a stream row inserted without an id
+	db := testutil.DB(t)
+
+	// when the insert runs
+	var id string
+	err := db.Get(&id, `
+		INSERT INTO streams (streamer_name, game_name, channel_url)
+		VALUES ('Aelith', 'World of Warcraft', 'https://twitch.tv/aelith')
+		RETURNING id`)
+
+	// then I expect a generated, non-empty UUID
+	if err != nil {
+		t.Fatalf("insert without id: %v", err)
+	}
+	if id == "" || id == "00000000-0000-0000-0000-000000000000" {
+		t.Errorf("expected a generated UUID, got %q", id)
+	}
+}
+
+func TestStreamsInsert_KeepsProvidedId_WhenIdIsGiven(t *testing.T) {
+	// given a stream row inserted with an explicit id
+	db := testutil.DB(t)
+	const providedID = "33333333-3333-3333-3333-333333333333"
+
+	// when the insert runs
+	var id string
+	err := db.Get(&id, `
+		INSERT INTO streams (id, streamer_name, game_name, channel_url)
+		VALUES ($1, 'Aelith', 'World of Warcraft', 'https://twitch.tv/aelith')
+		RETURNING id`, providedID)
+
+	// then I expect the stored id to match what was provided
+	if err != nil {
+		t.Fatalf("insert with id: %v", err)
+	}
+	if id != providedID {
+		t.Errorf("expected id %q, got %q", providedID, id)
+	}
+}
