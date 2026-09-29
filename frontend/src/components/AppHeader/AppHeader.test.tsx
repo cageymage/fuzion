@@ -11,6 +11,7 @@ const thundermane: AuthUser = {
   id: '11111111-1111-1111-1111-111111111111',
   username: 'thundermane',
   avatarUrl: 'https://cdn.discordapp.com/avatars/80351110224678912/abc.png',
+  isOfficer: false,
 }
 
 function loggedInAs(user: AuthUser) {
