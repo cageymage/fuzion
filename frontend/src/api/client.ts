@@ -15,6 +15,14 @@ export async function apiPost(path: string): Promise<void> {
   }
 }
 
+export async function apiDelete(path: string): Promise<void> {
+  const response = await fetch(`${baseUrl}${path}`, { method: 'DELETE', credentials: 'include' })
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as { error?: string } | null
+    throw new Error(problem?.error ?? `DELETE ${path} failed with ${response.status}`)
+  }
+}
+
 export async function apiSend<T>(method: 'POST' | 'PATCH', path: string, body: unknown): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, {
     method,

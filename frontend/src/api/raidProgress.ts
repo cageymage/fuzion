@@ -4,7 +4,7 @@ import type {
   RaidProgressBoss,
   RaidTier,
 } from '../types/raidProgress'
-import { apiGet, apiSend, baseUrl } from './client'
+import { apiDelete, apiGet, apiSend, baseUrl } from './client'
 
 // A guild between tiers, or one where nothing is current yet, is a normal
 // state, not an error, so a missing current tier (404) resolves to an empty
@@ -34,4 +34,12 @@ export function setRaidTierCurrent(id: string, isCurrent: boolean): Promise<Raid
 
 export function setRaidBossKilled(id: string, killed: boolean): Promise<RaidProgressBoss> {
   return apiSend<RaidProgressBoss>('PATCH', `/raid-bosses/${id}`, { killed })
+}
+
+export function deleteRaidTier(id: string): Promise<void> {
+  return apiDelete(`/raid-tiers/${id}`)
+}
+
+export function deleteRaidBoss(id: string): Promise<void> {
+  return apiDelete(`/raid-bosses/${id}`)
 }

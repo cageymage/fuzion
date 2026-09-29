@@ -102,3 +102,17 @@ func (s *Service) SetBossKilled(ctx context.Context, id uuid.UUID, req SetKilled
 	}
 	return boss, nil
 }
+
+func (s *Service) DeleteTier(ctx context.Context, id uuid.UUID) error {
+	if err := s.repo.DeleteTier(ctx, id); err != nil {
+		return fmt.Errorf("delete raid tier %s: %w", id, err)
+	}
+	return nil
+}
+
+func (s *Service) DeleteBoss(ctx context.Context, id uuid.UUID) error {
+	if err := s.repo.DeleteBoss(ctx, id); err != nil {
+		return fmt.Errorf("delete raid boss %s: %w", id, err)
+	}
+	return nil
+}

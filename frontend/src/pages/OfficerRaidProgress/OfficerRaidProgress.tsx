@@ -107,16 +107,75 @@ function CreateTierForm({ nextSortOrder }: CreateTierFormProps) {
   )
 }
 
+interface ConfirmDeleteButtonProps {
+  target: string
+  children: string
+  disabled?: boolean
+  onConfirm: () => void
+}
+
+function ConfirmDeleteButton({ target, children, disabled = false, onConfirm }: ConfirmDeleteButtonProps) {
+  const [confirming, setConfirming] = useState(false)
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        className={styles.smallButton}
+        aria-label={`Delete ${target}`}
+        disabled={disabled}
+        onClick={() => setConfirming(true)}
+      >
+        {children}
+      </button>
+    )
+  }
+
+  return (
+    <span className={styles.confirm}>
+      <button
+        type="button"
+        className={`${styles.smallButton} ${styles.dangerButton}`}
+        aria-label={`Confirm delete ${target}`}
+        onClick={() => {
+          setConfirming(false)
+          onConfirm()
+        }}
+      >
+        Delete
+      </button>
+      <button
+        type="button"
+        className={styles.smallButton}
+        aria-label={`Cancel deleting ${target}`}
+        onClick={() => setConfirming(false)}
+      >
+        Cancel
+      </button>
+    </span>
+  )
+}
+
 interface TierManagerProps {
   tier: RaidTier
 }
 
 function TierManager({ tier }: TierManagerProps) {
-  const { setTierCurrent, setBossKilled } = useOfficerRaidProgress()
+  const { setTierCurrent, setBossKilled, deleteTier, deleteBoss } = useOfficerRaidProgress()
 
   return (
     <div className={`card ${styles.card}`}>
-      <h3 className={styles.tierName}>{tier.name}</h3>
+      <div className={styles.tierHeader}>
+        <h3 className={styles.tierName}>{tier.name}</h3>
+        <ConfirmDeleteButton
+          target={tier.name}
+          disabled={tier.isCurrent}
+          onConfirm={() => deleteTier.mutate(tier.id)}
+        >
+          Delete raid
+        </ConfirmDeleteButton>
+      </div>
+      {tier.isCurrent && <p className={styles.noticeText}>Uncheck "Current raid" before deleting this raid.</p>}
       <label className={styles.toggle}>
         <input
           type="checkbox"
@@ -128,7 +187,7 @@ function TierManager({ tier }: TierManagerProps) {
       </label>
       <ul className={styles.bossList}>
         {tier.bosses.map((boss) => (
-          <li key={boss.id}>
+          <li key={boss.id} className={styles.bossItem}>
             <label className={styles.toggle}>
               <input
                 type="checkbox"
@@ -138,6 +197,9 @@ function TierManager({ tier }: TierManagerProps) {
               />
               <span>{boss.name}</span>
             </label>
+            <ConfirmDeleteButton target={boss.name} onConfirm={() => deleteBoss.mutate(boss.id)}>
+              ✕
+            </ConfirmDeleteButton>
           </li>
         ))}
       </ul>
@@ -149,6 +211,16 @@ function TierManager({ tier }: TierManagerProps) {
       {setBossKilled.isError && (
         <p role="alert" className={styles.error}>
           {setBossKilled.error.message}
+        </p>
+      )}
+      {deleteTier.isError && (
+        <p role="alert" className={styles.error}>
+          {deleteTier.error.message}
+        </p>
+      )}
+      {deleteBoss.isError && (
+        <p role="alert" className={styles.error}>
+          {deleteBoss.error.message}
         </p>
       )}
     </div>

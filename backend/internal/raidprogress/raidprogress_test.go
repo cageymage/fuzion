@@ -579,3 +579,158 @@ func TestMarkBossKilled_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) 
 	// then I expect a 401
 	resp.RequireStatus(t, http.StatusUnauthorized)
 }
+
+func countRows(t *testing.T, db *sqlx.DB, table string) int {
+	t.Helper()
+	var count int
+	if err := db.Get(&count, `SELECT count(*) FROM `+table); err != nil {
+		t.Fatalf("count %s: %v", table, err)
+	}
+	return count
+}
+
+func TestDeleteRaidTier_DeletesTierAndItsBosses_WhenTierIsNotCurrent(t *testing.T) {
+	// given a retired tier with a boss
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Shattered Spire", false)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Voidshard Sentinel", 0, nil)
+
+	// when I delete the tier
+	resp := srv.Delete(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111")
+
+	// then I expect a 204 with the tier and its boss both gone
+	resp.RequireStatus(t, http.StatusNoContent)
+	if got := countRows(t, db, "raid_tiers"); got != 0 {
+		t.Errorf("expected the tier to be deleted, found %d rows", got)
+	}
+	if got := countRows(t, db, "raid_bosses"); got != 0 {
+		t.Errorf("expected the tier's bosses to be deleted, found %d rows", got)
+	}
+}
+
+func TestDeleteRaidTier_ReturnsConflict_WhenTierIsCurrent(t *testing.T) {
+	// given a current tier
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+
+	// when I delete the tier
+	resp := srv.Delete(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111")
+
+	// then I expect a 409 and the tier still there
+	resp.RequireStatus(t, http.StatusConflict)
+	requireErrorBody(t, resp, "raid tier is current; clear its current flag before deleting it")
+	if got := countRows(t, db, "raid_tiers"); got != 1 {
+		t.Errorf("expected the current tier to remain, found %d rows", got)
+	}
+}
+
+func TestDeleteRaidTier_ReturnsNotFound_WhenTierDoesNotExist(t *testing.T) {
+	// given I am logged in as an officer and no tiers exist
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I delete a nonexistent tier
+	resp := srv.Delete(t, "/api/raid-tiers/99999999-9999-9999-9999-999999999999")
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+	requireErrorBody(t, resp, "raid tier not found")
+}
+
+func TestDeleteRaidTier_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
+	// given a retired tier and a logged-in regular member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "member-1", "Member")
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Shattered Spire", false)
+
+	// when I delete the tier
+	resp := srv.Delete(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111")
+
+	// then I expect a 403
+	resp.RequireStatus(t, http.StatusForbidden)
+}
+
+func TestDeleteRaidTier_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given a retired tier and nobody logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Shattered Spire", false)
+
+	// when I delete the tier
+	resp := srv.Delete(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111")
+
+	// then I expect a 401
+	resp.RequireStatus(t, http.StatusUnauthorized)
+}
+
+func TestDeleteRaidBoss_DeletesOnlyThatBoss(t *testing.T) {
+	// given a current tier with two bosses
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 0, nil)
+	insertBoss(t, db, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "11111111-1111-1111-1111-111111111111", "Ashveil", 1, nil)
+
+	// when I delete the first boss
+	resp := srv.Delete(t, "/api/raid-bosses/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+	// then I expect a 204 and only the other boss left in the tier
+	resp.RequireStatus(t, http.StatusNoContent)
+	var remaining []string
+	if err := db.Select(&remaining, `SELECT name FROM raid_bosses ORDER BY sort_order`); err != nil {
+		t.Fatalf("select remaining bosses: %v", err)
+	}
+	if diff := cmp.Diff([]string{"Ashveil"}, remaining); diff != "" {
+		t.Errorf("unexpected remaining bosses (-want +got):\n%s", diff)
+	}
+}
+
+func TestDeleteRaidBoss_ReturnsNotFound_WhenBossDoesNotExist(t *testing.T) {
+	// given I am logged in as an officer and no bosses exist
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I delete a nonexistent boss
+	resp := srv.Delete(t, "/api/raid-bosses/99999999-9999-9999-9999-999999999999")
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+	requireErrorBody(t, resp, "raid boss not found")
+}
+
+func TestDeleteRaidBoss_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
+	// given a boss and a logged-in regular member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "member-1", "Member")
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 0, nil)
+
+	// when I delete the boss
+	resp := srv.Delete(t, "/api/raid-bosses/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+	// then I expect a 403
+	resp.RequireStatus(t, http.StatusForbidden)
+}
+
+func TestDeleteRaidBoss_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given a boss and nobody logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 0, nil)
+
+	// when I delete the boss
+	resp := srv.Delete(t, "/api/raid-bosses/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+	// then I expect a 401
+	resp.RequireStatus(t, http.StatusUnauthorized)
+}

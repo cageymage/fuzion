@@ -40,6 +40,30 @@
   margin: 2px 0 8px;
 }
 
+.tierHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bossItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.confirm {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.smallButton.dangerButton {
+  border-color: var(--live);
+  color: var(--live);
+}
+
 .field {
   display: flex;
   flex-direction: column;

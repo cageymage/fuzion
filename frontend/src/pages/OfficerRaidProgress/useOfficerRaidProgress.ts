@@ -1,5 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { createRaidTier, setRaidBossKilled, setRaidTierCurrent } from '../../api/raidProgress'
+import {
+  createRaidTier,
+  deleteRaidBoss,
+  deleteRaidTier,
+  setRaidBossKilled,
+  setRaidTierCurrent,
+} from '../../api/raidProgress'
 
 export function useOfficerRaidProgress() {
   const queryClient = useQueryClient()
@@ -21,5 +27,8 @@ export function useOfficerRaidProgress() {
     onSuccess: refetchProgress,
   })
 
-  return { createTier, setTierCurrent, setBossKilled }
+  const deleteTier = useMutation({ mutationFn: deleteRaidTier, onSuccess: refetchProgress })
+  const deleteBoss = useMutation({ mutationFn: deleteRaidBoss, onSuccess: refetchProgress })
+
+  return { createTier, setTierCurrent, setBossKilled, deleteTier, deleteBoss }
 }

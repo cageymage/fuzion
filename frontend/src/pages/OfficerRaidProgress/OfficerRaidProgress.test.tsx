@@ -258,4 +258,133 @@ describe('OfficerRaidProgress', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('raid boss not found')
   })
+
+  it('should disable deleting a tier when it is the current raid', async () => {
+    signInAs(officer)
+
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    expect(await screen.findByRole('button', { name: 'Delete Molten Depths' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete Shattered Spire' })).toBeEnabled()
+  })
+
+  it('should not send a delete request when an officer clicks delete on a tier without confirming', async () => {
+    signInAs(officer)
+    let deleteRequested = false
+    server.use(
+      http.delete('/api/raid-tiers/:id', () => {
+        deleteRequested = true
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    // given an officer who clicked delete on a retired tier
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Shattered Spire' }))
+
+    // when I cancel
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel deleting Shattered Spire' }))
+
+    // then no delete is sent and the delete button is back
+    expect(screen.getByRole('button', { name: 'Delete Shattered Spire' })).toBeInTheDocument()
+    expect(deleteRequested).toBe(false)
+  })
+
+  it('should remove a tier from the list when an officer confirms deleting it', async () => {
+    signInAs(officer)
+    let tiers = [
+      { id: 'tier-1', name: 'Molten Depths', isCurrent: true, sortOrder: 2, bosses: [] },
+      { id: 'tier-2', name: 'Shattered Spire', isCurrent: false, sortOrder: 1, bosses: [] },
+    ]
+    let requestedPath = ''
+    server.use(
+      http.get('/api/raid-tiers', () => HttpResponse.json(tiers)),
+      http.delete('/api/raid-tiers/:id', ({ params }) => {
+        requestedPath = String(params.id)
+        tiers = tiers.filter((tier) => tier.id !== params.id)
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    // given an officer who clicked delete on a retired tier
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Shattered Spire' }))
+
+    // when I confirm the delete
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete Shattered Spire' }))
+
+    // then the tier is deleted and gone from the refetched list
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Shattered Spire' })).not.toBeInTheDocument(),
+    )
+    expect(requestedPath).toBe('tier-2')
+  })
+
+  it('should show the API error message when deleting a tier is rejected', async () => {
+    signInAs(officer)
+    server.use(
+      http.delete('/api/raid-tiers/:id', () =>
+        HttpResponse.json(
+          { error: 'raid tier is current; clear its current flag before deleting it' },
+          { status: 409 },
+        ),
+      ),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Shattered Spire' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete Shattered Spire' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'raid tier is current; clear its current flag before deleting it',
+    )
+  })
+
+  it('should remove a boss from its tier when an officer confirms deleting it', async () => {
+    signInAs(officer)
+    let bosses = [
+      { id: 'boss-1', name: 'Grimjaw', killedAt: null },
+      { id: 'boss-2', name: 'Ashveil', killedAt: null },
+    ]
+    let requestedPath = ''
+    server.use(
+      http.get('/api/raid-tiers', () =>
+        HttpResponse.json([{ id: 'tier-1', name: 'Molten Depths', isCurrent: true, sortOrder: 2, bosses }]),
+      ),
+      http.delete('/api/raid-bosses/:id', ({ params }) => {
+        requestedPath = String(params.id)
+        bosses = bosses.filter((boss) => boss.id !== params.id)
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    // given an officer who clicked delete on a boss
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Grimjaw' }))
+
+    // when I confirm the delete
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete Grimjaw' }))
+
+    // then the boss is deleted and gone from the refetched tier
+    await waitFor(() =>
+      expect(screen.queryByRole('checkbox', { name: 'Grimjaw killed' })).not.toBeInTheDocument(),
+    )
+    expect(screen.getByRole('checkbox', { name: 'Ashveil killed' })).toBeInTheDocument()
+    expect(requestedPath).toBe('boss-1')
+  })
+
+  it('should show the API error message when deleting a boss is rejected', async () => {
+    signInAs(officer)
+    server.use(
+      http.delete('/api/raid-bosses/:id', () =>
+        HttpResponse.json({ error: 'raid boss not found' }, { status: 404 }),
+      ),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Grimjaw' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm delete Grimjaw' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('raid boss not found')
+  })
 })
