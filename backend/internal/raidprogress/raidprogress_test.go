@@ -1,0 +1,581 @@
+package raidprogress_test
+
+import (
+	"net/http"
+	"os"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/jmoiron/sqlx"
+
+	"github.com/cageymage/fuzion/backend/internal/testutil"
+)
+
+func TestMain(m *testing.M) {
+	os.Exit(testutil.Run(m))
+}
+
+type bossJSON struct {
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	KilledAt *string `json:"killedAt"`
+}
+
+type progressJSON struct {
+	Tier struct {
+		Name string `json:"name"`
+	} `json:"tier"`
+	Bosses []bossJSON `json:"bosses"`
+	Killed int        `json:"killed"`
+	Total  int        `json:"total"`
+}
+
+type tierJSON struct {
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	IsCurrent bool       `json:"isCurrent"`
+	SortOrder int        `json:"sortOrder"`
+	Bosses    []bossJSON `json:"bosses"`
+}
+
+func requireErrorBody(t *testing.T, resp testutil.Response, want string) {
+	t.Helper()
+
+	var body map[string]string
+	resp.DecodeJSON(t, &body)
+	if diff := cmp.Diff(map[string]string{"error": want}, body); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+}
+
+func insertTier(t *testing.T, db *sqlx.DB, id, name string, isCurrent bool) {
+	t.Helper()
+	db.MustExec(`INSERT INTO raid_tiers (id, name, is_current) VALUES ($1, $2, $3)`, id, name, isCurrent)
+}
+
+func insertTierWithCreatedAt(t *testing.T, db *sqlx.DB, id, name string, isCurrent bool, createdAt string) {
+	t.Helper()
+	db.MustExec(`INSERT INTO raid_tiers (id, name, is_current, created_at) VALUES ($1, $2, $3, $4)`,
+		id, name, isCurrent, createdAt)
+}
+
+func insertTierWithSortOrder(t *testing.T, db *sqlx.DB, id, name string, isCurrent bool, sortOrder int, createdAt string) {
+	t.Helper()
+	db.MustExec(`INSERT INTO raid_tiers (id, name, is_current, sort_order, created_at) VALUES ($1, $2, $3, $4, $5)`,
+		id, name, isCurrent, sortOrder, createdAt)
+}
+
+func insertBoss(t *testing.T, db *sqlx.DB, id, tierID, name string, sortOrder int, killedAt *string) {
+	t.Helper()
+	db.MustExec(`INSERT INTO raid_bosses (id, tier_id, name, sort_order, killed_at) VALUES ($1, $2, $3, $4, $5)`,
+		id, tierID, name, sortOrder, killedAt)
+}
+
+func TestGetRaidProgress_ReturnsCurrentTierWithBossesInOrder(t *testing.T) {
+	// given a current tier with three bosses, one already killed, inserted out of order
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Ashveil", 2, nil)
+	killedAt := "2026-03-01T20:00:00Z"
+	insertBoss(t, db, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "11111111-1111-1111-1111-111111111111", "Grimjaw", 1, &killedAt)
+	insertBoss(t, db, "cccccccc-cccc-cccc-cccc-cccccccccccc", "11111111-1111-1111-1111-111111111111", "Pyrelord", 3, nil)
+
+	// when I ask for raid progress
+	resp := srv.Get(t, "/api/raid-progress")
+
+	// then I expect the current tier with bosses in sort order and a kill count
+	resp.RequireStatus(t, http.StatusOK)
+	var progress []progressJSON
+	resp.DecodeJSON(t, &progress)
+
+	want := []progressJSON{
+		{
+			Tier: struct {
+				Name string `json:"name"`
+			}{Name: "Molten Depths"},
+			Bosses: []bossJSON{
+				{ID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", Name: "Grimjaw", KilledAt: &killedAt},
+				{ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", Name: "Ashveil", KilledAt: nil},
+				{ID: "cccccccc-cccc-cccc-cccc-cccccccccccc", Name: "Pyrelord", KilledAt: nil},
+			},
+			Killed: 1,
+			Total:  3,
+		},
+	}
+	if diff := cmp.Diff(want, progress); diff != "" {
+		t.Errorf("unexpected progress (-want +got):\n%s", diff)
+	}
+}
+
+func TestGetRaidProgress_ReturnsEveryCurrentTier_WhenMultipleAreCurrent(t *testing.T) {
+	// given two current tiers (Forever ships at least two raids per tier) and one retired tier
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTierWithCreatedAt(t, db, "11111111-1111-1111-1111-111111111111", "Barrow Deeps", true, "2026-01-01T00:00:00Z")
+	insertTierWithCreatedAt(t, db, "22222222-2222-2222-2222-222222222222", "Onyxia's Lair", true, "2026-01-02T00:00:00Z")
+	insertTierWithCreatedAt(t, db, "33333333-3333-3333-3333-333333333333", "Shattered Spire", false, "2025-12-01T00:00:00Z")
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "22222222-2222-2222-2222-222222222222", "Onyxia", 0, nil)
+
+	// when I ask for raid progress
+	resp := srv.Get(t, "/api/raid-progress")
+
+	// then I expect both current tiers, newest first, and the retired tier excluded
+	resp.RequireStatus(t, http.StatusOK)
+	var progress []progressJSON
+	resp.DecodeJSON(t, &progress)
+
+	want := []progressJSON{
+		{
+			Tier: struct {
+				Name string `json:"name"`
+			}{Name: "Onyxia's Lair"},
+			Bosses: []bossJSON{{ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", Name: "Onyxia", KilledAt: nil}},
+			Killed: 0,
+			Total:  1,
+		},
+		{
+			Tier: struct {
+				Name string `json:"name"`
+			}{Name: "Barrow Deeps"},
+			Bosses: []bossJSON{},
+			Killed: 0,
+			Total:  0,
+		},
+	}
+	if diff := cmp.Diff(want, progress); diff != "" {
+		t.Errorf("unexpected progress (-want +got):\n%s", diff)
+	}
+}
+
+func TestGetRaidProgress_ReturnsNotFound_WhenNoTierIsCurrent(t *testing.T) {
+	// given a tier that exists but is not current
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", false)
+
+	// when I ask for raid progress
+	resp := srv.Get(t, "/api/raid-progress")
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+	requireErrorBody(t, resp, "no current raid tier")
+}
+
+func TestGetRaidProgress_ReturnsNotFound_WhenNoTiersExist(t *testing.T) {
+	// given no raid tiers have been created yet
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when I ask for raid progress
+	resp := srv.Get(t, "/api/raid-progress")
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+	requireErrorBody(t, resp, "no current raid tier")
+}
+
+func TestListRaidTiers_ReturnsTiersNewestFirstWithBosses(t *testing.T) {
+	// given an older finished tier and a newer current tier, inserted oldest first
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTierWithCreatedAt(t, db, "11111111-1111-1111-1111-111111111111", "Sunken Reliquary", false, "2026-01-01T00:00:00Z")
+	insertTierWithCreatedAt(t, db, "22222222-2222-2222-2222-222222222222", "Molten Depths", true, "2026-03-01T00:00:00Z")
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "22222222-2222-2222-2222-222222222222", "Grimjaw", 1, nil)
+	killedAt := "2026-01-05T00:00:00Z"
+	insertBoss(t, db, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "11111111-1111-1111-1111-111111111111", "Voidshard Sentinel", 1, &killedAt)
+
+	// when I list raid tiers
+	resp := srv.Get(t, "/api/raid-tiers")
+
+	// then I expect the newer tier first, each with its own bosses
+	resp.RequireStatus(t, http.StatusOK)
+	var tiers []tierJSON
+	resp.DecodeJSON(t, &tiers)
+
+	want := []tierJSON{
+		{
+			ID:        "22222222-2222-2222-2222-222222222222",
+			Name:      "Molten Depths",
+			IsCurrent: true,
+			Bosses:    []bossJSON{{ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", Name: "Grimjaw", KilledAt: nil}},
+		},
+		{
+			ID:        "11111111-1111-1111-1111-111111111111",
+			Name:      "Sunken Reliquary",
+			IsCurrent: false,
+			Bosses:    []bossJSON{{ID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", Name: "Voidshard Sentinel", KilledAt: &killedAt}},
+		},
+	}
+	if diff := cmp.Diff(want, tiers); diff != "" {
+		t.Errorf("unexpected tiers (-want +got):\n%s", diff)
+	}
+}
+
+func TestListRaidTiers_OrdersBySortOrder_RegardlessOfCreationOrder(t *testing.T) {
+	// given a tier created later but given a lower sort_order than an older tier
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTierWithSortOrder(t, db, "11111111-1111-1111-1111-111111111111", "Hyjal Summit", true, 1, "2026-01-01T00:00:00Z")
+	insertTierWithSortOrder(t, db, "22222222-2222-2222-2222-222222222222", "Barrow Deeps", true, 0, "2026-03-01T00:00:00Z")
+
+	// when I list raid tiers
+	resp := srv.Get(t, "/api/raid-tiers")
+
+	// then I expect the higher sort_order first, regardless of creation time
+	resp.RequireStatus(t, http.StatusOK)
+	var tiers []tierJSON
+	resp.DecodeJSON(t, &tiers)
+
+	names := make([]string, len(tiers))
+	for i, tier := range tiers {
+		names[i] = tier.Name
+	}
+	want := []string{"Hyjal Summit", "Barrow Deeps"}
+	if diff := cmp.Diff(want, names); diff != "" {
+		t.Errorf("unexpected tier order (-want +got):\n%s", diff)
+	}
+}
+
+func TestGetRaidProgress_OrdersBySortOrder_RegardlessOfCreationOrder(t *testing.T) {
+	// given a current tier created later but given a lower sort_order than another current tier
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTierWithSortOrder(t, db, "11111111-1111-1111-1111-111111111111", "Hyjal Summit", true, 1, "2026-01-01T00:00:00Z")
+	insertTierWithSortOrder(t, db, "22222222-2222-2222-2222-222222222222", "Barrow Deeps", true, 0, "2026-03-01T00:00:00Z")
+
+	// when I ask for raid progress
+	resp := srv.Get(t, "/api/raid-progress")
+
+	// then I expect the higher sort_order first, regardless of creation time
+	resp.RequireStatus(t, http.StatusOK)
+	var progress []progressJSON
+	resp.DecodeJSON(t, &progress)
+
+	names := make([]string, len(progress))
+	for i, p := range progress {
+		names[i] = p.Tier.Name
+	}
+	want := []string{"Hyjal Summit", "Barrow Deeps"}
+	if diff := cmp.Diff(want, names); diff != "" {
+		t.Errorf("unexpected tier order (-want +got):\n%s", diff)
+	}
+}
+
+func TestListRaidTiers_ReturnsEmptyArray_WhenNoTiersExist(t *testing.T) {
+	// given no raid tiers exist
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when I list raid tiers
+	resp := srv.Get(t, "/api/raid-tiers")
+
+	// then I expect a 200 with an empty JSON array rather than null
+	resp.RequireStatus(t, http.StatusOK)
+	if got := string(resp.Body); got != "[]\n" {
+		t.Errorf("expected an empty JSON array, got %q", got)
+	}
+}
+
+func TestCreateRaidTier_ReturnsCreatedTier_WhenOfficerSubmitsValidBody(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a tier with two bosses
+	resp := srv.Post(t, "/api/raid-tiers", map[string]any{
+		"name":   "Molten Depths",
+		"bosses": []string{"Grimjaw", "Ashveil"},
+	})
+
+	// then I expect a 201 with the tier not current and bosses in the given order
+	resp.RequireStatus(t, http.StatusCreated)
+	var created tierJSON
+	resp.DecodeJSON(t, &created)
+
+	want := tierJSON{
+		ID:        created.ID,
+		Name:      "Molten Depths",
+		IsCurrent: false,
+		Bosses: []bossJSON{
+			{ID: created.Bosses[0].ID, Name: "Grimjaw", KilledAt: nil},
+			{ID: created.Bosses[1].ID, Name: "Ashveil", KilledAt: nil},
+		},
+	}
+	if diff := cmp.Diff(want, created); diff != "" {
+		t.Errorf("unexpected created tier (-want +got):\n%s", diff)
+	}
+	if created.ID == "" || created.Bosses[0].ID == "" || created.Bosses[1].ID == "" {
+		t.Errorf("expected the server to generate ids, got %+v", created)
+	}
+}
+
+func TestCreateRaidTier_ReturnsCreatedTierWithGivenSortOrder(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a tier with an explicit sort order
+	resp := srv.Post(t, "/api/raid-tiers", map[string]any{"name": "Molten Depths", "sortOrder": 3})
+
+	// then I expect the sort order stored and returned
+	resp.RequireStatus(t, http.StatusCreated)
+	var created tierJSON
+	resp.DecodeJSON(t, &created)
+	if created.SortOrder != 3 {
+		t.Errorf("expected sortOrder 3, got %d", created.SortOrder)
+	}
+}
+
+func TestCreateRaidTier_ReturnsCreatedTierWithoutBosses_WhenBossesOmitted(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a tier without any bosses
+	resp := srv.Post(t, "/api/raid-tiers", map[string]any{"name": "Molten Depths"})
+
+	// then I expect a 201 with an empty boss list
+	resp.RequireStatus(t, http.StatusCreated)
+	var created tierJSON
+	resp.DecodeJSON(t, &created)
+	if len(created.Bosses) != 0 {
+		t.Errorf("expected no bosses, got %+v", created.Bosses)
+	}
+}
+
+func TestCreateRaidTier_ReturnsBadRequest_WhenNameIsEmpty(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a tier with a blank name
+	resp := srv.Post(t, "/api/raid-tiers", map[string]any{"name": "   "})
+
+	// then I expect a 400 naming the name field
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "name: must not be empty")
+}
+
+func TestCreateRaidTier_ReturnsBadRequest_WhenABossNameIsEmpty(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a tier whose second boss name is blank
+	resp := srv.Post(t, "/api/raid-tiers", map[string]any{
+		"name":   "Molten Depths",
+		"bosses": []string{"Grimjaw", "  "},
+	})
+
+	// then I expect a 400 naming the bosses field
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "bosses: must not contain an empty name")
+}
+
+func TestCreateRaidTier_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given nobody is logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when I create a tier
+	resp := srv.Post(t, "/api/raid-tiers", map[string]any{"name": "Molten Depths"})
+
+	// then I expect a 401
+	resp.RequireStatus(t, http.StatusUnauthorized)
+}
+
+func TestCreateRaidTier_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
+	// given I am logged in as a regular member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "member-1", "Member")
+
+	// when I create a tier
+	resp := srv.Post(t, "/api/raid-tiers", map[string]any{"name": "Molten Depths"})
+
+	// then I expect a 403
+	resp.RequireStatus(t, http.StatusForbidden)
+}
+
+func TestSetCurrentTier_DoesNotClearOtherCurrentTiers(t *testing.T) {
+	// given one already-current tier (Forever ships at least two raids per tier, so this is expected)
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Barrow Deeps", true)
+	insertTier(t, db, "22222222-2222-2222-2222-222222222222", "Onyxia's Lair", false)
+
+	// when I mark the second tier current too
+	resp := srv.Patch(t, "/api/raid-tiers/22222222-2222-2222-2222-222222222222", map[string]any{"isCurrent": true})
+
+	// then I expect both tiers current
+	resp.RequireStatus(t, http.StatusOK)
+	var updated tierJSON
+	resp.DecodeJSON(t, &updated)
+	want := tierJSON{ID: "22222222-2222-2222-2222-222222222222", Name: "Onyxia's Lair", IsCurrent: true, Bosses: []bossJSON{}}
+	if diff := cmp.Diff(want, updated); diff != "" {
+		t.Errorf("unexpected patched tier (-want +got):\n%s", diff)
+	}
+
+	var stillCurrent bool
+	if err := db.Get(&stillCurrent, `SELECT is_current FROM raid_tiers WHERE id = '11111111-1111-1111-1111-111111111111'`); err != nil {
+		t.Fatalf("check other tier: %v", err)
+	}
+	if !stillCurrent {
+		t.Errorf("expected the other tier to remain current")
+	}
+}
+
+func TestSetCurrentTier_AllowsNoCurrentTier_WhenSetToFalse(t *testing.T) {
+	// given a current tier
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+
+	// when I clear it without naming a replacement
+	resp := srv.Patch(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111", map[string]any{"isCurrent": false})
+
+	// then I expect it cleared, and the progress endpoint now 404s
+	resp.RequireStatus(t, http.StatusOK)
+	var updated tierJSON
+	resp.DecodeJSON(t, &updated)
+	if updated.IsCurrent {
+		t.Errorf("expected the tier to no longer be current, got %+v", updated)
+	}
+
+	progressResp := srv.Get(t, "/api/raid-progress")
+	progressResp.RequireStatus(t, http.StatusNotFound)
+}
+
+func TestSetCurrentTier_ReturnsNotFound_WhenTierDoesNotExist(t *testing.T) {
+	// given I am logged in as an officer and no tiers exist
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I mark a nonexistent tier current
+	resp := srv.Patch(t, "/api/raid-tiers/99999999-9999-9999-9999-999999999999", map[string]any{"isCurrent": true})
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+}
+
+func TestSetCurrentTier_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
+	// given a tier and a logged-in regular member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "member-1", "Member")
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", false)
+
+	// when I mark it current
+	resp := srv.Patch(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111", map[string]any{"isCurrent": true})
+
+	// then I expect a 403
+	resp.RequireStatus(t, http.StatusForbidden)
+}
+
+func TestSetCurrentTier_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given a tier and nobody logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", false)
+
+	// when I mark it current
+	resp := srv.Patch(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111", map[string]any{"isCurrent": true})
+
+	// then I expect a 401
+	resp.RequireStatus(t, http.StatusUnauthorized)
+}
+
+func TestMarkBossKilled_SetsKilledAt_WhenOfficerRequests(t *testing.T) {
+	// given an unkilled boss in a tier
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 1, nil)
+
+	// when I mark the boss killed
+	resp := srv.Patch(t, "/api/raid-bosses/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", map[string]any{"killed": true})
+
+	// then I expect a 200 with killedAt set to the current fixed time
+	resp.RequireStatus(t, http.StatusOK)
+	var updated bossJSON
+	resp.DecodeJSON(t, &updated)
+
+	fixedNow := "2026-03-14T20:00:00Z"
+	want := bossJSON{ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", Name: "Grimjaw", KilledAt: &fixedNow}
+	if diff := cmp.Diff(want, updated); diff != "" {
+		t.Errorf("unexpected boss (-want +got):\n%s", diff)
+	}
+}
+
+func TestMarkBossKilled_ClearsKilledAt_WhenSetToFalse(t *testing.T) {
+	// given an already-killed boss
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	killedAt := "2026-03-01T20:00:00Z"
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 1, &killedAt)
+
+	// when I clear the kill
+	resp := srv.Patch(t, "/api/raid-bosses/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", map[string]any{"killed": false})
+
+	// then I expect a 200 with killedAt cleared
+	resp.RequireStatus(t, http.StatusOK)
+	var updated bossJSON
+	resp.DecodeJSON(t, &updated)
+	if updated.KilledAt != nil {
+		t.Errorf("expected killedAt cleared, got %+v", updated)
+	}
+}
+
+func TestMarkBossKilled_ReturnsNotFound_WhenBossDoesNotExist(t *testing.T) {
+	// given I am logged in as an officer and no bosses exist
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I mark a nonexistent boss killed
+	resp := srv.Patch(t, "/api/raid-bosses/99999999-9999-9999-9999-999999999999", map[string]any{"killed": true})
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+}
+
+func TestMarkBossKilled_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
+	// given a boss and a logged-in regular member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "member-1", "Member")
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 1, nil)
+
+	// when I mark the boss killed
+	resp := srv.Patch(t, "/api/raid-bosses/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", map[string]any{"killed": true})
+
+	// then I expect a 403
+	resp.RequireStatus(t, http.StatusForbidden)
+}
+
+func TestMarkBossKilled_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given a boss and nobody logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 1, nil)
+
+	// when I mark the boss killed
+	resp := srv.Patch(t, "/api/raid-bosses/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", map[string]any{"killed": true})
+
+	// then I expect a 401
+	resp.RequireStatus(t, http.StatusUnauthorized)
+}
