@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import type { NewsPost } from '../types/news'
+import type { RaidProgress, RaidTier } from '../types/raidProgress'
 import type { Raid } from '../types/raids'
 import type { Character } from '../types/roster'
 import type { Stream } from '../types/streams'
@@ -189,10 +190,36 @@ const rosterCharacters: Character[] = [
   },
 ]
 
+const raidProgress: RaidProgress = {
+  tier: { name: 'Molten Depths' },
+  bosses: [
+    { id: 'boss-1', name: 'Grimjaw', killedAt: new Date(Date.now() - 3 * 86_400_000).toISOString() },
+    { id: 'boss-2', name: 'Ashveil', killedAt: null },
+    { id: 'boss-3', name: 'Pyrelord', killedAt: null },
+  ],
+  killed: 1,
+  total: 3,
+}
+
+const raidTiers: RaidTier[] = [
+  { id: 'tier-1', name: raidProgress.tier.name, isCurrent: true, bosses: raidProgress.bosses },
+  {
+    id: 'tier-2',
+    name: 'Shattered Spire',
+    isCurrent: false,
+    bosses: [
+      { id: 'boss-4', name: 'Voidshard Sentinel', killedAt: new Date(Date.now() - 30 * 86_400_000).toISOString() },
+      { id: 'boss-5', name: 'Thornqueen Ilyra', killedAt: new Date(Date.now() - 28 * 86_400_000).toISOString() },
+    ],
+  },
+]
+
 export const handlers = [
   http.get('/api/auth/me', () => HttpResponse.json({ error: 'login required' }, { status: 401 })),
   http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/news', () => HttpResponse.json(newsPosts)),
+  http.get('/api/raid-progress', () => HttpResponse.json([raidProgress])),
+  http.get('/api/raid-tiers', () => HttpResponse.json(raidTiers)),
   http.get('/api/raids', () => HttpResponse.json(upcomingRaids)),
   http.get('/api/raids/next', () => HttpResponse.json(nextRaid)),
   http.get('/api/roster', () => HttpResponse.json(rosterCharacters)),
