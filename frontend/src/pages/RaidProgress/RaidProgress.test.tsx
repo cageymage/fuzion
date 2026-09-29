@@ -110,4 +110,32 @@ describe('RaidProgress', () => {
     await screen.findByRole('heading', { name: 'Molten Depths' })
     expect(screen.queryByText('Raid History')).not.toBeInTheDocument()
   })
+
+  it('should link to the officer management page when the visitor is an officer', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ id: 'user-1', username: 'Officer', avatarUrl: null, isOfficer: true }),
+      ),
+    )
+
+    renderWithProviders(<RaidProgress />)
+
+    expect(await screen.findByRole('link', { name: 'Manage raid progress' })).toHaveAttribute(
+      'href',
+      '/officer/raid-progress',
+    )
+  })
+
+  it('should not link to the officer management page when the visitor is not an officer', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ id: 'user-2', username: 'Member', avatarUrl: null, isOfficer: false }),
+      ),
+    )
+
+    renderWithProviders(<RaidProgress />)
+
+    await screen.findByRole('heading', { name: 'Molten Depths' })
+    expect(screen.queryByRole('link', { name: 'Manage raid progress' })).not.toBeInTheDocument()
+  })
 })

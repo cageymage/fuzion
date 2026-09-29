@@ -15,5 +15,12 @@ export interface RaidTier {
   id: string
   name: string
   isCurrent: boolean
+  sortOrder: number
   bosses: RaidProgressBoss[]
+}
+
+export interface CreateRaidTierRequest {
+  name: string
+  sortOrder: number
+  bosses: string[]
 }

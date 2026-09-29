@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { formatRaidDay } from '../../lib/format'
 import type { RaidProgressBoss } from '../../types/raidProgress'
 import styles from './RaidProgress.module.css'
@@ -55,11 +57,17 @@ function TierCard({ name, killed, total, bosses, muted }: TierCardProps) {
 export function RaidProgress() {
   const progress = useRaidProgressData()
   const tiers = useRaidTiersData()
+  const currentUser = useCurrentUser()
   const pastTiers = (tiers.data ?? []).filter((tier) => !tier.isCurrent)
 
   return (
     <section className={styles.page}>
       <h1 className={styles.title}>Raid Progress</h1>
+      {currentUser.data?.isOfficer && (
+        <Link to="/officer/raid-progress" className={styles.manageLink}>
+          Manage raid progress
+        </Link>
+      )}
 
       {progress.isPending && <p className={styles.noticeText}>Loading raid progress…</p>}
       {progress.isError && <p className={styles.noticeText}>Raid progress could not be loaded.</p>}

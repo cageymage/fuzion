@@ -15,6 +15,7 @@ var (
 	ErrNoCurrentTier = errors.New("no current raid tier")
 	ErrTierNotFound  = errors.New("raid tier not found")
 	ErrBossNotFound  = errors.New("raid boss not found")
+	ErrTierIsCurrent = errors.New("raid tier is current; clear its current flag before deleting it")
 )
 
 type Boss struct {
@@ -185,6 +186,46 @@ func (r *Repo) SetBossKilled(ctx context.Context, id uuid.UUID, killedAt *time.T
 	}
 	normalizeKilledAt(&boss)
 	return boss, nil
+}
+
+// DeleteTier refuses a current tier so the public progress widget never loses
+// a raid out from under it; the tier's bosses go with it via ON DELETE CASCADE.
+func (r *Repo) DeleteTier(ctx context.Context, id uuid.UUID) error {
+	result, err := r.db.ExecContext(ctx, `DELETE FROM raid_tiers WHERE id = $1 AND is_current = false`, id)
+	if err != nil {
+		return fmt.Errorf("delete raid tier %s: %w", id, err)
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count deleted raid tiers: %w", err)
+	}
+	if deleted > 0 {
+		return nil
+	}
+
+	var isCurrent bool
+	if err := r.db.GetContext(ctx, &isCurrent, `SELECT is_current FROM raid_tiers WHERE id = $1`, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrTierNotFound
+		}
+		return fmt.Errorf("check raid tier %s: %w", id, err)
+	}
+	return ErrTierIsCurrent
+}
+
+func (r *Repo) DeleteBoss(ctx context.Context, id uuid.UUID) error {
+	result, err := r.db.ExecContext(ctx, `DELETE FROM raid_bosses WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete raid boss %s: %w", id, err)
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count deleted raid bosses: %w", err)
+	}
+	if deleted == 0 {
+		return ErrBossNotFound
+	}
+	return nil
 }
 
 // pgx hands back timestamptz in the process-local zone; the API always emits UTC.

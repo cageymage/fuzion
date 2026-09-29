@@ -29,7 +29,9 @@ func (h *Handler) Register(r chi.Router) {
 		officer.Use(auth.RequireOfficer)
 		officer.Post("/raid-tiers", h.createTier)
 		officer.Patch("/raid-tiers/{id}", h.setCurrent)
+		officer.Delete("/raid-tiers/{id}", h.deleteTier)
 		officer.Patch("/raid-bosses/{id}", h.setBossKilled)
+		officer.Delete("/raid-bosses/{id}", h.deleteBoss)
 	})
 }
 
@@ -101,6 +103,32 @@ func (h *Handler) setBossKilled(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, updated)
 }
 
+func (h *Handler) deleteTier(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(w, r, ErrTierNotFound)
+	if !ok {
+		return
+	}
+
+	if err := h.service.DeleteTier(r.Context(), id); err != nil {
+		h.writeError(w, r, "delete raid tier", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) deleteBoss(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(w, r, ErrBossNotFound)
+	if !ok {
+		return
+	}
+
+	if err := h.service.DeleteBoss(r.Context(), id); err != nil {
+		h.writeError(w, r, "delete raid boss", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func decodeBody(w http.ResponseWriter, r *http.Request, target any) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	if err := json.NewDecoder(r.Body).Decode(target); err != nil {
@@ -130,6 +158,8 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, action stri
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrTierNotFound.Error()})
 	case errors.Is(err, ErrBossNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrBossNotFound.Error()})
+	case errors.Is(err, ErrTierIsCurrent):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrTierIsCurrent.Error()})
 	default:
 		slog.ErrorContext(r.Context(), action, "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": action + " failed"})

@@ -5,6 +5,7 @@ import { Calendar } from '../pages/Calendar/Calendar'
 import { ComingSoon } from '../pages/ComingSoon/ComingSoon'
 import { Home } from '../pages/Home/Home'
 import { News } from '../pages/News/News'
+import { OfficerRaidProgress } from '../pages/OfficerRaidProgress/OfficerRaidProgress'
 import { RaidProgress } from '../pages/RaidProgress/RaidProgress'
 import { Roster } from '../pages/Roster/Roster'
 import { Streams } from '../pages/Streams/Streams'
@@ -22,6 +23,7 @@ export function App() {
           <Route path="/news" element={<News />} />
           <Route path="/roster" element={<Roster />} />
           <Route path="/raid-progress" element={<RaidProgress />} />
+          <Route path="/officer/raid-progress" element={<OfficerRaidProgress />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/streams" element={<Streams />} />
           {navItems

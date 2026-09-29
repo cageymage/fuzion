@@ -202,11 +202,18 @@ const raidProgress: RaidProgress = {
 }
 
 const raidTiers: RaidTier[] = [
-  { id: 'tier-1', name: raidProgress.tier.name, isCurrent: true, bosses: raidProgress.bosses },
+  {
+    id: 'tier-1',
+    name: raidProgress.tier.name,
+    isCurrent: true,
+    sortOrder: 2,
+    bosses: raidProgress.bosses,
+  },
   {
     id: 'tier-2',
     name: 'Shattered Spire',
     isCurrent: false,
+    sortOrder: 1,
     bosses: [
       { id: 'boss-4', name: 'Voidshard Sentinel', killedAt: new Date(Date.now() - 30 * 86_400_000).toISOString() },
       { id: 'boss-5', name: 'Thornqueen Ilyra', killedAt: new Date(Date.now() - 28 * 86_400_000).toISOString() },
@@ -220,6 +227,16 @@ export const handlers = [
   http.get('/api/news', () => HttpResponse.json(newsPosts)),
   http.get('/api/raid-progress', () => HttpResponse.json([raidProgress])),
   http.get('/api/raid-tiers', () => HttpResponse.json(raidTiers)),
+  http.post('/api/raid-tiers', () =>
+    HttpResponse.json(
+      { id: 'tier-3', name: 'New Tier', isCurrent: false, sortOrder: 3, bosses: [] },
+      { status: 201 },
+    ),
+  ),
+  http.patch('/api/raid-tiers/:id', () => HttpResponse.json(raidTiers[0])),
+  http.delete('/api/raid-tiers/:id', () => new HttpResponse(null, { status: 204 })),
+  http.patch('/api/raid-bosses/:id', () => HttpResponse.json(raidProgress.bosses[0])),
+  http.delete('/api/raid-bosses/:id', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/raids', () => HttpResponse.json(upcomingRaids)),
   http.get('/api/raids/next', () => HttpResponse.json(nextRaid)),
   http.get('/api/roster', () => HttpResponse.json(rosterCharacters)),
