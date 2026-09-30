@@ -8,6 +8,17 @@ export async function apiGet<T>(path: string): Promise<T> {
   return (await response.json()) as T
 }
 
+export async function apiGetOptional<T>(path: string): Promise<T | null> {
+  const response = await fetch(`${baseUrl}${path}`, { credentials: 'include' })
+  if (response.status === 204) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(`GET ${path} failed with ${response.status}`)
+  }
+  return (await response.json()) as T
+}
+
 export async function apiPost(path: string): Promise<void> {
   const response = await fetch(`${baseUrl}${path}`, { method: 'POST', credentials: 'include' })
   if (!response.ok) {

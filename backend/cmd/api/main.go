@@ -24,6 +24,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/youtube"
 	"github.com/cageymage/fuzion/backend/migrations"
 )
 
@@ -60,6 +61,16 @@ func run() error {
 		BaseURL:      auth.DiscordAPIBaseURL,
 	}, &http.Client{Timeout: 10 * time.Second})
 
+	playlistID := cfg.youtube.playlistID
+	if !cfg.youtube.enabled() {
+		slog.Info("suggested videos disabled: YOUTUBE_API_KEY and YOUTUBE_PLAYLIST_ID are not both set")
+		playlistID = ""
+	}
+	youTube := youtube.NewClient(youtube.Config{
+		APIKey:  cfg.youtube.apiKey,
+		BaseURL: youtube.APIBaseURL,
+	}, &http.Client{Timeout: 10 * time.Second})
+
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{})),
 		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db))),
@@ -68,7 +79,7 @@ func run() error {
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.System{})),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
-		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db))),
+		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), streams.NewSuggestedVideos(youTube, playlistID, clock.System{})),
 		AllowedOrigins: cfg.allowedOrigins,
 	})
 

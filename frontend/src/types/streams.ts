@@ -1,3 +1,8 @@
+export interface SuggestedVideo {
+  id: string
+  title: string
+}
+
 export interface Stream {
   id: string
   streamerName: string

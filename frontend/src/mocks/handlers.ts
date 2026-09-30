@@ -267,4 +267,7 @@ export const handlers = [
   http.get('/api/roster', () => HttpResponse.json(rosterCharacters)),
   http.get('/api/streams', () => HttpResponse.json(allStreams)),
   http.get('/api/streams/live', () => HttpResponse.json(liveStreams)),
+  http.get('/api/streams/suggested-video', () =>
+    HttpResponse.json({ id: 'vid-1', title: 'Queen Ansurek kill' }),
+  ),
 ]

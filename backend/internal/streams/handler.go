@@ -9,16 +9,32 @@ import (
 )
 
 type Handler struct {
-	service *Service
+	service         *Service
+	suggestedVideos *SuggestedVideos
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, suggestedVideos *SuggestedVideos) *Handler {
+	return &Handler{service: service, suggestedVideos: suggestedVideos}
 }
 
 func (h *Handler) Register(r chi.Router) {
 	r.Get("/streams", h.listAll)
 	r.Get("/streams/live", h.listLive)
+	r.Get("/streams/suggested-video", h.suggestedVideo)
+}
+
+func (h *Handler) suggestedVideo(w http.ResponseWriter, r *http.Request) {
+	video, ok, err := h.suggestedVideos.Suggest(r.Context())
+	if err != nil {
+		slog.ErrorContext(r.Context(), "suggest video", "error", err)
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "suggested video could not be loaded"})
+		return
+	}
+	if !ok {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"id": video.ID, "title": video.Title})
 }
 
 func (h *Handler) listLive(w http.ResponseWriter, r *http.Request) {
