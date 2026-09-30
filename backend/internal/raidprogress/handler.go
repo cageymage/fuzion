@@ -28,9 +28,12 @@ func (h *Handler) Register(r chi.Router) {
 	r.Group(func(officer chi.Router) {
 		officer.Use(auth.RequireOfficer)
 		officer.Post("/raid-tiers", h.createTier)
-		officer.Patch("/raid-tiers/{id}", h.setCurrent)
+		officer.Put("/raid-tiers/order", h.reorderTiers)
+		officer.Patch("/raid-tiers/{id}", h.updateTier)
 		officer.Delete("/raid-tiers/{id}", h.deleteTier)
-		officer.Patch("/raid-bosses/{id}", h.setBossKilled)
+		officer.Post("/raid-tiers/{id}/bosses", h.addBoss)
+		officer.Put("/raid-tiers/{id}/bosses/order", h.reorderBosses)
+		officer.Patch("/raid-bosses/{id}", h.updateBoss)
 		officer.Delete("/raid-bosses/{id}", h.deleteBoss)
 	})
 }
@@ -67,37 +70,85 @@ func (h *Handler) createTier(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, created)
 }
 
-func (h *Handler) setCurrent(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) updateTier(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseID(w, r, ErrTierNotFound)
 	if !ok {
 		return
 	}
-	var req SetCurrentRequest
+	var req UpdateTierRequest
 	if !decodeBody(w, r, &req) {
 		return
 	}
 
-	updated, err := h.service.SetTierCurrent(r.Context(), id, req)
+	updated, err := h.service.UpdateTier(r.Context(), id, req)
 	if err != nil {
-		h.writeError(w, r, "set raid tier current", err)
+		h.writeError(w, r, "update raid tier", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, updated)
 }
 
-func (h *Handler) setBossKilled(w http.ResponseWriter, r *http.Request) {
-	id, ok := parseID(w, r, ErrBossNotFound)
-	if !ok {
-		return
-	}
-	var req SetKilledRequest
+func (h *Handler) reorderTiers(w http.ResponseWriter, r *http.Request) {
+	var req ReorderRequest
 	if !decodeBody(w, r, &req) {
 		return
 	}
 
-	updated, err := h.service.SetBossKilled(r.Context(), id, req)
+	if err := h.service.ReorderTiers(r.Context(), req); err != nil {
+		h.writeError(w, r, "reorder raid tiers", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) addBoss(w http.ResponseWriter, r *http.Request) {
+	tierID, ok := parseID(w, r, ErrTierNotFound)
+	if !ok {
+		return
+	}
+	var req AddBossRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+
+	added, err := h.service.AddBoss(r.Context(), tierID, req)
 	if err != nil {
-		h.writeError(w, r, "mark raid boss killed", err)
+		h.writeError(w, r, "add raid boss", err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, added)
+}
+
+func (h *Handler) reorderBosses(w http.ResponseWriter, r *http.Request) {
+	tierID, ok := parseID(w, r, ErrTierNotFound)
+	if !ok {
+		return
+	}
+	var req ReorderRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+
+	if err := h.service.ReorderBosses(r.Context(), tierID, req); err != nil {
+		h.writeError(w, r, "reorder raid bosses", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) updateBoss(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(w, r, ErrBossNotFound)
+	if !ok {
+		return
+	}
+	var req UpdateBossRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+
+	updated, err := h.service.UpdateBoss(r.Context(), id, req)
+	if err != nil {
+		h.writeError(w, r, "update raid boss", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, updated)
@@ -158,6 +209,10 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, action stri
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrTierNotFound.Error()})
 	case errors.Is(err, ErrBossNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrBossNotFound.Error()})
+	case errors.Is(err, ErrTierOrderMismatch):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": ErrTierOrderMismatch.Error()})
+	case errors.Is(err, ErrBossOrderMismatch):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": ErrBossOrderMismatch.Error()})
 	case errors.Is(err, ErrTierIsCurrent):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrTierIsCurrent.Error()})
 	default:

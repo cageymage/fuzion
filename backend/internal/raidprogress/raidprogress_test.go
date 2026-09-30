@@ -734,3 +734,500 @@ func TestDeleteRaidBoss_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) 
 	// then I expect a 401
 	resp.RequireStatus(t, http.StatusUnauthorized)
 }
+
+func tierNamesInListOrder(t *testing.T, srv *testutil.Server) []string {
+	t.Helper()
+	resp := srv.Get(t, "/api/raid-tiers")
+	resp.RequireStatus(t, http.StatusOK)
+	var tiers []tierJSON
+	resp.DecodeJSON(t, &tiers)
+	names := make([]string, len(tiers))
+	for i, tier := range tiers {
+		names[i] = tier.Name
+	}
+	return names
+}
+
+type bossRow struct {
+	Name      string  `db:"name"`
+	SortOrder int     `db:"sort_order"`
+	KilledAt  *string `db:"killed_at"`
+}
+
+func bossRowsInOrder(t *testing.T, db *sqlx.DB, tierID string) []bossRow {
+	t.Helper()
+	var rows []bossRow
+	const query = `SELECT name, sort_order, to_char(killed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS killed_at
+		FROM raid_bosses WHERE tier_id = $1 ORDER BY sort_order`
+	if err := db.Select(&rows, query, tierID); err != nil {
+		t.Fatalf("select bosses of tier %s: %v", tierID, err)
+	}
+	return rows
+}
+
+func TestRenameRaidTier_ReturnsRenamedTier_KeepingItsCurrentFlag(t *testing.T) {
+	// given a current tier with a misspelled name
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depthz", true)
+
+	// when I rename it with surrounding whitespace
+	resp := srv.Patch(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111", map[string]any{"name": "  Molten Depths  "})
+
+	// then I expect the trimmed name and the tier still current
+	resp.RequireStatus(t, http.StatusOK)
+	var updated tierJSON
+	resp.DecodeJSON(t, &updated)
+	want := tierJSON{ID: "11111111-1111-1111-1111-111111111111", Name: "Molten Depths", IsCurrent: true, Bosses: []bossJSON{}}
+	if diff := cmp.Diff(want, updated); diff != "" {
+		t.Errorf("unexpected renamed tier (-want +got):\n%s", diff)
+	}
+}
+
+func TestRenameRaidTier_ReturnsBadRequest_WhenNameIsEmpty(t *testing.T) {
+	// given a tier
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", false)
+
+	// when I rename it to a blank name
+	resp := srv.Patch(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111", map[string]any{"name": "   "})
+
+	// then I expect a 400 and the name unchanged
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "name: must not be empty")
+	if diff := cmp.Diff([]string{"Molten Depths"}, tierNamesInListOrder(t, srv)); diff != "" {
+		t.Errorf("unexpected tier names (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateRaidTier_ReturnsBadRequest_WhenBodySetsNoField(t *testing.T) {
+	// given a tier
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", false)
+
+	// when I patch it with an empty body
+	resp := srv.Patch(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111", map[string]any{})
+
+	// then I expect a 400 asking for at least one field
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "body: must set name or isCurrent")
+}
+
+func TestRenameRaidTier_ReturnsNotFound_WhenTierDoesNotExist(t *testing.T) {
+	// given I am logged in as an officer and no tiers exist
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I rename a nonexistent tier
+	resp := srv.Patch(t, "/api/raid-tiers/99999999-9999-9999-9999-999999999999", map[string]any{"name": "Molten Depths"})
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+	requireErrorBody(t, resp, "raid tier not found")
+}
+
+func TestReorderRaidTiers_ListsTiersInTheGivenOrder(t *testing.T) {
+	// given three tiers listed newest first
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTierWithSortOrder(t, db, "11111111-1111-1111-1111-111111111111", "Barrow Deeps", false, 0, "2026-01-01T00:00:00Z")
+	insertTierWithSortOrder(t, db, "22222222-2222-2222-2222-222222222222", "Hyjal Summit", true, 1, "2026-02-01T00:00:00Z")
+	insertTierWithSortOrder(t, db, "33333333-3333-3333-3333-333333333333", "Onyxia's Lair", true, 2, "2026-03-01T00:00:00Z")
+
+	// when I put them in a new order
+	resp := srv.Put(t, "/api/raid-tiers/order", map[string]any{"ids": []string{
+		"22222222-2222-2222-2222-222222222222",
+		"11111111-1111-1111-1111-111111111111",
+		"33333333-3333-3333-3333-333333333333",
+	}})
+
+	// then I expect a 204 and the tier list in exactly that order
+	resp.RequireStatus(t, http.StatusNoContent)
+	want := []string{"Hyjal Summit", "Barrow Deeps", "Onyxia's Lair"}
+	if diff := cmp.Diff(want, tierNamesInListOrder(t, srv)); diff != "" {
+		t.Errorf("unexpected tier order (-want +got):\n%s", diff)
+	}
+}
+
+func TestReorderRaidTiers_ReturnsBadRequestAndChangesNothing_WhenListIsIncomplete(t *testing.T) {
+	// given two tiers
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTierWithSortOrder(t, db, "11111111-1111-1111-1111-111111111111", "Barrow Deeps", false, 0, "2026-01-01T00:00:00Z")
+	insertTierWithSortOrder(t, db, "22222222-2222-2222-2222-222222222222", "Hyjal Summit", true, 1, "2026-02-01T00:00:00Z")
+
+	// when I reorder with only one of them
+	resp := srv.Put(t, "/api/raid-tiers/order", map[string]any{"ids": []string{"11111111-1111-1111-1111-111111111111"}})
+
+	// then I expect a 400 and the original order kept
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "ids: must list every raid exactly once")
+	if diff := cmp.Diff([]string{"Hyjal Summit", "Barrow Deeps"}, tierNamesInListOrder(t, srv)); diff != "" {
+		t.Errorf("unexpected tier order (-want +got):\n%s", diff)
+	}
+}
+
+func TestReorderRaidTiers_ReturnsBadRequestAndChangesNothing_WhenListHasAStaleID(t *testing.T) {
+	// given two tiers
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTierWithSortOrder(t, db, "11111111-1111-1111-1111-111111111111", "Barrow Deeps", false, 0, "2026-01-01T00:00:00Z")
+	insertTierWithSortOrder(t, db, "22222222-2222-2222-2222-222222222222", "Hyjal Summit", true, 1, "2026-02-01T00:00:00Z")
+
+	// when I reorder with a list naming a since-deleted tier in place of one that exists
+	resp := srv.Put(t, "/api/raid-tiers/order", map[string]any{"ids": []string{
+		"11111111-1111-1111-1111-111111111111",
+		"99999999-9999-9999-9999-999999999999",
+	}})
+
+	// then I expect a 400 and the original order kept
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "ids: must list every raid exactly once")
+	if diff := cmp.Diff([]string{"Hyjal Summit", "Barrow Deeps"}, tierNamesInListOrder(t, srv)); diff != "" {
+		t.Errorf("unexpected tier order (-want +got):\n%s", diff)
+	}
+}
+
+func TestReorderRaidTiers_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
+	// given a tier and a logged-in regular member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "member-1", "Member")
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", false)
+
+	// when I reorder the tiers
+	resp := srv.Put(t, "/api/raid-tiers/order", map[string]any{"ids": []string{"11111111-1111-1111-1111-111111111111"}})
+
+	// then I expect a 403
+	resp.RequireStatus(t, http.StatusForbidden)
+}
+
+func TestReorderRaidTiers_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given a tier and nobody logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", false)
+
+	// when I reorder the tiers
+	resp := srv.Put(t, "/api/raid-tiers/order", map[string]any{"ids": []string{"11111111-1111-1111-1111-111111111111"}})
+
+	// then I expect a 401
+	resp.RequireStatus(t, http.StatusUnauthorized)
+}
+
+func TestAddRaidBoss_ReturnsCreatedBossAddedLast(t *testing.T) {
+	// given a tier with two bosses
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 0, nil)
+	insertBoss(t, db, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "11111111-1111-1111-1111-111111111111", "Ashveil", 1, nil)
+
+	// when I add a boss with surrounding whitespace
+	resp := srv.Post(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111/bosses", map[string]any{"name": " Pyrelord "})
+
+	// then I expect a 201 with the trimmed, unkilled boss, placed after the existing bosses
+	resp.RequireStatus(t, http.StatusCreated)
+	var added bossJSON
+	resp.DecodeJSON(t, &added)
+	if diff := cmp.Diff(bossJSON{ID: added.ID, Name: "Pyrelord", KilledAt: nil}, added); diff != "" {
+		t.Errorf("unexpected added boss (-want +got):\n%s", diff)
+	}
+	if added.ID == "" {
+		t.Errorf("expected the server to generate an id")
+	}
+
+	want := []bossRow{
+		{Name: "Grimjaw", SortOrder: 0},
+		{Name: "Ashveil", SortOrder: 1},
+		{Name: "Pyrelord", SortOrder: 2},
+	}
+	if diff := cmp.Diff(want, bossRowsInOrder(t, db, "11111111-1111-1111-1111-111111111111")); diff != "" {
+		t.Errorf("unexpected bosses (-want +got):\n%s", diff)
+	}
+}
+
+func TestAddRaidBoss_StartsAtSortOrderZero_WhenTierHasNoBosses(t *testing.T) {
+	// given a tier with no bosses
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+
+	// when I add a boss
+	resp := srv.Post(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111/bosses", map[string]any{"name": "Grimjaw"})
+
+	// then I expect it stored as the first boss
+	resp.RequireStatus(t, http.StatusCreated)
+	want := []bossRow{{Name: "Grimjaw", SortOrder: 0}}
+	if diff := cmp.Diff(want, bossRowsInOrder(t, db, "11111111-1111-1111-1111-111111111111")); diff != "" {
+		t.Errorf("unexpected bosses (-want +got):\n%s", diff)
+	}
+}
+
+func TestAddRaidBoss_ReturnsBadRequest_WhenNameIsEmpty(t *testing.T) {
+	// given a tier
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+
+	// when I add a boss with a blank name
+	resp := srv.Post(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111/bosses", map[string]any{"name": "  "})
+
+	// then I expect a 400 and no boss stored
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "name: must not be empty")
+	if got := countRows(t, db, "raid_bosses"); got != 0 {
+		t.Errorf("expected no bosses, found %d rows", got)
+	}
+}
+
+func TestAddRaidBoss_ReturnsNotFound_WhenTierDoesNotExist(t *testing.T) {
+	// given I am logged in as an officer and no tiers exist
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I add a boss to a nonexistent tier
+	resp := srv.Post(t, "/api/raid-tiers/99999999-9999-9999-9999-999999999999/bosses", map[string]any{"name": "Grimjaw"})
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+	requireErrorBody(t, resp, "raid tier not found")
+}
+
+func TestAddRaidBoss_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
+	// given a tier and a logged-in regular member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "member-1", "Member")
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+
+	// when I add a boss
+	resp := srv.Post(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111/bosses", map[string]any{"name": "Grimjaw"})
+
+	// then I expect a 403
+	resp.RequireStatus(t, http.StatusForbidden)
+}
+
+func TestAddRaidBoss_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given a tier and nobody logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+
+	// when I add a boss
+	resp := srv.Post(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111/bosses", map[string]any{"name": "Grimjaw"})
+
+	// then I expect a 401
+	resp.RequireStatus(t, http.StatusUnauthorized)
+}
+
+func TestRenameRaidBoss_ReturnsRenamedBoss_KeepingItsKill(t *testing.T) {
+	// given a killed boss with a misspelled name
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	killedAt := "2026-03-01T20:00:00Z"
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjow", 0, &killedAt)
+
+	// when I rename it
+	resp := srv.Patch(t, "/api/raid-bosses/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", map[string]any{"name": " Grimjaw "})
+
+	// then I expect the trimmed name and the original kill time
+	resp.RequireStatus(t, http.StatusOK)
+	var updated bossJSON
+	resp.DecodeJSON(t, &updated)
+	want := bossJSON{ID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", Name: "Grimjaw", KilledAt: &killedAt}
+	if diff := cmp.Diff(want, updated); diff != "" {
+		t.Errorf("unexpected renamed boss (-want +got):\n%s", diff)
+	}
+}
+
+func TestRenameRaidBoss_ReturnsBadRequest_WhenNameIsEmpty(t *testing.T) {
+	// given a boss
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 0, nil)
+
+	// when I rename it to a blank name
+	resp := srv.Patch(t, "/api/raid-bosses/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", map[string]any{"name": ""})
+
+	// then I expect a 400 and the name unchanged
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "name: must not be empty")
+	want := []bossRow{{Name: "Grimjaw", SortOrder: 0}}
+	if diff := cmp.Diff(want, bossRowsInOrder(t, db, "11111111-1111-1111-1111-111111111111")); diff != "" {
+		t.Errorf("unexpected bosses (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateRaidBoss_ReturnsBadRequest_WhenBodySetsNoField(t *testing.T) {
+	// given a boss
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 0, nil)
+
+	// when I patch it with an empty body
+	resp := srv.Patch(t, "/api/raid-bosses/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", map[string]any{})
+
+	// then I expect a 400 asking for at least one field
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "body: must set name or killed")
+}
+
+func TestRenameRaidBoss_ReturnsNotFound_WhenBossDoesNotExist(t *testing.T) {
+	// given I am logged in as an officer and no bosses exist
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I rename a nonexistent boss
+	resp := srv.Patch(t, "/api/raid-bosses/99999999-9999-9999-9999-999999999999", map[string]any{"name": "Grimjaw"})
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+	requireErrorBody(t, resp, "raid boss not found")
+}
+
+func TestReorderRaidBosses_StoresTheGivenOrder_WithoutTrippingTheUniqueSortOrder(t *testing.T) {
+	// given a tier with three bosses at sort orders 0..2, the middle one killed
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	killedAt := "2026-03-01T20:00:00Z"
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 0, nil)
+	insertBoss(t, db, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "11111111-1111-1111-1111-111111111111", "Ashveil", 1, &killedAt)
+	insertBoss(t, db, "cccccccc-cccc-cccc-cccc-cccccccccccc", "11111111-1111-1111-1111-111111111111", "Pyrelord", 2, nil)
+
+	// when I reverse them, so each boss takes a sort order another boss holds
+	resp := srv.Put(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111/bosses/order", map[string]any{"ids": []string{
+		"cccccccc-cccc-cccc-cccc-cccccccccccc",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+		"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+	}})
+
+	// then I expect a 204 and the bosses in the new order with their kill state kept
+	resp.RequireStatus(t, http.StatusNoContent)
+	want := []bossRow{
+		{Name: "Pyrelord", SortOrder: 0},
+		{Name: "Ashveil", SortOrder: 1, KilledAt: &killedAt},
+		{Name: "Grimjaw", SortOrder: 2},
+	}
+	if diff := cmp.Diff(want, bossRowsInOrder(t, db, "11111111-1111-1111-1111-111111111111")); diff != "" {
+		t.Errorf("unexpected bosses (-want +got):\n%s", diff)
+	}
+}
+
+func TestReorderRaidBosses_ReturnsBadRequestAndChangesNothing_WhenListIsIncomplete(t *testing.T) {
+	// given a tier with two bosses
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 0, nil)
+	insertBoss(t, db, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "11111111-1111-1111-1111-111111111111", "Ashveil", 1, nil)
+
+	// when I reorder with only one of them
+	resp := srv.Put(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111/bosses/order", map[string]any{"ids": []string{
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+	}})
+
+	// then I expect a 400 and the original order kept
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "ids: must list every boss in the raid exactly once")
+	want := []bossRow{{Name: "Grimjaw", SortOrder: 0}, {Name: "Ashveil", SortOrder: 1}}
+	if diff := cmp.Diff(want, bossRowsInOrder(t, db, "11111111-1111-1111-1111-111111111111")); diff != "" {
+		t.Errorf("unexpected bosses (-want +got):\n%s", diff)
+	}
+}
+
+func TestReorderRaidBosses_ReturnsBadRequestAndChangesNothing_WhenListHasABossFromAnotherTier(t *testing.T) {
+	// given two tiers with one boss each
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertTier(t, db, "22222222-2222-2222-2222-222222222222", "Shattered Spire", false)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 0, nil)
+	insertBoss(t, db, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "22222222-2222-2222-2222-222222222222", "Voidshard Sentinel", 0, nil)
+
+	// when I reorder the first tier's bosses using the other tier's boss
+	resp := srv.Put(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111/bosses/order", map[string]any{"ids": []string{
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+	}})
+
+	// then I expect a 400 and neither tier's bosses changed
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "ids: must list every boss in the raid exactly once")
+	if diff := cmp.Diff([]bossRow{{Name: "Grimjaw", SortOrder: 0}}, bossRowsInOrder(t, db, "11111111-1111-1111-1111-111111111111")); diff != "" {
+		t.Errorf("unexpected bosses in first tier (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]bossRow{{Name: "Voidshard Sentinel", SortOrder: 0}}, bossRowsInOrder(t, db, "22222222-2222-2222-2222-222222222222")); diff != "" {
+		t.Errorf("unexpected bosses in second tier (-want +got):\n%s", diff)
+	}
+}
+
+func TestReorderRaidBosses_ReturnsNotFound_WhenTierDoesNotExist(t *testing.T) {
+	// given I am logged in as an officer and no tiers exist
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I reorder the bosses of a nonexistent tier
+	resp := srv.Put(t, "/api/raid-tiers/99999999-9999-9999-9999-999999999999/bosses/order", map[string]any{"ids": []string{}})
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+	requireErrorBody(t, resp, "raid tier not found")
+}
+
+func TestReorderRaidBosses_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
+	// given a tier with a boss and a logged-in regular member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "member-1", "Member")
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 0, nil)
+
+	// when I reorder the bosses
+	resp := srv.Put(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111/bosses/order", map[string]any{"ids": []string{
+		"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+	}})
+
+	// then I expect a 403
+	resp.RequireStatus(t, http.StatusForbidden)
+}
+
+func TestReorderRaidBosses_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given a tier with a boss and nobody logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertTier(t, db, "11111111-1111-1111-1111-111111111111", "Molten Depths", true)
+	insertBoss(t, db, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "11111111-1111-1111-1111-111111111111", "Grimjaw", 0, nil)
+
+	// when I reorder the bosses
+	resp := srv.Put(t, "/api/raid-tiers/11111111-1111-1111-1111-111111111111/bosses/order", map[string]any{"ids": []string{
+		"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+	}})
+
+	// then I expect a 401
+	resp.RequireStatus(t, http.StatusUnauthorized)
+}

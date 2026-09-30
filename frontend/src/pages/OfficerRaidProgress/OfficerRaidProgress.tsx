@@ -7,6 +7,13 @@ import { useRaidTiersData } from '../RaidProgress/useRaidProgressData'
 import styles from './OfficerRaidProgress.module.css'
 import { useOfficerRaidProgress } from './useOfficerRaidProgress'
 
+function swapped<T>(items: T[], index: number, offset: -1 | 1): T[] {
+  const target = index + offset
+  const reordered = [...items]
+  ;[reordered[index], reordered[target]] = [reordered[target], reordered[index]]
+  return reordered
+}
+
 interface CreateTierFormProps {
   nextSortOrder: number
 }
@@ -21,10 +28,7 @@ function CreateTierForm({ nextSortOrder }: CreateTierFormProps) {
   }
 
   function moveBoss(index: number, offset: -1 | 1) {
-    const target = index + offset
-    const reordered = [...bossNames]
-    ;[reordered[index], reordered[target]] = [reordered[target], reordered[index]]
-    setBossNames(reordered)
+    setBossNames(swapped(bossNames, index, offset))
   }
 
   function submit(event: FormEvent) {
@@ -156,24 +160,187 @@ function ConfirmDeleteButton({ target, children, disabled = false, onConfirm }: 
   )
 }
 
-interface TierManagerProps {
+interface RenameControlProps {
+  target: string
+  isPending: boolean
+  onSave: (name: string, onSaved: () => void) => void
+}
+
+function RenameControl({ target, isPending, onSave }: RenameControlProps) {
+  const [draft, setDraft] = useState<string | null>(null)
+
+  if (draft === null) {
+    return (
+      <button
+        type="button"
+        className={styles.smallButton}
+        aria-label={`Rename ${target}`}
+        onClick={() => setDraft(target)}
+      >
+        Rename
+      </button>
+    )
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    onSave(draft ?? '', () => setDraft(null))
+  }
+
+  return (
+    <form className={styles.inlineForm} onSubmit={submit}>
+      <input
+        className={styles.inlineInput}
+        aria-label={`New name for ${target}`}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <button
+        type="submit"
+        className={styles.smallButton}
+        aria-label={`Save name for ${target}`}
+        disabled={isPending}
+      >
+        Save
+      </button>
+      <button
+        type="button"
+        className={styles.smallButton}
+        aria-label={`Cancel renaming ${target}`}
+        onClick={() => setDraft(null)}
+      >
+        Cancel
+      </button>
+    </form>
+  )
+}
+
+interface MoveButtonsProps {
+  target: string
+  isFirst: boolean
+  isLast: boolean
+  disabled: boolean
+  onMove: (offset: -1 | 1) => void
+}
+
+function MoveButtons({ target, isFirst, isLast, disabled, onMove }: MoveButtonsProps) {
+  return (
+    <>
+      <button
+        type="button"
+        className={styles.smallButton}
+        aria-label={`Move ${target} up`}
+        disabled={disabled || isFirst}
+        onClick={() => onMove(-1)}
+      >
+        ↑
+      </button>
+      <button
+        type="button"
+        className={styles.smallButton}
+        aria-label={`Move ${target} down`}
+        disabled={disabled || isLast}
+        onClick={() => onMove(1)}
+      >
+        ↓
+      </button>
+    </>
+  )
+}
+
+interface AddBossFormProps {
   tier: RaidTier
 }
 
-function TierManager({ tier }: TierManagerProps) {
-  const { setTierCurrent, setBossKilled, deleteTier, deleteBoss } = useOfficerRaidProgress()
+function AddBossForm({ tier }: AddBossFormProps) {
+  const { addBoss } = useOfficerRaidProgress()
+  const [name, setName] = useState('')
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    addBoss.mutate({ tierId: tier.id, name }, { onSuccess: () => setName('') })
+  }
+
+  return (
+    <form className={styles.inlineForm} onSubmit={submit}>
+      <input
+        className={styles.inlineInput}
+        aria-label={`New boss for ${tier.name}`}
+        placeholder="New boss name"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+      />
+      <button
+        type="submit"
+        className={styles.smallButton}
+        aria-label={`Add boss to ${tier.name}`}
+        disabled={addBoss.isPending}
+      >
+        Add boss
+      </button>
+      {addBoss.isError && (
+        <p role="alert" className={styles.error}>
+          {addBoss.error.message}
+        </p>
+      )}
+    </form>
+  )
+}
+
+interface TierManagerProps {
+  tier: RaidTier
+  tierIds: string[]
+  index: number
+}
+
+function TierManager({ tier, tierIds, index }: TierManagerProps) {
+  const {
+    setTierCurrent,
+    renameTier,
+    reorderTiers,
+    setBossKilled,
+    renameBoss,
+    reorderBosses,
+    deleteTier,
+    deleteBoss,
+  } = useOfficerRaidProgress()
+  const bossIds = tier.bosses.map((boss) => boss.id)
+  const errors = [
+    setTierCurrent,
+    renameTier,
+    reorderTiers,
+    setBossKilled,
+    renameBoss,
+    reorderBosses,
+    deleteTier,
+    deleteBoss,
+  ].flatMap((mutation) => (mutation.error ? [mutation.error.message] : []))
 
   return (
     <div className={`card ${styles.card}`}>
       <div className={styles.tierHeader}>
         <h3 className={styles.tierName}>{tier.name}</h3>
-        <ConfirmDeleteButton
-          target={tier.name}
-          disabled={tier.isCurrent}
-          onConfirm={() => deleteTier.mutate(tier.id)}
-        >
-          Delete raid
-        </ConfirmDeleteButton>
+        <div className={styles.controls}>
+          <RenameControl
+            target={tier.name}
+            isPending={renameTier.isPending}
+            onSave={(name, onSaved) => renameTier.mutate({ id: tier.id, name }, { onSuccess: onSaved })}
+          />
+          <MoveButtons
+            target={tier.name}
+            isFirst={index === 0}
+            isLast={index === tierIds.length - 1}
+            disabled={reorderTiers.isPending}
+            onMove={(offset) => reorderTiers.mutate(swapped(tierIds, index, offset))}
+          />
+          <ConfirmDeleteButton
+            target={tier.name}
+            disabled={tier.isCurrent}
+            onConfirm={() => deleteTier.mutate(tier.id)}
+          >
+            Delete raid
+          </ConfirmDeleteButton>
+        </div>
       </div>
       {tier.isCurrent && <p className={styles.noticeText}>Uncheck "Current raid" before deleting this raid.</p>}
       <label className={styles.toggle}>
@@ -185,8 +352,9 @@ function TierManager({ tier }: TierManagerProps) {
         />
         <span>Current raid</span>
       </label>
+      {tier.bosses.length === 0 && <p className={styles.noticeText}>No bosses yet.</p>}
       <ul className={styles.bossList}>
-        {tier.bosses.map((boss) => (
+        {tier.bosses.map((boss, bossIndex) => (
           <li key={boss.id} className={styles.bossItem}>
             <label className={styles.toggle}>
               <input
@@ -197,32 +365,34 @@ function TierManager({ tier }: TierManagerProps) {
               />
               <span>{boss.name}</span>
             </label>
-            <ConfirmDeleteButton target={boss.name} onConfirm={() => deleteBoss.mutate(boss.id)}>
-              ✕
-            </ConfirmDeleteButton>
+            <div className={styles.controls}>
+              <RenameControl
+                target={boss.name}
+                isPending={renameBoss.isPending}
+                onSave={(name, onSaved) => renameBoss.mutate({ id: boss.id, name }, { onSuccess: onSaved })}
+              />
+              <MoveButtons
+                target={boss.name}
+                isFirst={bossIndex === 0}
+                isLast={bossIndex === bossIds.length - 1}
+                disabled={reorderBosses.isPending}
+                onMove={(offset) =>
+                  reorderBosses.mutate({ tierId: tier.id, ids: swapped(bossIds, bossIndex, offset) })
+                }
+              />
+              <ConfirmDeleteButton target={boss.name} onConfirm={() => deleteBoss.mutate(boss.id)}>
+                ✕
+              </ConfirmDeleteButton>
+            </div>
           </li>
         ))}
       </ul>
-      {setTierCurrent.isError && (
-        <p role="alert" className={styles.error}>
-          {setTierCurrent.error.message}
+      <AddBossForm tier={tier} />
+      {errors.map((message) => (
+        <p key={message} role="alert" className={styles.error}>
+          {message}
         </p>
-      )}
-      {setBossKilled.isError && (
-        <p role="alert" className={styles.error}>
-          {setBossKilled.error.message}
-        </p>
-      )}
-      {deleteTier.isError && (
-        <p role="alert" className={styles.error}>
-          {deleteTier.error.message}
-        </p>
-      )}
-      {deleteBoss.isError && (
-        <p role="alert" className={styles.error}>
-          {deleteBoss.error.message}
-        </p>
-      )}
+      ))}
     </div>
   )
 }
@@ -238,6 +408,7 @@ function OfficerTools() {
   }
 
   const nextSortOrder = tiers.data.reduce((highest, tier) => Math.max(highest, tier.sortOrder), 0) + 1
+  const tierIds = tiers.data.map((tier) => tier.id)
 
   return (
     <>
@@ -245,8 +416,8 @@ function OfficerTools() {
       <h2 className={styles.sectionTitle}>Raids</h2>
       {tiers.data.length === 0 && <p className={styles.noticeText}>No raids yet.</p>}
       <div className={styles.tierList}>
-        {tiers.data.map((tier) => (
-          <TierManager key={tier.id} tier={tier} />
+        {tiers.data.map((tier, index) => (
+          <TierManager key={tier.id} tier={tier} tierIds={tierIds} index={index} />
         ))}
       </div>
     </>
