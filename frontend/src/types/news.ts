@@ -9,3 +9,13 @@ export interface NewsPost {
   authorName: string
   publishedAt: string
 }
+
+export interface NewsLink {
+  href: string
+}
+
+export interface NewsPage {
+  total: number
+  _links: Partial<Record<'self' | 'first' | 'prev' | 'next' | 'last', NewsLink>>
+  _embedded: { news: NewsPost[] }
+}

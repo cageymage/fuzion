@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import type { NewsPost } from '../types/news'
+import type { NewsPage, NewsPost } from '../types/news'
 import type { RaidProgress, RaidTier } from '../types/raidProgress'
 import type { Raid } from '../types/raids'
 import type { Character } from '../types/roster'
@@ -35,6 +35,15 @@ const newsPosts: NewsPost[] = [
     publishedAt: new Date(Date.now() - 6 * 86_400_000).toISOString(),
   },
 ]
+
+export function newsPage(posts: NewsPost[]): NewsPage {
+  const onlyPage = { href: '/api/news?limit=10&offset=0' }
+  return {
+    total: posts.length,
+    _links: { self: onlyPage, first: onlyPage, last: onlyPage },
+    _embedded: { news: posts },
+  }
+}
 
 const nextRaid: Raid = {
   id: 'raid-1',
@@ -224,7 +233,7 @@ const raidTiers: RaidTier[] = [
 export const handlers = [
   http.get('/api/auth/me', () => HttpResponse.json({ error: 'login required' }, { status: 401 })),
   http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
-  http.get('/api/news', () => HttpResponse.json(newsPosts)),
+  http.get('/api/news', () => HttpResponse.json(newsPage(newsPosts))),
   http.get('/api/raid-progress', () => HttpResponse.json([raidProgress])),
   http.get('/api/raid-tiers', () => HttpResponse.json(raidTiers)),
   http.post('/api/raid-tiers', () =>

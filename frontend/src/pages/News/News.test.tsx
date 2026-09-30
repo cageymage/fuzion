@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
+import { newsPage } from '../../mocks/handlers'
 import { server } from '../../mocks/server'
 import type { NewsPost } from '../../types/news'
 import { renderWithProviders } from '../../testUtils'
@@ -29,6 +30,21 @@ describe('News', () => {
       'Now recruiting: Restoration Druid & Fire Mage',
       'Welcome our newest officers',
     ])
+  })
+
+  it('should request the largest allowed page so the whole archive shows', async () => {
+    let requestedLimit: string | null = null
+    server.use(
+      http.get('/api/news', ({ request }) => {
+        requestedLimit = new URL(request.url).searchParams.get('limit')
+        return HttpResponse.json(newsPage([recruitmentPost]))
+      }),
+    )
+
+    renderWithProviders(<News />)
+
+    await screen.findByText('Now recruiting: Holy Priest')
+    expect(requestedLimit).toBe('50')
   })
 
   it('should show a loading message when the request is still in flight', () => {
@@ -78,7 +94,7 @@ describe('News', () => {
   })
 
   it('should show an empty message when no posts match the selected category', async () => {
-    server.use(http.get('/api/news', () => HttpResponse.json([recruitmentPost])))
+    server.use(http.get('/api/news', () => HttpResponse.json(newsPage([recruitmentPost]))))
     const user = userEvent.setup()
     renderWithProviders(<News />)
     await screen.findByText('Now recruiting: Holy Priest')

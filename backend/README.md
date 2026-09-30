@@ -50,7 +50,7 @@ is no separate migrate step.
 | ------ | ------------------- | --------------------------------------------------- |
 | GET    | `/api/health`       | `{"status":"ok"}`                                   |
 | GET    | `/api/professions`  | crafting directory with each character embedded, sorted by profession, then skill; optional `?profession=` (case-insensitive, `[]` when nothing matches) |
-| GET    | `/api/news`         | news posts, newest first (`[]` when none); optional `?limit=N` (positive integer, else 400) returns only the N newest |
+| GET    | `/api/news`         | one page of news posts as HAL: `{total, _links: {self, first, last, prev?, next?}, _embedded: {news: [...]}}`, newest first (`news` is `[]` when none); `?limit=` 1 to 50 (default 10), `?offset=` 0 or more (default 0), `?category=raid-progress\|recruitment\|guild-news`, else 400; `total` counts the category matches, ignoring limit and offset; links keep the filters and leave out defaults (`offset=0` never appears, `limit` only when you sent it) |
 | GET    | `/api/raids/next`   | soonest upcoming raid, or `null` when none scheduled |
 | GET    | `/api/streams/live` | live streamers, most viewers first (`[]` when none) |
 | GET    | `/api/applications`  | officer only: applications newest first, `?status=pending\|accepted\|declined` optional (400 on unknown) |

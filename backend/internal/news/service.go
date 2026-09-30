@@ -13,10 +13,19 @@ func NewService(repo *Repo) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) LatestPosts(ctx context.Context, limit int) ([]Post, error) {
-	posts, err := s.repo.ListPosts(ctx, limit)
+type Page struct {
+	Posts []Post
+	Total int
+}
+
+func (s *Service) ListPosts(ctx context.Context, params ListParams) (Page, error) {
+	posts, err := s.repo.ListPosts(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("latest posts: %w", err)
+		return Page{}, fmt.Errorf("list posts: %w", err)
 	}
-	return posts, nil
+	total, err := s.repo.CountPosts(ctx, params.Category)
+	if err != nil {
+		return Page{}, fmt.Errorf("list posts: %w", err)
+	}
+	return Page{Posts: posts, Total: total}, nil
 }
