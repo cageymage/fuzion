@@ -250,6 +250,21 @@ func (s *Server) Patch(t *testing.T, path string, body any) Response {
 	return s.do(t, req)
 }
 
+func (s *Server) Put(t *testing.T, path string, body any) Response {
+	t.Helper()
+
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("encode body of PUT %s: %v", path, err)
+	}
+	req, err := http.NewRequest(http.MethodPut, s.URL+path, bytes.NewReader(encoded))
+	if err != nil {
+		t.Fatalf("build PUT %s: %v", path, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return s.do(t, req)
+}
+
 func (s *Server) Delete(t *testing.T, path string) Response {
 	t.Helper()
 

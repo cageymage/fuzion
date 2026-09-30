@@ -26,12 +26,22 @@ type CreateTierRequest struct {
 	Bosses    []string `json:"bosses"`
 }
 
-type SetCurrentRequest struct {
-	IsCurrent bool `json:"isCurrent"`
+type UpdateTierRequest struct {
+	Name      *string `json:"name"`
+	IsCurrent *bool   `json:"isCurrent"`
 }
 
-type SetKilledRequest struct {
-	Killed bool `json:"killed"`
+type UpdateBossRequest struct {
+	Name   *string `json:"name"`
+	Killed *bool   `json:"killed"`
+}
+
+type AddBossRequest struct {
+	Name string `json:"name"`
+}
+
+type ReorderRequest struct {
+	IDs []uuid.UUID `json:"ids"`
 }
 
 type Service struct {
@@ -81,26 +91,80 @@ func (s *Service) CreateTier(ctx context.Context, req CreateTierRequest) (Tier, 
 	return created, nil
 }
 
-func (s *Service) SetTierCurrent(ctx context.Context, id uuid.UUID, req SetCurrentRequest) (Tier, error) {
-	updated, err := s.repo.SetTierCurrent(ctx, id, req.IsCurrent)
+func (s *Service) UpdateTier(ctx context.Context, id uuid.UUID, req UpdateTierRequest) (Tier, error) {
+	if req.Name == nil && req.IsCurrent == nil {
+		return Tier{}, &ValidationError{Field: "body", Problem: "must set name or isCurrent"}
+	}
+	name, err := optionalName(req.Name)
 	if err != nil {
-		return Tier{}, fmt.Errorf("set raid tier %s current: %w", id, err)
+		return Tier{}, err
+	}
+
+	updated, err := s.repo.UpdateTier(ctx, id, name, req.IsCurrent)
+	if err != nil {
+		return Tier{}, fmt.Errorf("update raid tier %s: %w", id, err)
 	}
 	return updated, nil
 }
 
-func (s *Service) SetBossKilled(ctx context.Context, id uuid.UUID, req SetKilledRequest) (Boss, error) {
+func (s *Service) UpdateBoss(ctx context.Context, id uuid.UUID, req UpdateBossRequest) (Boss, error) {
+	if req.Name == nil && req.Killed == nil {
+		return Boss{}, &ValidationError{Field: "body", Problem: "must set name or killed"}
+	}
+	name, err := optionalName(req.Name)
+	if err != nil {
+		return Boss{}, err
+	}
+
 	var killedAt *time.Time
-	if req.Killed {
+	if req.Killed != nil && *req.Killed {
 		now := s.clock.Now()
 		killedAt = &now
 	}
 
-	boss, err := s.repo.SetBossKilled(ctx, id, killedAt)
+	boss, err := s.repo.UpdateBoss(ctx, id, name, req.Killed != nil, killedAt)
 	if err != nil {
-		return Boss{}, fmt.Errorf("set raid boss %s killed: %w", id, err)
+		return Boss{}, fmt.Errorf("update raid boss %s: %w", id, err)
 	}
 	return boss, nil
+}
+
+func (s *Service) AddBoss(ctx context.Context, tierID uuid.UUID, req AddBossRequest) (Boss, error) {
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		return Boss{}, &ValidationError{Field: "name", Problem: "must not be empty"}
+	}
+
+	boss, err := s.repo.AddBoss(ctx, tierID, name)
+	if err != nil {
+		return Boss{}, fmt.Errorf("add boss to raid tier %s: %w", tierID, err)
+	}
+	return boss, nil
+}
+
+func (s *Service) ReorderTiers(ctx context.Context, req ReorderRequest) error {
+	if err := s.repo.ReorderTiers(ctx, req.IDs); err != nil {
+		return fmt.Errorf("reorder raid tiers: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) ReorderBosses(ctx context.Context, tierID uuid.UUID, req ReorderRequest) error {
+	if err := s.repo.ReorderBosses(ctx, tierID, req.IDs); err != nil {
+		return fmt.Errorf("reorder bosses in raid tier %s: %w", tierID, err)
+	}
+	return nil
+}
+
+func optionalName(name *string) (*string, error) {
+	if name == nil {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*name)
+	if trimmed == "" {
+		return nil, &ValidationError{Field: "name", Problem: "must not be empty"}
+	}
+	return &trimmed, nil
 }
 
 func (s *Service) DeleteTier(ctx context.Context, id uuid.UUID) error {

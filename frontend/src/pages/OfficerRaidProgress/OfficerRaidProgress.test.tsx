@@ -387,4 +387,230 @@ describe('OfficerRaidProgress', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('raid boss not found')
   })
+
+  it('should show the new tier name after an officer renames a tier and the tiers refetch', async () => {
+    signInAs(officer)
+    let tierName = 'Molten Depthz'
+    let requestBody: unknown
+    let requestedPath = ''
+    server.use(
+      http.get('/api/raid-tiers', () =>
+        HttpResponse.json([{ id: 'tier-1', name: tierName, isCurrent: true, sortOrder: 2, bosses: [] }]),
+      ),
+      http.patch('/api/raid-tiers/:id', async ({ request, params }) => {
+        requestBody = await request.json()
+        requestedPath = String(params.id)
+        tierName = 'Molten Depths'
+        return HttpResponse.json({ id: 'tier-1', name: tierName, isCurrent: true, sortOrder: 2, bosses: [] })
+      }),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    // given an officer who opened the rename field and typed a corrected name
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename Molten Depthz' }))
+    const nameInput = screen.getByRole('textbox', { name: 'New name for Molten Depthz' })
+    await userEvent.clear(nameInput)
+    await userEvent.type(nameInput, 'Molten Depths')
+
+    // when I save the name
+    await userEvent.click(screen.getByRole('button', { name: 'Save name for Molten Depthz' }))
+
+    // then the API receives the new name and the refetched heading shows it
+    expect(await screen.findByRole('heading', { name: 'Molten Depths' })).toBeInTheDocument()
+    expect(requestBody).toEqual({ name: 'Molten Depths' })
+    expect(requestedPath).toBe('tier-1')
+    expect(screen.queryByRole('textbox', { name: 'New name for Molten Depthz' })).not.toBeInTheDocument()
+  })
+
+  it('should not send a rename request when an officer cancels renaming a tier', async () => {
+    signInAs(officer)
+    let renameRequested = false
+    server.use(
+      http.patch('/api/raid-tiers/:id', () => {
+        renameRequested = true
+        return HttpResponse.json({})
+      }),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename Shattered Spire' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'New name for Shattered Spire' }), ' Two')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel renaming Shattered Spire' }))
+
+    expect(screen.getByRole('button', { name: 'Rename Shattered Spire' })).toBeInTheDocument()
+    expect(renameRequested).toBe(false)
+  })
+
+  it('should keep the rename field open with the API error message when renaming a tier is rejected', async () => {
+    signInAs(officer)
+    server.use(
+      http.patch('/api/raid-tiers/:id', () =>
+        HttpResponse.json({ error: 'name: must not be empty' }, { status: 400 }),
+      ),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename Shattered Spire' }))
+    await userEvent.clear(screen.getByRole('textbox', { name: 'New name for Shattered Spire' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save name for Shattered Spire' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('name: must not be empty')
+    expect(screen.getByRole('textbox', { name: 'New name for Shattered Spire' })).toBeInTheDocument()
+  })
+
+  it('should send every tier id in the new order when an officer moves a tier down', async () => {
+    signInAs(officer)
+    let requestBody: unknown
+    server.use(
+      http.put('/api/raid-tiers/order', async ({ request }) => {
+        requestBody = await request.json()
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Move Molten Depths down' }))
+
+    await waitFor(() => expect(requestBody).toEqual({ ids: ['tier-2', 'tier-1'] }))
+  })
+
+  it('should disable moving the first tier up and the last tier down', async () => {
+    signInAs(officer)
+
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    expect(await screen.findByRole('button', { name: 'Move Molten Depths up' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Move Molten Depths down' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Move Shattered Spire up' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Move Shattered Spire down' })).toBeDisabled()
+  })
+
+  it('should show the API error message when reordering tiers is rejected', async () => {
+    signInAs(officer)
+    server.use(
+      http.put('/api/raid-tiers/order', () =>
+        HttpResponse.json({ error: 'ids: must list every raid exactly once' }, { status: 400 }),
+      ),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Move Shattered Spire up' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('ids: must list every raid exactly once')
+  })
+
+  it('should show a no-bosses message when a tier has no bosses', async () => {
+    signInAs(officer)
+    server.use(
+      http.get('/api/raid-tiers', () =>
+        HttpResponse.json([{ id: 'tier-1', name: 'Molten Depths', isCurrent: false, sortOrder: 1, bosses: [] }]),
+      ),
+    )
+
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    expect(await screen.findByText('No bosses yet.')).toBeInTheDocument()
+  })
+
+  it('should show the added boss after an officer adds a boss to a tier and the tiers refetch', async () => {
+    signInAs(officer)
+    const bosses = [{ id: 'boss-1', name: 'Grimjaw', killedAt: null }]
+    let requestBody: unknown
+    let requestedPath = ''
+    server.use(
+      http.get('/api/raid-tiers', () =>
+        HttpResponse.json([{ id: 'tier-1', name: 'Molten Depths', isCurrent: true, sortOrder: 2, bosses }]),
+      ),
+      http.post('/api/raid-tiers/:id/bosses', async ({ request, params }) => {
+        requestBody = await request.json()
+        requestedPath = String(params.id)
+        const added = { id: 'boss-2', name: 'Pyrelord', killedAt: null }
+        bosses.push(added)
+        return HttpResponse.json(added, { status: 201 })
+      }),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    // given an officer who typed a new boss name for the tier
+    await userEvent.type(await screen.findByRole('textbox', { name: 'New boss for Molten Depths' }), 'Pyrelord')
+
+    // when I add the boss
+    await userEvent.click(screen.getByRole('button', { name: 'Add boss to Molten Depths' }))
+
+    // then the API receives the name, the refetched tier lists the boss, and the field clears
+    expect(await screen.findByRole('checkbox', { name: 'Pyrelord killed' })).toBeInTheDocument()
+    expect(requestBody).toEqual({ name: 'Pyrelord' })
+    expect(requestedPath).toBe('tier-1')
+    expect(screen.getByRole('textbox', { name: 'New boss for Molten Depths' })).toHaveValue('')
+  })
+
+  it('should show the API error message when adding a boss is rejected', async () => {
+    signInAs(officer)
+    server.use(
+      http.post('/api/raid-tiers/:id/bosses', () =>
+        HttpResponse.json({ error: 'name: must not be empty' }, { status: 400 }),
+      ),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add boss to Molten Depths' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('name: must not be empty')
+  })
+
+  it('should send the new name to the boss endpoint when an officer renames a boss', async () => {
+    signInAs(officer)
+    let requestBody: unknown
+    let requestedPath = ''
+    server.use(
+      http.patch('/api/raid-bosses/:id', async ({ request, params }) => {
+        requestBody = await request.json()
+        requestedPath = String(params.id)
+        return HttpResponse.json({ id: 'boss-2', name: 'Ashveil the Burning', killedAt: null })
+      }),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename Ashveil' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'New name for Ashveil' }), ' the Burning')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save name for Ashveil' }))
+
+    await waitFor(() => expect(requestBody).toEqual({ name: 'Ashveil the Burning' }))
+    expect(requestedPath).toBe('boss-2')
+  })
+
+  it('should send every boss id of the tier in the new order when an officer moves a boss up', async () => {
+    signInAs(officer)
+    let requestBody: unknown
+    let requestedPath = ''
+    server.use(
+      http.put('/api/raid-tiers/:id/bosses/order', async ({ request, params }) => {
+        requestBody = await request.json()
+        requestedPath = String(params.id)
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Move Pyrelord up' }))
+
+    await waitFor(() => expect(requestBody).toEqual({ ids: ['boss-1', 'boss-3', 'boss-2'] }))
+    expect(requestedPath).toBe('tier-1')
+  })
+
+  it('should show the API error message when reordering bosses is rejected', async () => {
+    signInAs(officer)
+    server.use(
+      http.put('/api/raid-tiers/:id/bosses/order', () =>
+        HttpResponse.json({ error: 'ids: must list every boss in the raid exactly once' }, { status: 400 }),
+      ),
+    )
+    renderWithProviders(<OfficerRaidProgress />, '/officer/raid-progress')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Move Grimjaw down' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'ids: must list every boss in the raid exactly once',
+    )
+  })
 })

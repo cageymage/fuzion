@@ -23,6 +23,19 @@ export async function apiDelete(path: string): Promise<void> {
   }
 }
 
+export async function apiPut(path: string, body: unknown): Promise<void> {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as { error?: string } | null
+    throw new Error(problem?.error ?? `PUT ${path} failed with ${response.status}`)
+  }
+}
+
 export async function apiSend<T>(method: 'POST' | 'PATCH', path: string, body: unknown): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, {
     method,

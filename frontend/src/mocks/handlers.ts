@@ -233,8 +233,13 @@ export const handlers = [
       { status: 201 },
     ),
   ),
+  http.put('/api/raid-tiers/order', () => new HttpResponse(null, { status: 204 })),
   http.patch('/api/raid-tiers/:id', () => HttpResponse.json(raidTiers[0])),
   http.delete('/api/raid-tiers/:id', () => new HttpResponse(null, { status: 204 })),
+  http.post('/api/raid-tiers/:id/bosses', () =>
+    HttpResponse.json({ id: 'boss-6', name: 'New Boss', killedAt: null }, { status: 201 }),
+  ),
+  http.put('/api/raid-tiers/:id/bosses/order', () => new HttpResponse(null, { status: 204 })),
   http.patch('/api/raid-bosses/:id', () => HttpResponse.json(raidProgress.bosses[0])),
   http.delete('/api/raid-bosses/:id', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/raids', () => HttpResponse.json(upcomingRaids)),

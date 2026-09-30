@@ -16,6 +16,9 @@ var (
 	ErrTierNotFound  = errors.New("raid tier not found")
 	ErrBossNotFound  = errors.New("raid boss not found")
 	ErrTierIsCurrent = errors.New("raid tier is current; clear its current flag before deleting it")
+
+	ErrTierOrderMismatch = errors.New("ids: must list every raid exactly once")
+	ErrBossOrderMismatch = errors.New("ids: must list every boss in the raid exactly once")
 )
 
 type Boss struct {
@@ -130,13 +133,7 @@ func (r *Repo) CreateTier(ctx context.Context, name string, sortOrder int, bossN
 	if err != nil {
 		return Tier{}, fmt.Errorf("begin create tier: %w", err)
 	}
-	defer func() {
-		if err != nil {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				err = errors.Join(err, fmt.Errorf("rollback create tier: %w", rollbackErr))
-			}
-		}
-	}()
+	defer rollbackOnError(tx, "create tier", &err)
 
 	const tierQuery = `INSERT INTO raid_tiers (name, sort_order) VALUES ($1, $2) RETURNING id, name, is_current, sort_order`
 	if err = tx.GetContext(ctx, &created, tierQuery, name, sortOrder); err != nil {
@@ -157,14 +154,17 @@ func (r *Repo) CreateTier(ctx context.Context, name string, sortOrder int, bossN
 	return created, nil
 }
 
-// SetTierCurrent flips just this tier's own flag. Multiple tiers can be
-// current at once (see CurrentProgress), so setting one current never
-// touches any other tier's row.
-func (r *Repo) SetTierCurrent(ctx context.Context, id uuid.UUID, isCurrent bool) (Tier, error) {
-	const query = `UPDATE raid_tiers SET is_current = $2 WHERE id = $1 RETURNING id, name, is_current, sort_order`
+// UpdateTier changes only the fields given. Setting a tier current never
+// touches any other tier's row, since multiple tiers can be current at once
+// (see CurrentProgress).
+func (r *Repo) UpdateTier(ctx context.Context, id uuid.UUID, name *string, isCurrent *bool) (Tier, error) {
+	const query = `UPDATE raid_tiers
+		SET name = COALESCE($2::text, name), is_current = COALESCE($3::boolean, is_current)
+		WHERE id = $1
+		RETURNING id, name, is_current, sort_order`
 
 	var updated Tier
-	if err := r.db.GetContext(ctx, &updated, query, id, isCurrent); err != nil {
+	if err := r.db.GetContext(ctx, &updated, query, id, name, isCurrent); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Tier{}, ErrTierNotFound
 		}
@@ -174,11 +174,15 @@ func (r *Repo) SetTierCurrent(ctx context.Context, id uuid.UUID, isCurrent bool)
 	return updated, nil
 }
 
-func (r *Repo) SetBossKilled(ctx context.Context, id uuid.UUID, killedAt *time.Time) (Boss, error) {
-	const query = `UPDATE raid_bosses SET killed_at = $2 WHERE id = $1 RETURNING id, name, killed_at`
+func (r *Repo) UpdateBoss(ctx context.Context, id uuid.UUID, name *string, setKilled bool, killedAt *time.Time) (Boss, error) {
+	const query = `UPDATE raid_bosses
+		SET name = COALESCE($2::text, name),
+		    killed_at = CASE WHEN $3::boolean THEN $4::timestamptz ELSE killed_at END
+		WHERE id = $1
+		RETURNING id, name, killed_at`
 
 	var boss Boss
-	if err := r.db.GetContext(ctx, &boss, query, id, killedAt); err != nil {
+	if err := r.db.GetContext(ctx, &boss, query, id, name, setKilled, killedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Boss{}, ErrBossNotFound
 		}
@@ -186,6 +190,136 @@ func (r *Repo) SetBossKilled(ctx context.Context, id uuid.UUID, killedAt *time.T
 	}
 	normalizeKilledAt(&boss)
 	return boss, nil
+}
+
+// AddBoss locks the tier row so two concurrent adds can't both claim the same
+// next sort_order and trip UNIQUE (tier_id, sort_order).
+func (r *Repo) AddBoss(ctx context.Context, tierID uuid.UUID, name string) (added Boss, err error) {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return Boss{}, fmt.Errorf("begin add boss: %w", err)
+	}
+	defer rollbackOnError(tx, "add boss", &err)
+
+	if err = lockTier(ctx, tx, tierID); err != nil {
+		return Boss{}, err
+	}
+
+	const query = `INSERT INTO raid_bosses (tier_id, name, sort_order)
+		SELECT $1, $2, COALESCE(MAX(sort_order), -1) + 1 FROM raid_bosses WHERE tier_id = $1
+		RETURNING id, name, killed_at`
+	if err = tx.GetContext(ctx, &added, query, tierID, name); err != nil {
+		return Boss{}, fmt.Errorf("insert raid boss %q: %w", name, err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return Boss{}, fmt.Errorf("commit add boss: %w", err)
+	}
+	return added, nil
+}
+
+// ReorderTiers takes ids in display order (first shown first). Tiers list by
+// sort_order descending, so the first id gets the highest value.
+func (r *Repo) ReorderTiers(ctx context.Context, ids []uuid.UUID) (err error) {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin reorder tiers: %w", err)
+	}
+	defer rollbackOnError(tx, "reorder tiers", &err)
+
+	var existing []uuid.UUID
+	if err = tx.SelectContext(ctx, &existing, `SELECT id FROM raid_tiers FOR UPDATE`); err != nil {
+		return fmt.Errorf("select raid tiers: %w", err)
+	}
+	if !sameIDs(existing, ids) {
+		return ErrTierOrderMismatch
+	}
+
+	for i, id := range ids {
+		if _, err = tx.ExecContext(ctx, `UPDATE raid_tiers SET sort_order = $2 WHERE id = $1`, id, len(ids)-1-i); err != nil {
+			return fmt.Errorf("update sort order of raid tier %s: %w", id, err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit reorder tiers: %w", err)
+	}
+	return nil
+}
+
+// ReorderBosses assigns sort_order 0..n-1 in the given order. UNIQUE (tier_id,
+// sort_order) is checked per row, so the rows are first moved to negative
+// values (every path that writes sort_order keeps it non-negative) to keep the
+// final assignment from colliding with a not-yet-updated row.
+func (r *Repo) ReorderBosses(ctx context.Context, tierID uuid.UUID, ids []uuid.UUID) (err error) {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin reorder bosses: %w", err)
+	}
+	defer rollbackOnError(tx, "reorder bosses", &err)
+
+	if err = lockTier(ctx, tx, tierID); err != nil {
+		return err
+	}
+
+	var existing []uuid.UUID
+	if err = tx.SelectContext(ctx, &existing, `SELECT id FROM raid_bosses WHERE tier_id = $1`, tierID); err != nil {
+		return fmt.Errorf("select bosses of raid tier %s: %w", tierID, err)
+	}
+	if !sameIDs(existing, ids) {
+		return ErrBossOrderMismatch
+	}
+
+	if _, err = tx.ExecContext(ctx, `UPDATE raid_bosses SET sort_order = -1 - sort_order WHERE tier_id = $1`, tierID); err != nil {
+		return fmt.Errorf("move bosses of raid tier %s out of range: %w", tierID, err)
+	}
+	for i, id := range ids {
+		if _, err = tx.ExecContext(ctx, `UPDATE raid_bosses SET sort_order = $2 WHERE id = $1`, id, i); err != nil {
+			return fmt.Errorf("update sort order of raid boss %s: %w", id, err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit reorder bosses: %w", err)
+	}
+	return nil
+}
+
+func lockTier(ctx context.Context, tx *sqlx.Tx, id uuid.UUID) error {
+	var locked uuid.UUID
+	if err := tx.GetContext(ctx, &locked, `SELECT id FROM raid_tiers WHERE id = $1 FOR UPDATE`, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrTierNotFound
+		}
+		return fmt.Errorf("lock raid tier %s: %w", id, err)
+	}
+	return nil
+}
+
+func sameIDs(existing, given []uuid.UUID) bool {
+	if len(existing) != len(given) {
+		return false
+	}
+	remaining := make(map[uuid.UUID]bool, len(existing))
+	for _, id := range existing {
+		remaining[id] = true
+	}
+	for _, id := range given {
+		if !remaining[id] {
+			return false
+		}
+		delete(remaining, id)
+	}
+	return true
+}
+
+func rollbackOnError(tx *sqlx.Tx, action string, err *error) {
+	if *err == nil {
+		return
+	}
+	if rollbackErr := tx.Rollback(); rollbackErr != nil {
+		*err = errors.Join(*err, fmt.Errorf("rollback %s: %w", action, rollbackErr))
+	}
 }
 
 // DeleteTier refuses a current tier so the public progress widget never loses
