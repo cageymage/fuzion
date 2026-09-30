@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { newsPage } from '../../mocks/handlers'
 import { server } from '../../mocks/server'
 import { renderWithProviders } from '../../testUtils'
 import type { Stream } from '../../types/streams'
@@ -64,7 +65,7 @@ describe('Home', () => {
     server.use(
       http.get('/api/news', ({ request }) => {
         requestedLimit = new URL(request.url).searchParams.get('limit')
-        return HttpResponse.json([])
+        return HttpResponse.json(newsPage([]))
       }),
     )
 
@@ -149,7 +150,7 @@ describe('Home', () => {
   })
 
   it('should show empty-news copy when the guild has posted no news', async () => {
-    server.use(http.get('/api/news', () => HttpResponse.json([])))
+    server.use(http.get('/api/news', () => HttpResponse.json(newsPage([]))))
 
     renderWithProviders(<Home />)
 
