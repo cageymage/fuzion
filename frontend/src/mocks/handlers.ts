@@ -36,13 +36,24 @@ const newsPosts: NewsPost[] = [
   },
 ]
 
-export function newsPage(posts: NewsPost[]): NewsPage {
+export function newsPage(posts: NewsPost[], total = posts.length): NewsPage {
   const onlyPage = { href: '/api/news?limit=10&offset=0' }
   return {
-    total: posts.length,
+    total,
     _links: { self: onlyPage, first: onlyPage, last: onlyPage },
     _embedded: { news: posts },
   }
+}
+
+export function newsHandler(posts: NewsPost[]) {
+  return http.get('/api/news', ({ request }) => {
+    const params = new URL(request.url).searchParams
+    const category = params.get('category')
+    const limit = Number(params.get('limit') ?? 10)
+    const offset = Number(params.get('offset') ?? 0)
+    const matching = posts.filter((post) => !category || post.category === category)
+    return HttpResponse.json(newsPage(matching.slice(offset, offset + limit), matching.length))
+  })
 }
 
 const nextRaid: Raid = {
@@ -233,7 +244,7 @@ const raidTiers: RaidTier[] = [
 export const handlers = [
   http.get('/api/auth/me', () => HttpResponse.json({ error: 'login required' }, { status: 401 })),
   http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
-  http.get('/api/news', () => HttpResponse.json(newsPage(newsPosts))),
+  newsHandler(newsPosts),
   http.get('/api/raid-progress', () => HttpResponse.json([raidProgress])),
   http.get('/api/raid-tiers', () => HttpResponse.json(raidTiers)),
   http.post('/api/raid-tiers', () =>
