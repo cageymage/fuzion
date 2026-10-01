@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { FeaturedNewsCard } from '../../components/FeaturedNewsCard/FeaturedNewsCard'
-import { LiveStreamCard } from '../../components/LiveStreamCard/LiveStreamCard'
+import { LiveStreamEmbed } from '../../components/LiveStreamEmbed/LiveStreamEmbed'
 import { NewsCard } from '../../components/NewsCard/NewsCard'
 import { NextRaidCard } from '../../components/NextRaidCard/NextRaidCard'
 import styles from './Home.module.css'
@@ -64,7 +64,7 @@ export function Home() {
           {liveStreams.isError && (
             <p className={styles.noticeText}>Live streams could not be loaded.</p>
           )}
-          {featuredStream && <LiveStreamCard stream={featuredStream} />}
+          {featuredStream && <LiveStreamEmbed key={featuredStream.id} stream={featuredStream} />}
           {liveStreams.isSuccess && liveStreams.data.length === 0 && (
             <p className={styles.noticeText}>Nobody is streaming right now.</p>
           )}

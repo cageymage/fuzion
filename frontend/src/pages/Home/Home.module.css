@@ -39,7 +39,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: minmax(0, 3fr) minmax(400px, 2fr);
   gap: 32px;
   padding: 28px var(--gutter) 0;
 }

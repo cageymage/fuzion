@@ -141,6 +141,46 @@ describe('Home', () => {
     expect(await screen.findByText('Raid night prep')).toBeInTheDocument()
   })
 
+  it('should embed the featured live stream muted and autoplaying when someone is live', async () => {
+    server.use(http.get('/api/streams/live', () => HttpResponse.json([centrifuze])))
+
+    renderWithProviders(<Home />)
+
+    const player = await screen.findByTitle('Centrifuze live stream')
+    const playerUrl = new URL(player.getAttribute('src') ?? '')
+    expect(playerUrl.origin + playerUrl.pathname).toBe('https://player.twitch.tv/')
+    expect(Object.fromEntries(playerUrl.searchParams)).toEqual({
+      channel: 'centrifuze',
+      parent: 'localhost',
+      muted: 'true',
+      autoplay: 'true',
+    })
+  })
+
+  it('should keep a link to the channel on Twitch when the stream is embedded', async () => {
+    server.use(http.get('/api/streams/live', () => HttpResponse.json([centrifuze])))
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByRole('link', { name: 'Watch on Twitch →' })).toHaveAttribute(
+      'href',
+      'https://www.twitch.tv/centrifuze',
+    )
+  })
+
+  it('should fall back to the stream card when the channel URL has no channel name', async () => {
+    server.use(
+      http.get('/api/streams/live', () =>
+        HttpResponse.json([{ ...centrifuze, channelUrl: 'https://www.twitch.tv/' }]),
+      ),
+    )
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByText('Centrifuze is live')).toBeInTheDocument()
+    expect(screen.queryByTitle('Centrifuze live stream')).not.toBeInTheDocument()
+  })
+
   it('should show a nobody-streaming message when no one is live', async () => {
     server.use(http.get('/api/streams/live', () => HttpResponse.json([])))
 
