@@ -1,5 +1,14 @@
 export const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message)
+  }
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, { credentials: 'include' })
   if (!response.ok) {
@@ -56,7 +65,10 @@ export async function apiSend<T>(method: 'POST' | 'PATCH', path: string, body: u
   })
   if (!response.ok) {
     const problem = (await response.json().catch(() => null)) as { error?: string } | null
-    throw new Error(problem?.error ?? `${method} ${path} failed with ${response.status}`)
+    throw new ApiError(
+      problem?.error ?? `${method} ${path} failed with ${response.status}`,
+      response.status,
+    )
   }
   return (await response.json()) as T
 }

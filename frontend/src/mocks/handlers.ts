@@ -242,6 +242,7 @@ const raidTiers: RaidTier[] = [
 ]
 
 export const handlers = [
+  http.post('/api/applications', () => HttpResponse.json({ id: 'app-1' }, { status: 201 })),
   http.get('/api/auth/me', () => HttpResponse.json({ error: 'login required' }, { status: 401 })),
   http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
   newsHandler(newsPosts),
