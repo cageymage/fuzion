@@ -4,11 +4,14 @@ import { FeaturedNewsCard } from '../../components/FeaturedNewsCard/FeaturedNews
 import { LiveStreamEmbed } from '../../components/LiveStreamEmbed/LiveStreamEmbed'
 import { NewsCard } from '../../components/NewsCard/NewsCard'
 import { NextRaidCard } from '../../components/NextRaidCard/NextRaidCard'
+import { SuggestedVideoCard } from '../../components/SuggestedVideoCard/SuggestedVideoCard'
 import styles from './Home.module.css'
 import { useHomeData } from './useHomeData'
 
 export function Home() {
-  const { news, nextRaid, liveStreams } = useHomeData()
+  const { news, nextRaid, liveStreams, suggestedVideo } = useHomeData()
+  const nobodyIsLive = liveStreams.isSuccess && liveStreams.data.length === 0
+  const vaultVideo = nobodyIsLive ? suggestedVideo.data : null
   const [featuredPost, ...remainingPosts] = news.data ?? []
   const featuredStream = useMemo(
     () => liveStreams.data?.[Math.floor(Math.random() * liveStreams.data.length)],
@@ -58,14 +61,15 @@ export function Home() {
 
         <section>
           <header className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Live Now</h2>
+            <h2 className={styles.sectionTitle}>{vaultVideo ? 'From the Vault' : 'Live Now'}</h2>
           </header>
           {liveStreams.isPending && <p className={styles.noticeText}>Checking who is live…</p>}
           {liveStreams.isError && (
             <p className={styles.noticeText}>Live streams could not be loaded.</p>
           )}
           {featuredStream && <LiveStreamEmbed key={featuredStream.id} stream={featuredStream} />}
-          {liveStreams.isSuccess && liveStreams.data.length === 0 && (
+          {vaultVideo && <SuggestedVideoCard video={vaultVideo} />}
+          {nobodyIsLive && (suggestedVideo.isError || suggestedVideo.data === null) && (
             <p className={styles.noticeText}>Nobody is streaming right now.</p>
           )}
         </section>

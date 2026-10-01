@@ -44,6 +44,12 @@ services:
         sync: false
       - key: DISCORD_REDIRECT_URL
         sync: false
+      # Optional: without both, the Home page has no suggested video when nobody
+      # is live. The playlist must be Public or Unlisted.
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: YOUTUBE_PLAYLIST_ID
+        sync: false
 
   # Runs the same image as fuzion-api with a different command; each sync job
   # is one invocation (see backend/cmd/sync). Without the Twitch credentials the

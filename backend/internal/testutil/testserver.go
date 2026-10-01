@@ -26,6 +26,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/youtube"
 )
 
 // FixedNow is the instant every server built by NewServer reports as "now".
@@ -34,13 +35,35 @@ var FixedNow = time.Date(2026, 3, 14, 20, 0, 0, 0, time.UTC)
 type Server struct {
 	*httptest.Server
 	Discord *FakeDiscord
+	YouTube *FakeYouTube
 
 	db     *sqlx.DB
 	client *http.Client
 }
 
-func NewServer(t *testing.T, db *sqlx.DB) *Server {
+type ServerOption func(*serverOptions)
+
+type serverOptions struct {
+	youTubePlaylistID string
+}
+
+// WithoutYouTubePlaylist builds the server the way a deploy without
+// YOUTUBE_PLAYLIST_ID runs: suggested videos are disabled.
+func WithoutYouTubePlaylist() ServerOption {
+	return func(o *serverOptions) { o.youTubePlaylistID = "" }
+}
+
+func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	t.Helper()
+
+	options := serverOptions{youTubePlaylistID: YouTubePlaylistID}
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	youTube := NewFakeYouTube(t)
+	youTubeClient := youtube.NewClient(youtube.Config{APIKey: YouTubeAPIKey, BaseURL: youTube.URL}, youTube.Client())
+	suggestedVideos := streams.NewSuggestedVideos(youTubeClient, options.youTubePlaylistID, clock.Fixed(FixedNow))
 
 	discord := NewFakeDiscord(t)
 	provider := auth.NewDiscord(auth.DiscordConfig{
@@ -58,7 +81,7 @@ func NewServer(t *testing.T, db *sqlx.DB) *Server {
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.Fixed(FixedNow))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
-		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db))),
+		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), suggestedVideos),
 		AllowedOrigins: []string{"http://localhost:5173"},
 	})
 
@@ -75,7 +98,7 @@ func NewServer(t *testing.T, db *sqlx.DB) *Server {
 	client.Jar = jar
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
-	return &Server{Server: httpServer, Discord: discord, db: db, client: client}
+	return &Server{Server: httpServer, Discord: discord, YouTube: youTube, db: db, client: client}
 }
 
 type LoginOption func(*loginOptions)

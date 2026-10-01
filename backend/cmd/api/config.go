@@ -12,6 +12,18 @@ type config struct {
 	databaseURL    string
 	allowedOrigins []string
 	discord        discordConfig
+	youtube        youTubeConfig
+}
+
+// Both values are optional: without them the Home page simply has no suggested
+// video to show, which local dev and forks should not have to set up.
+type youTubeConfig struct {
+	apiKey     string
+	playlistID string
+}
+
+func (c youTubeConfig) enabled() bool {
+	return c.apiKey != "" && c.playlistID != ""
 }
 
 type discordConfig struct {
@@ -50,6 +62,10 @@ func loadConfig() (config, error) {
 		databaseURL:    databaseURL,
 		allowedOrigins: allowedOrigins,
 		discord:        discord,
+		youtube: youTubeConfig{
+			apiKey:     os.Getenv("YOUTUBE_API_KEY"),
+			playlistID: os.Getenv("YOUTUBE_PLAYLIST_ID"),
+		},
 	}, nil
 }
 

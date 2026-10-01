@@ -181,8 +181,89 @@ describe('Home', () => {
     expect(screen.queryByTitle('Centrifuze live stream')).not.toBeInTheDocument()
   })
 
-  it('should show a nobody-streaming message when no one is live', async () => {
+  it('should suggest a playlist video as a click-to-play embed when no one is live', async () => {
     server.use(http.get('/api/streams/live', () => HttpResponse.json([])))
+
+    renderWithProviders(<Home />)
+
+    const titled = await screen.findAllByTitle('Queen Ansurek kill')
+    const player = titled.find((element) => element.tagName === 'IFRAME')
+    expect(player).toHaveAttribute('src', 'https://www.youtube.com/embed/vid-1')
+    expect(screen.queryByText('Nobody is streaming right now.')).not.toBeInTheDocument()
+  })
+
+  it('should title the section From the Vault when a playlist video is suggested', async () => {
+    server.use(http.get('/api/streams/live', () => HttpResponse.json([])))
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByRole('heading', { name: 'From the Vault' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Live Now' })).not.toBeInTheDocument()
+  })
+
+  it('should title the section Live Now when someone is streaming', async () => {
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByText('Thundermane is live')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Live Now' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'From the Vault' })).not.toBeInTheDocument()
+  })
+
+  it('should title the section Live Now when no one is live and no video is available', async () => {
+    server.use(
+      http.get('/api/streams/live', () => HttpResponse.json([])),
+      http.get('/api/streams/suggested-video', () => new HttpResponse(null, { status: 204 })),
+    )
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByText('Nobody is streaming right now.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Live Now' })).toBeInTheDocument()
+  })
+
+  it('should link the suggested video to YouTube when no one is live', async () => {
+    server.use(http.get('/api/streams/live', () => HttpResponse.json([])))
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByRole('link', { name: 'Watch on YouTube →' })).toHaveAttribute(
+      'href',
+      'https://www.youtube.com/watch?v=vid-1',
+    )
+  })
+
+  it('should not suggest a video when someone is live', async () => {
+    let suggestedVideoRequested = false
+    server.use(
+      http.get('/api/streams/suggested-video', () => {
+        suggestedVideoRequested = true
+        return HttpResponse.json({ id: 'vid-1', title: 'Queen Ansurek kill' })
+      }),
+    )
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByText('Thundermane is live')).toBeInTheDocument()
+    expect(screen.queryByTitle('Queen Ansurek kill')).not.toBeInTheDocument()
+    expect(suggestedVideoRequested).toBe(false)
+  })
+
+  it('should show a nobody-streaming message when no one is live and the playlist has no videos', async () => {
+    server.use(
+      http.get('/api/streams/live', () => HttpResponse.json([])),
+      http.get('/api/streams/suggested-video', () => new HttpResponse(null, { status: 204 })),
+    )
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByText('Nobody is streaming right now.')).toBeInTheDocument()
+  })
+
+  it('should show a nobody-streaming message when no one is live and the suggested video request fails', async () => {
+    server.use(
+      http.get('/api/streams/live', () => HttpResponse.json([])),
+      http.get('/api/streams/suggested-video', () => new HttpResponse(null, { status: 502 })),
+    )
 
     renderWithProviders(<Home />)
 
