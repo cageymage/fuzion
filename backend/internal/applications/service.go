@@ -3,12 +3,14 @@ package applications
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 
 	"github.com/cageymage/fuzion/backend/internal/clock"
+	"github.com/cageymage/fuzion/backend/internal/discord"
 )
 
 const (
@@ -41,13 +43,19 @@ func (e *ValidationError) Error() string {
 	return e.Field + ": " + e.Problem
 }
 
-type Service struct {
-	repo  *Repo
-	clock clock.Clock
+// Notifier is the recruiting channel; a nil Notifier means notifications are disabled.
+type Notifier interface {
+	Send(ctx context.Context, msg discord.Message) error
 }
 
-func NewService(repo *Repo, clock clock.Clock) *Service {
-	return &Service{repo: repo, clock: clock}
+type Service struct {
+	repo     *Repo
+	clock    clock.Clock
+	notifier Notifier
+}
+
+func NewService(repo *Repo, clock clock.Clock, notifier Notifier) *Service {
+	return &Service{repo: repo, clock: clock, notifier: notifier}
 }
 
 func (s *Service) Submit(ctx context.Context, req SubmitRequest) (Submitted, error) {
@@ -69,7 +77,33 @@ func (s *Service) Submit(ctx context.Context, req SubmitRequest) (Submitted, err
 	if err != nil {
 		return Submitted{}, fmt.Errorf("submit application: %w", err)
 	}
+
+	s.notifyRecruiting(ctx, app)
 	return submitted, nil
+}
+
+// The application is already saved, so a failed ping must not fail the submission.
+func (s *Service) notifyRecruiting(ctx context.Context, app Application) {
+	if s.notifier == nil {
+		return
+	}
+	if err := s.notifier.Send(ctx, newApplicationMessage(app)); err != nil {
+		slog.ErrorContext(ctx, "notify recruiting channel of new application", "applicationID", app.ID, "error", err)
+	}
+}
+
+func newApplicationMessage(app Application) discord.Message {
+	return discord.Message{Embeds: []discord.Embed{{
+		Title:       "New application: " + app.CharacterName,
+		Description: "An officer needs to review this on the site.",
+		Fields: []discord.EmbedField{
+			{Name: "Applicant", Value: app.ApplicantName},
+			{Name: "Character", Value: app.CharacterName},
+			{Name: "Class / Role", Value: app.Class + " / " + app.Role},
+			{Name: "Availability", Value: app.Availability},
+			{Name: "Discord", Value: app.DiscordHandle},
+		},
+	}}}
 }
 
 func (s *Service) List(ctx context.Context, status string) ([]Reviewable, error) {
