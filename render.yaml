@@ -44,6 +44,11 @@ services:
         sync: false
       - key: DISCORD_REDIRECT_URL
         sync: false
+      # Optional: without it, new applications are not announced in Discord. It is
+      # a channel webhook URL (Edit Channel > Integrations > Webhooks); treat it
+      # as a secret.
+      - key: DISCORD_RECRUITING_WEBHOOK_URL
+        sync: false
       # Optional: without both, the Home page has no suggested video when nobody
       # is live. The playlist must be Public or Unlisted.
       - key: YOUTUBE_API_KEY

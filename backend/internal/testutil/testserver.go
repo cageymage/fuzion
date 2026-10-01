@@ -19,6 +19,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/applications"
 	"github.com/cageymage/fuzion/backend/internal/auth"
 	"github.com/cageymage/fuzion/backend/internal/clock"
+	"github.com/cageymage/fuzion/backend/internal/discord"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/professions"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
@@ -35,6 +36,7 @@ var FixedNow = time.Date(2026, 3, 14, 20, 0, 0, 0, time.UTC)
 type Server struct {
 	*httptest.Server
 	Discord *FakeDiscord
+	Webhook *FakeWebhook
 	YouTube *FakeYouTube
 
 	db     *sqlx.DB
@@ -45,6 +47,13 @@ type ServerOption func(*serverOptions)
 
 type serverOptions struct {
 	youTubePlaylistID string
+	recruitingWebhook bool
+}
+
+// WithoutRecruitingWebhook builds the server the way a deploy without
+// DISCORD_RECRUITING_WEBHOOK_URL runs: new applications are not announced.
+func WithoutRecruitingWebhook() ServerOption {
+	return func(o *serverOptions) { o.recruitingWebhook = false }
 }
 
 // WithoutYouTubePlaylist builds the server the way a deploy without
@@ -56,9 +65,15 @@ func WithoutYouTubePlaylist() ServerOption {
 func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	t.Helper()
 
-	options := serverOptions{youTubePlaylistID: YouTubePlaylistID}
+	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true}
 	for _, opt := range opts {
 		opt(&options)
+	}
+
+	webhook := NewFakeWebhook(t)
+	var recruiting applications.Notifier
+	if options.recruitingWebhook {
+		recruiting = discord.NewWebhook(webhook.WebhookURL(), webhook.Client())
 	}
 
 	youTube := NewFakeYouTube(t)
@@ -74,7 +89,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	}, discord.Client())
 
 	router := server.New(server.Deps{
-		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow))),
+		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting)),
 		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db))),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
@@ -98,7 +113,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	client.Jar = jar
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
-	return &Server{Server: httpServer, Discord: discord, YouTube: youTube, db: db, client: client}
+	return &Server{Server: httpServer, Discord: discord, Webhook: webhook, YouTube: youTube, db: db, client: client}
 }
 
 type LoginOption func(*loginOptions)

@@ -13,6 +13,10 @@ type config struct {
 	allowedOrigins []string
 	discord        discordConfig
 	youtube        youTubeConfig
+
+	// Optional: empty disables the Discord ping for new applications, so local
+	// dev and CI need no real channel.
+	recruitingWebhookURL string
 }
 
 // Both values are optional: without them the Home page simply has no suggested
@@ -66,6 +70,7 @@ func loadConfig() (config, error) {
 			apiKey:     os.Getenv("YOUTUBE_API_KEY"),
 			playlistID: os.Getenv("YOUTUBE_PLAYLIST_ID"),
 		},
+		recruitingWebhookURL: os.Getenv("DISCORD_RECRUITING_WEBHOOK_URL"),
 	}, nil
 }
 

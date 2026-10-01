@@ -1,6 +1,7 @@
 package applications_test
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -118,6 +119,94 @@ func TestSubmitApplication_ReturnsCreated_WhenBodyIsValid(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, row); diff != "" {
 		t.Errorf("unexpected stored application (-want +got):\n%s", diff)
+	}
+}
+
+func TestSubmitApplication_PostsSummaryToDiscordWebhook(t *testing.T) {
+	// given a server whose recruiting webhook is a fake Discord channel
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when I submit the application
+	resp := srv.Post(t, "/api/applications", validApplication())
+
+	// then I expect a 201
+	resp.RequireStatus(t, 201)
+
+	// and exactly one message was posted to the webhook, summarising the applicant
+	bodies := srv.Webhook.Bodies()
+	if len(bodies) != 1 {
+		t.Fatalf("expected exactly 1 webhook post, got %d", len(bodies))
+	}
+	var got struct {
+		Embeds []struct {
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			Fields      []struct {
+				Name   string `json:"name"`
+				Value  string `json:"value"`
+				Inline bool   `json:"inline"`
+			} `json:"fields"`
+		} `json:"embeds"`
+	}
+	if err := json.Unmarshal(bodies[0], &got); err != nil {
+		t.Fatalf("decode webhook body %q: %v", bodies[0], err)
+	}
+	if len(got.Embeds) != 1 {
+		t.Fatalf("expected 1 embed, got %d in %s", len(got.Embeds), bodies[0])
+	}
+	embed := got.Embeds[0]
+	if embed.Title != "New application: Thornleaf" {
+		t.Errorf("expected title %q, got %q", "New application: Thornleaf", embed.Title)
+	}
+	if !strings.Contains(embed.Description, "review") {
+		t.Errorf("expected description to point officers at the review queue, got %q", embed.Description)
+	}
+	type field struct{ Name, Value string }
+	var gotFields []field
+	for _, f := range embed.Fields {
+		gotFields = append(gotFields, field{f.Name, f.Value})
+	}
+	wantFields := []field{
+		{"Applicant", "Mira"},
+		{"Character", "Thornleaf"},
+		{"Class / Role", "Druid / healer"},
+		{"Availability", "Tue/Thu 8-11pm ET"},
+		{"Discord", "mira.heals"},
+	}
+	if diff := cmp.Diff(wantFields, gotFields); diff != "" {
+		t.Errorf("unexpected embed fields (-want +got):\n%s", diff)
+	}
+}
+
+func TestSubmitApplication_StillReturnsCreated_WhenDiscordWebhookFails(t *testing.T) {
+	// given a recruiting webhook that answers 500
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.Webhook.Status = 500
+
+	// when I submit the application
+	resp := srv.Post(t, "/api/applications", validApplication())
+
+	// then I expect a 201 and the application is stored
+	resp.RequireStatus(t, 201)
+	if got := countApplications(t, db); got != 1 {
+		t.Errorf("expected 1 stored application, got %d", got)
+	}
+}
+
+func TestSubmitApplication_DoesNotCallDiscord_WhenWebhookURLIsEmpty(t *testing.T) {
+	// given a deploy without DISCORD_RECRUITING_WEBHOOK_URL
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db, testutil.WithoutRecruitingWebhook())
+
+	// when I submit the application
+	resp := srv.Post(t, "/api/applications", validApplication())
+
+	// then I expect a 201 and no message reached the fake Discord
+	resp.RequireStatus(t, 201)
+	if got := len(srv.Webhook.Bodies()); got != 0 {
+		t.Errorf("expected no webhook posts, got %d", got)
 	}
 }
 

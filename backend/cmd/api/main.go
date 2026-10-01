@@ -17,6 +17,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/applications"
 	"github.com/cageymage/fuzion/backend/internal/auth"
 	"github.com/cageymage/fuzion/backend/internal/clock"
+	idiscord "github.com/cageymage/fuzion/backend/internal/discord"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/professions"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
@@ -71,8 +72,16 @@ func run() error {
 		BaseURL: youtube.APIBaseURL,
 	}, &http.Client{Timeout: 10 * time.Second})
 
+	// Assign only when set: a typed-nil *Webhook in the interface would not read as disabled.
+	var recruiting applications.Notifier
+	if cfg.recruitingWebhookURL != "" {
+		recruiting = idiscord.NewWebhook(cfg.recruitingWebhookURL, &http.Client{Timeout: 5 * time.Second})
+	} else {
+		slog.Info("application notifications disabled: DISCORD_RECRUITING_WEBHOOK_URL is not set")
+	}
+
 	router := server.New(server.Deps{
-		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{})),
+		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{}, recruiting)),
 		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db))),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
