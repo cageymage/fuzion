@@ -1,0 +1,103 @@
+.page {
+  padding: 28px var(--gutter) 40px;
+}
+
+.title {
+  margin: 0 0 20px;
+  font-size: 38px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 560px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.field input,
+.field select,
+.field textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.counter {
+  align-self: flex-end;
+  font-size: 12px;
+}
+
+.roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.roles legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.radio input {
+  accent-color: var(--gold);
+}
+
+.button {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--gold);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--gold-soft);
+  color: var(--gold-hover);
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0;
+  color: var(--live);
+  font-size: 14px;
+}
+
+.thanks {
+  max-width: 560px;
+  font-size: 16px;
+}

@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import { AppFooter } from '../components/AppFooter/AppFooter'
 import { AppHeader } from '../components/AppHeader/AppHeader'
+import { Applications } from '../pages/Applications/Applications'
 import { Calendar } from '../pages/Calendar/Calendar'
 import { ComingSoon } from '../pages/ComingSoon/ComingSoon'
 import { Home } from '../pages/Home/Home'
@@ -26,12 +27,19 @@ export function App() {
           <Route path="/officer/raid-progress" element={<OfficerRaidProgress />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/streams" element={<Streams />} />
+          <Route path="/applications" element={<Applications />} />
           {navItems
             .filter(
               (item) =>
-                !['/', '/news', '/roster', '/raid-progress', '/calendar', '/streams'].includes(
-                  item.path,
-                ),
+                ![
+                  '/',
+                  '/news',
+                  '/roster',
+                  '/raid-progress',
+                  '/calendar',
+                  '/streams',
+                  '/applications',
+                ].includes(item.path),
             )
             .map((item) => (
               <Route
