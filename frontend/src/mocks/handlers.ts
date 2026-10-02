@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import type { NewsPage, NewsPost } from '../types/news'
+import type { EditablePost, NewsPage, NewsPost } from '../types/news'
 import type { RaidProgress, RaidTier } from '../types/raidProgress'
 import type { Raid } from '../types/raids'
 import type { Character } from '../types/roster'
@@ -35,6 +35,18 @@ const newsPosts: NewsPost[] = [
     publishedAt: new Date(Date.now() - 6 * 86_400_000).toISOString(),
   },
 ]
+
+export const draftPost: EditablePost = {
+  id: 'draft-1',
+  title: 'Patch 11.0 notes',
+  excerpt: 'What changed.',
+  category: 'patch-notes',
+  body: '## Changes',
+  pinned: false,
+  authorName: 'Officer',
+  publishedAt: null,
+  updatedAt: new Date().toISOString(),
+}
 
 export function newsPage(posts: NewsPost[], total = posts.length): NewsPage {
   const onlyPage = { href: '/api/news?limit=10&offset=0' }
@@ -246,6 +258,18 @@ export const handlers = [
   http.get('/api/auth/me', () => HttpResponse.json({ error: 'login required' }, { status: 401 })),
   http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
   newsHandler(newsPosts),
+  http.get('/api/news/drafts', () => HttpResponse.json([draftPost])),
+  http.get('/api/news/:id', ({ params }) => {
+    const post = newsPosts.find((candidate) => candidate.id === params.id)
+    return post
+      ? HttpResponse.json({ ...post, body: '', pinned: false, updatedAt: post.publishedAt })
+      : HttpResponse.json({ error: 'news post not found' }, { status: 404 })
+  }),
+  http.post('/api/news', () => HttpResponse.json(draftPost, { status: 201 })),
+  http.patch('/api/news/:id', () => HttpResponse.json(draftPost)),
+  http.post('/api/news/:id/publish', () =>
+    HttpResponse.json({ ...draftPost, publishedAt: new Date().toISOString() }),
+  ),
   http.get('/api/raid-progress', () => HttpResponse.json([raidProgress])),
   http.get('/api/raid-tiers', () => HttpResponse.json(raidTiers)),
   http.post('/api/raid-tiers', () =>
