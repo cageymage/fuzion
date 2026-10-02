@@ -8,6 +8,7 @@ export interface NewsPost {
   imageUrl: string | null
   authorName: string
   publishedAt: string
+  body?: string
 }
 
 export interface NewsLink {
@@ -38,4 +39,8 @@ export interface PostFields {
   category: NewsCategory
   body: string
   pinned: boolean
+}
+
+export interface NewsPostDetail extends NewsPost {
+  body: string
 }

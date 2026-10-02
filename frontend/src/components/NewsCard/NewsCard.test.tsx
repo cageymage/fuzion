@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderWithProviders } from '../../testUtils'
 import type { NewsPost } from '../../types/news'
 import { NewsCard } from './NewsCard'
 
@@ -24,7 +25,7 @@ describe('NewsCard', () => {
   })
 
   it('should show the headline with its category chip', () => {
-    render(<NewsCard post={post} />)
+    renderWithProviders(<NewsCard post={post} />)
 
     expect(
       screen.getByRole('heading', { name: 'Now recruiting: Restoration Druid & Fire Mage' }),
@@ -33,14 +34,22 @@ describe('NewsCard', () => {
   })
 
   it('should show the author and how long ago the post was published', () => {
-    render(<NewsCard post={post} />)
+    renderWithProviders(<NewsCard post={post} />)
 
     expect(screen.getByText('Posted by Officer · 4 days ago')).toBeInTheDocument()
   })
 
   it('should leave out the excerpt so the compact card stays a single line of meta', () => {
-    render(<NewsCard post={post} />)
+    renderWithProviders(<NewsCard post={post} />)
 
     expect(screen.queryByText('Two raid spots open for the Mythic roster.')).not.toBeInTheDocument()
+  })
+
+  it('should link the title to the post page', () => {
+    renderWithProviders(<NewsCard post={post} />)
+
+    expect(
+      screen.getByRole('link', { name: 'Now recruiting: Restoration Druid & Fire Mage' }),
+    ).toHaveAttribute('href', '/news/post-2')
   })
 })

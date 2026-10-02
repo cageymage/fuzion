@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import MDEditor, { commands, type ICommand } from '@uiw/react-md-editor/nohighlight'
 import '@uiw/react-md-editor/markdown-editor.css'
 import { useEffect, useState } from 'react'
-import { Link, useBlocker, useParams } from 'react-router-dom'
+import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { editablePostKey, fetchEditablePost, publishNewsPost } from '../../api/news'
+import { LightboxImage } from '../../components/LightboxImage/LightboxImage'
 import { OfficerOnly } from '../../components/OfficerOnly/OfficerOnly'
+import { useToast } from '../../components/Toast/Toast'
 import { newsCategoryMeta } from '../../lib/newsCategory'
 import type { EditablePost, NewsCategory, PostFields } from '../../types/news'
 import styles from './OfficerNewsEditor.module.css'
@@ -47,6 +49,8 @@ interface PostEditorProps {
 
 function PostEditor({ post }: PostEditorProps) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const { showToast } = useToast()
   const [fields, setFields] = useState<PostFields>({
     title: post.title,
     excerpt: post.excerpt,
@@ -64,12 +68,14 @@ function PostEditor({ post }: PostEditorProps) {
       }
       return publishNewsPost(post.id)
     },
-    onSuccess: async (published) => {
+    onSuccess: (published) => {
       setPublishedAt(published.publishedAt)
       setConfirmingPublish(false)
       queryClient.setQueryData(editablePostKey(post.id), published)
-      await queryClient.invalidateQueries({ queryKey: ['officer-news', 'drafts'] })
-      await queryClient.invalidateQueries({ queryKey: ['news'] })
+      void queryClient.invalidateQueries({ queryKey: ['officer-news', 'drafts'] })
+      void queryClient.invalidateQueries({ queryKey: ['news'] })
+      showToast('Post published')
+      navigate(`/news/${published.id}`)
     },
   })
 
@@ -138,6 +144,7 @@ function PostEditor({ post }: PostEditorProps) {
             onChange={(value) => change({ body: value ?? '' })}
             commands={toolbarCommands}
             preview="live"
+            previewOptions={{ components: { img: LightboxImage } }}
             height={420}
             textareaProps={{ 'aria-label': 'Body' }}
           />

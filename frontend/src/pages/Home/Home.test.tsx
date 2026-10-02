@@ -32,6 +32,43 @@ describe('Home', () => {
     expect(screen.getByText('Raiding · Mythic+ · PvP · Crafting')).toBeInTheDocument()
   })
 
+  it('should use the first image in the newest post body as the featured thumbnail', async () => {
+    server.use(
+      http.get('/api/news', () =>
+        HttpResponse.json(
+          newsPage([
+            {
+              id: 'post-1',
+              title: 'Server first',
+              excerpt: 'We did it.',
+              category: 'raid-progress',
+              imageUrl: null,
+              authorName: 'Officer',
+              publishedAt: new Date().toISOString(),
+              body: 'Intro\n\n![Kill](https://cdn.example/kill.png)',
+            },
+          ]),
+        ),
+      ),
+    )
+
+    const { container } = renderWithProviders(<Home />)
+
+    await screen.findByRole('heading', { name: 'Server first' })
+    expect(container.querySelector('img[src="https://cdn.example/kill.png"]')).not.toBeNull()
+  })
+
+  it('should keep the placeholder graph as the featured thumbnail when the post has no image', async () => {
+    const { container } = renderWithProviders(<Home />)
+
+    await screen.findByRole('heading', { name: 'Fuzion defeated Queen Ansurek on Mythic' })
+    const featuredCard = screen
+      .getByRole('heading', { name: 'Fuzion defeated Queen Ansurek on Mythic' })
+      .closest('article')
+    expect(featuredCard?.querySelector('img')).toBeNull()
+    expect(container.querySelector('svg[viewBox="0 0 210 130"]')).not.toBeNull()
+  })
+
   it('should show the countdown to the next raid when one is scheduled', async () => {
     renderWithProviders(<Home />)
 

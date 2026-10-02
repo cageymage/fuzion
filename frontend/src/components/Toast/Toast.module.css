@@ -1,0 +1,26 @@
+.toast {
+  position: fixed;
+  right: var(--gutter);
+  bottom: 24px;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100vw - 2 * var(--gutter));
+  padding: 12px 16px;
+  border-color: var(--gold);
+  font-size: 14px;
+}
+
+.dismiss {
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.dismiss:hover {
+  color: var(--text);
+}

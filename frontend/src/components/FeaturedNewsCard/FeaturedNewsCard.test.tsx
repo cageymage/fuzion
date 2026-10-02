@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderWithProviders } from '../../testUtils'
 import type { NewsPost } from '../../types/news'
 import { FeaturedNewsCard } from './FeaturedNewsCard'
 
@@ -24,7 +25,7 @@ describe('FeaturedNewsCard', () => {
   })
 
   it('should show the headline, excerpt and category label', () => {
-    render(<FeaturedNewsCard post={post} />)
+    renderWithProviders(<FeaturedNewsCard post={post} />)
 
     expect(
       screen.getByRole('heading', { name: 'Fuzion defeated Queen Ansurek on Mythic' }),
@@ -34,16 +35,24 @@ describe('FeaturedNewsCard', () => {
   })
 
   it('should show the author and how long ago the post was published', () => {
-    render(<FeaturedNewsCard post={post} />)
+    renderWithProviders(<FeaturedNewsCard post={post} />)
 
     expect(screen.getByText('Posted by Officer · 2 days ago')).toBeInTheDocument()
   })
 
   it('should render the post image when the post has one', () => {
-    const { container } = render(
+    const { container } = renderWithProviders(
       <FeaturedNewsCard post={{ ...post, imageUrl: 'https://cdn.example/ansurek.jpg' }} />,
     )
 
     expect(container.querySelector('img')).toHaveAttribute('src', 'https://cdn.example/ansurek.jpg')
+  })
+
+  it('should link the title to the post page', () => {
+    renderWithProviders(<FeaturedNewsCard post={post} />)
+
+    expect(
+      screen.getByRole('link', { name: 'Fuzion defeated Queen Ansurek on Mythic' }),
+    ).toHaveAttribute('href', '/news/post-1')
   })
 })
