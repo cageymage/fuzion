@@ -780,6 +780,26 @@ func TestCreateNewsPost_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) 
 	resp.RequireStatus(t, 401)
 }
 
+func TestCreateNewsPost_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
+	// given a logged-in member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "member-1", "Member")
+
+	// when I create a post
+	resp := srv.Post(t, "/api/news", map[string]any{"title": "x", "excerpt": "y", "category": "guild-news"})
+
+	// then I expect a 403 and no post to be stored
+	resp.RequireStatus(t, 403)
+	var count int
+	if err := db.Get(&count, `SELECT COUNT(*) FROM news_posts`); err != nil {
+		t.Fatalf("count posts: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected no posts, got %d", count)
+	}
+}
+
 func TestCreateNewsPost_ReturnsBadRequest_WhenTitleIsEmpty(t *testing.T) {
 	// given a logged-in officer
 	db := testutil.DB(t)
@@ -848,6 +868,51 @@ func TestUpdateNewsPost_ReturnsNotFound_WhenPostDoesNotExist(t *testing.T) {
 
 	// then I expect a 404
 	resp.RequireStatus(t, 404)
+}
+
+func TestUpdateNewsPost_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given a draft and nobody logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO news_posts (id, title, excerpt, category, author_name, body, published_at)
+		VALUES ('22222222-2222-2222-2222-222222222222', 'Old title', 'Old excerpt.', 'guild-news', 'Officer', 'Old body', NULL)`)
+
+	// when I patch the body
+	resp := srv.Patch(t, "/api/news/22222222-2222-2222-2222-222222222222", map[string]any{"body": "Hijacked"})
+
+	// then I expect a 401 and the body to be unchanged
+	resp.RequireStatus(t, 401)
+	var body string
+	if err := db.Get(&body, `SELECT body FROM news_posts WHERE id = '22222222-2222-2222-2222-222222222222'`); err != nil {
+		t.Fatalf("read post: %v", err)
+	}
+	if body != "Old body" {
+		t.Errorf("expected body %q, got %q", "Old body", body)
+	}
+}
+
+func TestUpdateNewsPost_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
+	// given a draft and a logged-in member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "member-1", "Member")
+	db.MustExec(`
+		INSERT INTO news_posts (id, title, excerpt, category, author_name, body, published_at)
+		VALUES ('22222222-2222-2222-2222-222222222222', 'Old title', 'Old excerpt.', 'guild-news', 'Officer', 'Old body', NULL)`)
+
+	// when I patch the body
+	resp := srv.Patch(t, "/api/news/22222222-2222-2222-2222-222222222222", map[string]any{"body": "Hijacked"})
+
+	// then I expect a 403 and the body to be unchanged
+	resp.RequireStatus(t, 403)
+	var body string
+	if err := db.Get(&body, `SELECT body FROM news_posts WHERE id = '22222222-2222-2222-2222-222222222222'`); err != nil {
+		t.Fatalf("read post: %v", err)
+	}
+	if body != "Old body" {
+		t.Errorf("expected body %q, got %q", "Old body", body)
+	}
 }
 
 func TestPublishNewsPost_SetsPublishedAt_OnFirstPublishOnly(t *testing.T) {
@@ -1024,6 +1089,28 @@ func TestPublishNewsPost_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T)
 	}
 }
 
+func TestPublishNewsPost_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given a draft and nobody logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO news_posts (id, title, excerpt, category, author_name, published_at)
+		VALUES ('22222222-2222-2222-2222-222222222222', 'Draft post', 'Soon.', 'guild-news', 'Officer', NULL)`)
+
+	// when I publish it
+	resp := srv.Post(t, "/api/news/22222222-2222-2222-2222-222222222222/publish", nil)
+
+	// then I expect a 401 and the post to stay a draft
+	resp.RequireStatus(t, 401)
+	var isDraft bool
+	if err := db.Get(&isDraft, `SELECT published_at IS NULL FROM news_posts WHERE id = '22222222-2222-2222-2222-222222222222'`); err != nil {
+		t.Fatalf("read post: %v", err)
+	}
+	if !isDraft {
+		t.Errorf("expected the post to remain a draft")
+	}
+}
+
 func TestListDrafts_ReturnsOnlyUnpublishedPosts_WhenOfficerAsks(t *testing.T) {
 	// given a published post, a draft and a logged-in officer
 	db := testutil.DB(t)
@@ -1060,6 +1147,18 @@ func TestListDrafts_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
 	resp.RequireStatus(t, 403)
 }
 
+func TestListDrafts_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given nobody is logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when I ask for the drafts
+	resp := srv.Get(t, "/api/news/drafts")
+
+	// then I expect a 401
+	resp.RequireStatus(t, 401)
+}
+
 func TestDeleteNewsPost_RemovesPost_WhenOfficerDeletes(t *testing.T) {
 	// given a post and a logged-in officer
 	db := testutil.DB(t)
@@ -1088,4 +1187,37 @@ func TestDeleteNewsPost_ReturnsNotFound_WhenPostDoesNotExist(t *testing.T) {
 
 	// then I expect a 404
 	resp.RequireStatus(t, 404)
+}
+
+func TestDeleteNewsPost_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given a published post and nobody logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO news_posts (id, title, excerpt, category, author_name, published_at)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Live post', 'Out.', 'guild-news', 'Officer', '2026-09-11T18:00:00Z')`)
+
+	// when I delete it
+	resp := srv.Delete(t, "/api/news/11111111-1111-1111-1111-111111111111")
+
+	// then I expect a 401 and the post to still be readable
+	resp.RequireStatus(t, 401)
+	srv.Get(t, "/api/news/11111111-1111-1111-1111-111111111111").RequireStatus(t, 200)
+}
+
+func TestDeleteNewsPost_ReturnsForbidden_WhenCallerIsNotAnOfficer(t *testing.T) {
+	// given a published post and a logged-in member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "member-1", "Member")
+	db.MustExec(`
+		INSERT INTO news_posts (id, title, excerpt, category, author_name, published_at)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Live post', 'Out.', 'guild-news', 'Officer', '2026-09-11T18:00:00Z')`)
+
+	// when I delete it
+	resp := srv.Delete(t, "/api/news/11111111-1111-1111-1111-111111111111")
+
+	// then I expect a 403 and the post to still be readable
+	resp.RequireStatus(t, 403)
+	srv.Get(t, "/api/news/11111111-1111-1111-1111-111111111111").RequireStatus(t, 200)
 }
