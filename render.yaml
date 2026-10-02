@@ -49,6 +49,16 @@ services:
       # as a secret.
       - key: DISCORD_RECRUITING_WEBHOOK_URL
         sync: false
+      # Optional: without it, newly published news posts are not cross-posted to
+      # Discord. A channel webhook URL, so treat it as a secret. When it is set,
+      # SITE_BASE_URL is required or the API refuses to start.
+      - key: DISCORD_ANNOUNCEMENTS_WEBHOOK_URL
+        sync: false
+      # Public address of the site, used for the post link in announcements. Use
+      # the host people actually browse (the custom domain, not onrender.com),
+      # e.g. https://fuziongaming.gg
+      - key: SITE_BASE_URL
+        sync: false
       # Optional: without both, the Home page has no suggested video when nobody
       # is live. The playlist must be Public or Unlisted.
       - key: YOUTUBE_API_KEY
