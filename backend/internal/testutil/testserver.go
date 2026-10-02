@@ -33,11 +33,16 @@ import (
 // FixedNow is the instant every server built by NewServer reports as "now".
 var FixedNow = time.Date(2026, 3, 14, 20, 0, 0, 0, time.UTC)
 
+// SiteBaseURL is the public site address that news announcements link to.
+const SiteBaseURL = "https://fuzion.example"
+
 type Server struct {
 	*httptest.Server
 	Discord *FakeDiscord
 	Webhook *FakeWebhook
-	YouTube *FakeYouTube
+	// Announcements is the news announcements channel, separate from Webhook (recruiting).
+	Announcements *FakeWebhook
+	YouTube       *FakeYouTube
 
 	db     *sqlx.DB
 	client *http.Client
@@ -46,8 +51,15 @@ type Server struct {
 type ServerOption func(*serverOptions)
 
 type serverOptions struct {
-	youTubePlaylistID string
-	recruitingWebhook bool
+	youTubePlaylistID    string
+	recruitingWebhook    bool
+	announcementsWebhook bool
+}
+
+// WithoutAnnouncementsWebhook builds the server the way a deploy without
+// DISCORD_ANNOUNCEMENTS_WEBHOOK_URL runs: published news is not cross-posted.
+func WithoutAnnouncementsWebhook() ServerOption {
+	return func(o *serverOptions) { o.announcementsWebhook = false }
 }
 
 // WithoutRecruitingWebhook builds the server the way a deploy without
@@ -65,7 +77,7 @@ func WithoutYouTubePlaylist() ServerOption {
 func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	t.Helper()
 
-	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true}
+	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -74,6 +86,12 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	var recruiting applications.Notifier
 	if options.recruitingWebhook {
 		recruiting = discord.NewWebhook(webhook.WebhookURL(), webhook.Client())
+	}
+
+	announcementsWebhook := NewFakeWebhook(t)
+	var announcements news.Notifier
+	if options.announcementsWebhook {
+		announcements = discord.NewWebhook(announcementsWebhook.WebhookURL(), announcementsWebhook.Client())
 	}
 
 	youTube := NewFakeYouTube(t)
@@ -91,7 +109,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting)),
 		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db))),
-		News:           news.NewHandler(news.NewService(news.NewRepo(db))),
+		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL)),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.Fixed(FixedNow))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
@@ -113,7 +131,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	client.Jar = jar
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
-	return &Server{Server: httpServer, Discord: discord, Webhook: webhook, YouTube: youTube, db: db, client: client}
+	return &Server{Server: httpServer, Discord: discord, Webhook: webhook, Announcements: announcementsWebhook, YouTube: youTube, db: db, client: client}
 }
 
 type LoginOption func(*loginOptions)
