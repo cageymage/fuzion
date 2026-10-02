@@ -1,4 +1,5 @@
 .card {
+  position: relative;
   display: flex;
   gap: 18px;
   padding: 16px;
@@ -71,4 +72,24 @@
   color: var(--muted);
   font-size: 11px;
   margin-top: 9px;
+}
+
+.titleLink {
+  color: inherit;
+}
+
+.titleLink:hover {
+  color: var(--gold-hover);
+}
+
+/* Stretched link: the title stays the only link, but its click area covers the whole card. */
+.titleLink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.card:hover,
+.card:focus-within {
+  border-color: var(--gold);
 }

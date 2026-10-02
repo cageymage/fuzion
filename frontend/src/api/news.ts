@@ -1,4 +1,12 @@
-import type { EditablePost, NewsCategory, NewsPage, NewsPost, PostFields } from '../types/news'
+import type {
+  EditablePost,
+  NewsCategory,
+  NewsPage,
+  NewsPost,
+  NewsPostDetail,
+  PostFields,
+} from '../types/news'
+import { firstMarkdownImageUrl } from '../lib/markdown'
 import { apiGet, apiSend } from './client'
 
 interface NewsPageQuery {
@@ -22,9 +30,13 @@ export async function fetchNewsPage({
   return { posts: result._embedded.news, total: result.total }
 }
 
+// The API returns each post's Markdown body in the list; the first image in it becomes the card thumbnail.
 export async function fetchLatestNews(limit: number): Promise<NewsPost[]> {
   const result = await apiGet<NewsPage>(`/news?limit=${limit}`)
-  return result._embedded.news
+  return result._embedded.news.map((post) => ({
+    ...post,
+    imageUrl: post.imageUrl ?? (post.body ? firstMarkdownImageUrl(post.body) : null),
+  }))
 }
 
 export function fetchDrafts(): Promise<EditablePost[]> {
@@ -57,3 +69,7 @@ export function publishNewsPost(id: string): Promise<EditablePost> {
 }
 
 export const editablePostKey = (id: string) => ['officer-news', 'post', id] as const
+
+export function fetchNewsPost(id: string): Promise<NewsPostDetail> {
+  return apiGet<NewsPostDetail>(`/news/${id}`)
+}

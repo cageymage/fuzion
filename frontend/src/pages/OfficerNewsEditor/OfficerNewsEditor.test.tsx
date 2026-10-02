@@ -3,7 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { Link, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { draftPost } from '../../mocks/handlers'
+import { draftPost, newsPage } from '../../mocks/handlers'
+import { News } from '../News/News'
+import { OfficerNews } from '../OfficerNews/OfficerNews'
+import { ToastProvider } from '../../components/Toast/Toast'
+import type { NewsPost } from '../../types/news'
 import { server } from '../../mocks/server'
 import { renderWithProviders } from '../../testUtils'
 import { OfficerNewsEditor } from './OfficerNewsEditor'
@@ -17,10 +21,13 @@ function signInAs(user: typeof officer) {
 
 function renderEditor(route = '/officer/news/draft-1') {
   return renderWithProviders(
-    <Routes>
-      <Route path="/officer/news/:id" element={<OfficerNewsEditor />} />
-      <Route path="/" element={<p>Home page</p>} />
-    </Routes>,
+    <ToastProvider>
+      <Routes>
+        <Route path="/officer/news/:id" element={<OfficerNewsEditor />} />
+        <Route path="/" element={<p>Home page</p>} />
+        <Route path="/news/:id" element={<p>Post page</p>} />
+      </Routes>
+    </ToastProvider>,
     route,
   )
 }
@@ -32,6 +39,7 @@ function renderEditorWithHomeLink() {
       <Routes>
         <Route path="/officer/news/:id" element={<OfficerNewsEditor />} />
         <Route path="/" element={<p>Home page</p>} />
+        <Route path="/news/:id" element={<p>Post page</p>} />
       </Routes>
     </>,
     '/officer/news/draft-1',
@@ -147,8 +155,59 @@ describe('OfficerNewsEditor', () => {
     await user.click(await screen.findByRole('button', { name: 'Publish' }))
     await user.click(screen.getByRole('button', { name: 'Confirm publish' }))
 
-    expect(await screen.findByText('Published')).toBeInTheDocument()
+    expect(await screen.findByText('Post page')).toBeInTheDocument()
     expect(published).toEqual(['draft-1'])
+  })
+
+  it('should open the published post page when Publish is confirmed', async () => {
+    signInAs(officer)
+    server.use(
+      http.post('/api/news/:id/publish', () =>
+        HttpResponse.json({ ...draftPost, publishedAt: new Date().toISOString() }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderEditor()
+
+    await user.click(await screen.findByRole('button', { name: 'Publish' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm publish' }))
+
+    expect(await screen.findByText('Post page')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
+  })
+
+  it('should show a success toast when Publish is confirmed', async () => {
+    signInAs(officer)
+    server.use(
+      http.post('/api/news/:id/publish', () =>
+        HttpResponse.json({ ...draftPost, publishedAt: new Date().toISOString() }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderEditor()
+
+    await user.click(await screen.findByRole('button', { name: 'Publish' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm publish' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Post published')
+  })
+
+  it('should stay on the editor without a toast when publishing fails', async () => {
+    signInAs(officer)
+    server.use(
+      http.post('/api/news/:id/publish', () =>
+        HttpResponse.json({ error: 'news post not found' }, { status: 404 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderEditor()
+
+    await user.click(await screen.findByRole('button', { name: 'Publish' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm publish' }))
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Title' })).toBeInTheDocument()
+    expect(screen.queryByText('Post published')).not.toBeInTheDocument()
   })
 
   it('should not call the publish endpoint when the publish confirmation is cancelled', async () => {
@@ -185,7 +244,7 @@ describe('OfficerNewsEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Publish' }))
     await user.click(screen.getByRole('button', { name: 'Confirm publish' }))
 
-    expect(await screen.findByText('Published')).toBeInTheDocument()
+    expect(await screen.findByText('Post page')).toBeInTheDocument()
     expect(patches).toHaveLength(1)
   })
 
@@ -211,6 +270,19 @@ describe('OfficerNewsEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Insert image' }))
 
     await waitFor(() => expect(body).toHaveValue('![](https://cdn.example/boss.png)## Changes'))
+  })
+
+  it('should show images in the live preview as lightbox thumbnails', async () => {
+    signInAs(officer)
+    server.use(
+      http.get('/api/news/drafts', () =>
+        HttpResponse.json([{ ...draftPost, body: '![Boss kill](https://cdn.example/boss.png)' }]),
+      ),
+    )
+
+    renderEditor()
+
+    expect(await screen.findByRole('button', { name: 'Open image: Boss kill' })).toBeInTheDocument()
   })
 
   it('should redirect to the home page when the visitor is not an officer', async () => {
@@ -286,6 +358,84 @@ describe('OfficerNewsEditor', () => {
     await user.click(await screen.findByRole('link', { name: 'Reopen editor' }))
 
     expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Patch 11.0 notes!')
+  })
+
+  it('should list the post on the news page when it is published after the news page was already loaded', async () => {
+    signInAs(officer)
+    const published = [
+      { ...draftPost, id: 'post-old', title: 'Older post', publishedAt: '2026-01-01T00:00:00Z' },
+    ]
+    server.use(
+      http.get('/api/news', () =>
+        HttpResponse.json(newsPage(published as unknown as NewsPost[])),
+      ),
+      http.post('/api/news/:id/publish', () => {
+        const nowPublished = { ...draftPost, publishedAt: '2026-09-01T00:00:00Z' }
+        published.unshift(nowPublished)
+        return HttpResponse.json(nowPublished)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(
+      <>
+        <Link to="/news">Go to news</Link>
+        <Link to="/officer/news/draft-1">Go to editor</Link>
+        <Routes>
+          <Route path="/officer/news/:id" element={<OfficerNewsEditor />} />
+          <Route path="/news" element={<News />} />
+          <Route path="/news/:id" element={<p>Post page</p>} />
+        </Routes>
+      </>,
+      '/news',
+    )
+    await screen.findByText('Older post')
+    await user.click(screen.getByRole('link', { name: 'Go to editor' }))
+    await user.click(await screen.findByRole('button', { name: 'Publish' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm publish' }))
+    await screen.findByText('Post page')
+
+    await user.click(screen.getByRole('link', { name: 'Go to news' }))
+
+    expect(await screen.findByText('Patch 11.0 notes')).toBeInTheDocument()
+  })
+
+  it('should move the post from drafts to published on the officer list when it is published', async () => {
+    signInAs(officer)
+    const published = [
+      { ...draftPost, id: 'post-old', title: 'Older post', publishedAt: '2026-01-01T00:00:00Z' },
+    ]
+    let drafts = [draftPost]
+    server.use(
+      http.get('/api/news/drafts', () => HttpResponse.json(drafts)),
+      http.get('/api/news', () => HttpResponse.json(newsPage(published as unknown as NewsPost[]))),
+      http.post('/api/news/:id/publish', () => {
+        const nowPublished = { ...draftPost, publishedAt: '2026-09-01T00:00:00Z' }
+        published.unshift(nowPublished)
+        drafts = []
+        return HttpResponse.json(nowPublished)
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(
+      <>
+        <Link to="/officer/news">Officer list</Link>
+        <Routes>
+          <Route path="/officer/news" element={<OfficerNews />} />
+          <Route path="/officer/news/:id" element={<OfficerNewsEditor />} />
+          <Route path="/news/:id" element={<p>Post page</p>} />
+        </Routes>
+      </>,
+      '/officer/news',
+    )
+    await user.click(await screen.findByRole('link', { name: 'Patch 11.0 notes' }))
+    await user.click(await screen.findByRole('button', { name: 'Publish' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm publish' }))
+    await screen.findByText('Post page')
+
+    await user.click(screen.getByRole('link', { name: 'Officer list' }))
+
+    expect(await screen.findByText('No drafts.')).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Patch 11.0 notes' })).toHaveLength(1)
   })
 
   it('should block navigation again when the user chose to stay and then tries to leave', async () => {

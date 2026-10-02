@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { formatRelativeDate } from '../../lib/format'
 import { newsCategoryMeta } from '../../lib/newsCategory'
 import type { NewsPost } from '../../types/news'
@@ -39,7 +40,11 @@ export function FeaturedNewsCard({ post }: FeaturedNewsCardProps) {
       </div>
       <div className={styles.body}>
         <Chip tone={tone}>{label}</Chip>
-        <h3 className={styles.title}>{post.title}</h3>
+        <h3 className={styles.title}>
+          <Link to={`/news/${post.id}`} className={styles.titleLink}>
+            {post.title}
+          </Link>
+        </h3>
         <p className={styles.excerpt}>{post.excerpt}</p>
         <div className={styles.meta}>
           Posted by {post.authorName} · {formatRelativeDate(post.publishedAt)}
