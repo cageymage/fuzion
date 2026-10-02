@@ -96,3 +96,10 @@
   font-size: 14px;
   margin: 8px 0 0;
 }
+
+.manageLink {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: var(--gold);
+  font-size: 14px;
+}

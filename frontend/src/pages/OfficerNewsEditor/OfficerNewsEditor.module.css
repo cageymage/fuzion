@@ -112,3 +112,43 @@
   font-size: 14px;
   margin: 0;
 }
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gutter);
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.leaveDialog {
+  width: 100%;
+  max-width: 440px;
+  padding: 24px 28px;
+}
+
+.dialogTitle {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.dialogText {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dangerButton {
+  border-color: var(--live);
+  color: var(--live);
+}

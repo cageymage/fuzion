@@ -1,6 +1,6 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { saveNewsPost } from '../../api/news'
+import { editablePostKey, saveNewsPost } from '../../api/news'
 import type { PostFields } from '../../types/news'
 
 export const autosaveDelayMs = 2000
@@ -24,8 +24,15 @@ function sameFields(a: PostFields, b: PostFields): boolean {
 export function useAutosave(postId: string, fields: PostFields) {
   const [savedFields, setSavedFields] = useState(fields)
   const [status, setStatus] = useState<SaveStatus>({ state: 'idle' })
+  const queryClient = useQueryClient()
   const { mutateAsync } = useMutation({
     mutationFn: (toSave: PostFields) => saveNewsPost(postId, toSave),
+    onSuccess: (saved) => {
+      // The editor's own copy never goes stale on its own, so reopening it would show pre-save text.
+      queryClient.setQueryData(editablePostKey(postId), saved)
+      void queryClient.invalidateQueries({ queryKey: ['officer-news', 'drafts'], refetchType: 'none' })
+      void queryClient.invalidateQueries({ queryKey: ['news'], refetchType: 'none' })
+    },
   })
   const latestFields = useRef(fields)
   latestFields.current = fields

@@ -55,3 +55,5 @@ export function saveNewsPost(id: string, fields: PostFields): Promise<EditablePo
 export function publishNewsPost(id: string): Promise<EditablePost> {
   return apiSend<EditablePost>('POST', `/news/${id}/publish`, {})
 }
+
+export const editablePostKey = (id: string) => ['officer-news', 'post', id] as const
