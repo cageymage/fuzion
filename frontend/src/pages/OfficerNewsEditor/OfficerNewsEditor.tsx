@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import MDEditor, { commands, type ICommand } from '@uiw/react-md-editor/nohighlight'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { fetchEditablePost, publishNewsPost } from '../../api/news'
+import { useEffect, useState } from 'react'
+import { Link, useBlocker, useParams } from 'react-router-dom'
+import { editablePostKey, fetchEditablePost, publishNewsPost } from '../../api/news'
 import { OfficerOnly } from '../../components/OfficerOnly/OfficerOnly'
 import { newsCategoryMeta } from '../../lib/newsCategory'
 import type { EditablePost, NewsCategory, PostFields } from '../../types/news'
@@ -67,10 +67,24 @@ function PostEditor({ post }: PostEditorProps) {
     onSuccess: async (published) => {
       setPublishedAt(published.publishedAt)
       setConfirmingPublish(false)
+      queryClient.setQueryData(editablePostKey(post.id), published)
       await queryClient.invalidateQueries({ queryKey: ['officer-news', 'drafts'] })
       await queryClient.invalidateQueries({ queryKey: ['news'] })
     },
   })
+
+  const blocker = useBlocker(dirty)
+
+  // beforeunload covers closing the tab; useBlocker covers in-app route changes.
+  useEffect(() => {
+    if (!dirty) return
+    function warn(event: BeforeUnloadEvent) {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
 
   function change(update: Partial<PostFields>) {
     setFields((current) => ({ ...current, ...update }))
@@ -156,6 +170,39 @@ function PostEditor({ post }: PostEditorProps) {
             </span>
           )}
         </div>
+        {blocker.state === 'blocked' && (
+          <div className={styles.backdrop}>
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-label="Unsaved changes"
+              className={`card ${styles.leaveDialog}`}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') blocker.reset()
+              }}
+            >
+              <h2 className={styles.dialogTitle}>Unsaved changes</h2>
+              <p className={styles.dialogText}>You have unsaved changes. Leave this page anyway?</p>
+              <div className={styles.dialogActions}>
+                <button
+                  type="button"
+                  className={styles.button}
+                  autoFocus
+                  onClick={() => blocker.reset()}
+                >
+                  Stay on this page
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.dangerButton}`}
+                  onClick={() => blocker.proceed()}
+                >
+                  Leave without saving
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {publish.isError && (
           <p role="alert" className={styles.error}>
             {publish.error.message}
@@ -169,7 +216,7 @@ function PostEditor({ post }: PostEditorProps) {
 function EditorLoader() {
   const { id = '' } = useParams()
   const post = useQuery({
-    queryKey: ['officer-news', 'post', id],
+    queryKey: editablePostKey(id),
     queryFn: () => fetchEditablePost(id),
     staleTime: Infinity,
   })

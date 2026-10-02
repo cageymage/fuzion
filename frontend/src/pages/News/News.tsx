@@ -1,7 +1,8 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { fetchNewsPage } from '../../api/news'
 import { NewsCard } from '../../components/NewsCard/NewsCard'
+import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { newsCategoryMeta } from '../../lib/newsCategory'
 import type { NewsCategory } from '../../types/news'
 import styles from './News.module.css'
@@ -28,6 +29,7 @@ function toSearchParams(category: CategoryFilter, page: number, pageSize: number
 
 export function News() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const currentUser = useCurrentUser()
   const category =
     filters.find((filter) => filter.value === searchParams.get('category'))?.value ?? 'all'
   const requestedPage = Number(searchParams.get('page'))
@@ -53,6 +55,11 @@ export function News() {
   return (
     <section className={styles.page}>
       <h1 className={styles.title}>News</h1>
+      {currentUser.data?.isOfficer && (
+        <Link to="/officer/news" className={styles.manageLink}>
+          Manage news
+        </Link>
+      )}
       <div className={styles.toolbar}>
         <div className={styles.filters}>
           {filters.map(({ value, label }) => (

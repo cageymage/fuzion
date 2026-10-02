@@ -319,6 +319,34 @@ describe('News', () => {
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
   })
 
+  it('should link to the officer news page when the visitor is an officer', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ id: 'user-1', username: 'Officer', avatarUrl: null, isOfficer: true }),
+      ),
+    )
+
+    renderNews()
+
+    expect(await screen.findByRole('link', { name: 'Manage news' })).toHaveAttribute(
+      'href',
+      '/officer/news',
+    )
+  })
+
+  it('should not link to the officer news page when the visitor is not an officer', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ id: 'user-2', username: 'Member', avatarUrl: null, isOfficer: false }),
+      ),
+    )
+
+    renderNews()
+
+    await screen.findByText('Welcome our newest officers')
+    expect(screen.queryByRole('link', { name: 'Manage news' })).not.toBeInTheDocument()
+  })
+
   it('should show an error message when the news request fails', async () => {
     server.use(http.get('/api/news', () => new HttpResponse(null, { status: 500 })))
 
