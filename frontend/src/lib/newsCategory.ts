@@ -5,6 +5,7 @@ const categoryMeta: Record<NewsCategory, { label: string; tone: ChipTone }> = {
   'raid-progress': { label: 'Raid Progress', tone: 'epic' },
   recruitment: { label: 'Recruitment', tone: 'legendary' },
   'guild-news': { label: 'Guild News', tone: 'gold' },
+  'patch-notes': { label: 'Patch Notes', tone: 'epic' },
 }
 
 export function newsCategoryMeta(category: NewsCategory): { label: string; tone: ChipTone } {

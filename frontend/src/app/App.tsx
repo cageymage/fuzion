@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { AppFooter } from '../components/AppFooter/AppFooter'
 import { AppHeader } from '../components/AppHeader/AppHeader'
@@ -6,12 +7,20 @@ import { Calendar } from '../pages/Calendar/Calendar'
 import { ComingSoon } from '../pages/ComingSoon/ComingSoon'
 import { Home } from '../pages/Home/Home'
 import { News } from '../pages/News/News'
+import { OfficerNews } from '../pages/OfficerNews/OfficerNews'
 import { OfficerRaidProgress } from '../pages/OfficerRaidProgress/OfficerRaidProgress'
 import { RaidProgress } from '../pages/RaidProgress/RaidProgress'
 import { Roster } from '../pages/Roster/Roster'
 import { Streams } from '../pages/Streams/Streams'
 import styles from './App.module.css'
 import { navItems } from './navigation'
+
+// Loaded on demand: the Markdown editor is heavy and only officers use it.
+const OfficerNewsEditor = lazy(() =>
+  import('../pages/OfficerNewsEditor/OfficerNewsEditor').then((module) => ({
+    default: module.OfficerNewsEditor,
+  })),
+)
 
 export function App() {
   return (
@@ -25,6 +34,15 @@ export function App() {
           <Route path="/roster" element={<Roster />} />
           <Route path="/raid-progress" element={<RaidProgress />} />
           <Route path="/officer/raid-progress" element={<OfficerRaidProgress />} />
+          <Route path="/officer/news" element={<OfficerNews />} />
+          <Route
+            path="/officer/news/:id"
+            element={
+              <Suspense fallback={null}>
+                <OfficerNewsEditor />
+              </Suspense>
+            }
+          />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/streams" element={<Streams />} />
           <Route path="/applications" element={<Applications />} />
