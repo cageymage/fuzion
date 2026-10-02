@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile'
+import { useRef, useState, type FormEvent } from 'react'
 import { submitApplication } from '../../api/applications'
 import { ApiError } from '../../api/client'
 import { wowClasses } from '../../lib/wowClasses'
@@ -7,6 +8,7 @@ import type { ApplicationRole, SubmitApplicationRequest } from '../../types/appl
 import styles from './Applications.module.css'
 
 const maxNotesLength = 2000
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY
 const genericError = 'Something went wrong, try again or ping an officer on Discord'
 
 const roles: { value: ApplicationRole; label: string }[] = [
@@ -23,9 +25,10 @@ const emptyForm: SubmitApplicationRequest = {
   availability: '',
   discordHandle: '',
   notes: '',
+  turnstileToken: '',
 }
 
-const requiredFields: { key: keyof SubmitApplicationRequest; label: string }[] = [
+const requiredFields: { key: Exclude<keyof SubmitApplicationRequest, 'turnstileToken'>; label: string }[] = [
   { key: 'applicantName', label: 'Your name' },
   { key: 'characterName', label: 'Character name' },
   { key: 'class', label: 'Class' },
@@ -37,6 +40,7 @@ const requiredFields: { key: keyof SubmitApplicationRequest; label: string }[] =
 export function Applications() {
   const [form, setForm] = useState(emptyForm)
   const [validationError, setValidationError] = useState<string | null>(null)
+  const turnstile = useRef<TurnstileInstance>(null)
   const submission = useMutation({ mutationFn: submitApplication })
 
   const update = (key: keyof SubmitApplicationRequest, value: string) =>
@@ -50,7 +54,13 @@ export function Applications() {
       return
     }
     setValidationError(null)
-    submission.mutate(form)
+    submission.mutate(form, {
+      onError: () => {
+        // Tokens are single-use, so a failed submit needs a fresh challenge.
+        update('turnstileToken', '')
+        turnstile.current?.reset()
+      },
+    })
   }
 
   if (submission.isSuccess) {
@@ -148,7 +158,18 @@ export function Applications() {
             {form.notes.length} / {maxNotesLength}
           </span>
         </label>
-        <button type="submit" className={styles.button} disabled={submission.isPending}>
+        <Turnstile
+          ref={turnstile}
+          siteKey={turnstileSiteKey}
+          onSuccess={(token) => update('turnstileToken', token)}
+          onExpire={() => update('turnstileToken', '')}
+          onError={() => update('turnstileToken', '')}
+        />
+        <button
+          type="submit"
+          className={styles.button}
+          disabled={submission.isPending || form.turnstileToken === ''}
+        >
           {submission.isPending ? 'Sending…' : 'Submit application'}
         </button>
       </form>

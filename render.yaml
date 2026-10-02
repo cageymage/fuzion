@@ -8,6 +8,11 @@ services:
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
+    envVars:
+      # Public Turnstile site key (Cloudflare dashboard > Turnstile). Baked into
+      # the bundle at build time, so changing it needs a redeploy.
+      - key: VITE_TURNSTILE_SITE_KEY
+        sync: false
     # Order matters: /api is proxied to the API service so the browser only
     # ever talks to one origin (same as the Vite proxy in local dev); anything
     # else falls through to the SPA. If Render assigned the API a different
@@ -48,6 +53,11 @@ services:
       # a channel webhook URL (Edit Channel > Integrations > Webhooks); treat it
       # as a secret.
       - key: DISCORD_RECRUITING_WEBHOOK_URL
+        sync: false
+      # Optional: without it, POST /applications skips the Turnstile bot check.
+      # The widget's secret key; set it only once the frontend sends tokens, or
+      # every real submission is rejected.
+      - key: TURNSTILE_SECRET_KEY
         sync: false
       # Optional: without it, newly published news posts are not cross-posted to
       # Discord. A channel webhook URL, so treat it as a secret. When it is set,

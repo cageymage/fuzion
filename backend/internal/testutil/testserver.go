@@ -27,6 +27,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/turnstile"
 	"github.com/cageymage/fuzion/backend/internal/youtube"
 )
 
@@ -43,8 +44,9 @@ type Server struct {
 	// Announcements is the news announcements channel, separate from Webhook (recruiting).
 	Announcements *FakeWebhook
 	YouTube       *FakeYouTube
+	Turnstile     *FakeTurnstile
 
-	db     *sqlx.DB
+	db    *sqlx.DB
 	client *http.Client
 }
 
@@ -54,6 +56,13 @@ type serverOptions struct {
 	youTubePlaylistID    string
 	recruitingWebhook    bool
 	announcementsWebhook bool
+	turnstile            bool
+}
+
+// WithoutTurnstile builds the server the way a deploy without
+// TURNSTILE_SECRET_KEY runs: applications are accepted without a token.
+func WithoutTurnstile() ServerOption {
+	return func(o *serverOptions) { o.turnstile = false }
 }
 
 // WithoutAnnouncementsWebhook builds the server the way a deploy without
@@ -77,7 +86,7 @@ func WithoutYouTubePlaylist() ServerOption {
 func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	t.Helper()
 
-	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true}
+	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -94,6 +103,12 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 		announcements = discord.NewWebhook(announcementsWebhook.WebhookURL(), announcementsWebhook.Client())
 	}
 
+	fakeTurnstile := NewFakeTurnstile(t)
+	var verifier applications.Verifier
+	if options.turnstile {
+		verifier = turnstile.NewClient(turnstile.Config{SecretKey: TurnstileSecretKey, BaseURL: fakeTurnstile.URL}, fakeTurnstile.Client())
+	}
+
 	youTube := NewFakeYouTube(t)
 	youTubeClient := youtube.NewClient(youtube.Config{APIKey: YouTubeAPIKey, BaseURL: youTube.URL}, youTube.Client())
 	suggestedVideos := streams.NewSuggestedVideos(youTubeClient, options.youTubePlaylistID, clock.Fixed(FixedNow))
@@ -107,7 +122,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	}, discord.Client())
 
 	router := server.New(server.Deps{
-		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting)),
+		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting, verifier)),
 		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL)),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
@@ -131,7 +146,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	client.Jar = jar
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
-	return &Server{Server: httpServer, Discord: discord, Webhook: webhook, Announcements: announcementsWebhook, YouTube: youTube, db: db, client: client}
+	return &Server{Server: httpServer, Discord: discord, Webhook: webhook, Announcements: announcementsWebhook, YouTube: youTube, Turnstile: fakeTurnstile, db: db, client: client}
 }
 
 type LoginOption func(*loginOptions)

@@ -8,4 +8,5 @@ export interface SubmitApplicationRequest {
   availability: string
   discordHandle: string
   notes: string
+  turnstileToken: string
 }

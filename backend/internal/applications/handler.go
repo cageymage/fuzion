@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -40,8 +41,19 @@ func (h *Handler) submit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	submitted, err := h.service.Submit(r.Context(), req)
 	var validationErr *ValidationError
+	err := h.service.VerifyHuman(r.Context(), req.TurnstileToken, clientIP(r))
+	if errors.As(err, &validationErr) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": validationErr.Error()})
+		return
+	}
+	if err != nil {
+		slog.ErrorContext(r.Context(), "verify application bot check", "error", err)
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "verification service unavailable"})
+		return
+	}
+
+	submitted, err := h.service.Submit(r.Context(), req)
 	if errors.As(err, &validationErr) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": validationErr.Error()})
 		return
@@ -101,6 +113,15 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, action stri
 		slog.ErrorContext(r.Context(), action, "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": action + " failed"})
 	}
+}
+
+// chi's RealIP middleware may already have replaced RemoteAddr with a bare IP from a proxy header.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

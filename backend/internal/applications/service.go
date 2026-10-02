@@ -2,6 +2,7 @@ package applications
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/cageymage/fuzion/backend/internal/clock"
 	"github.com/cageymage/fuzion/backend/internal/discord"
+	"github.com/cageymage/fuzion/backend/internal/turnstile"
 )
 
 const (
@@ -27,6 +29,8 @@ type SubmitRequest struct {
 	Availability  string `json:"availability"`
 	DiscordHandle string `json:"discordHandle"`
 	Notes         string `json:"notes"`
+
+	TurnstileToken string `json:"turnstileToken"`
 }
 
 type ReviewRequest struct {
@@ -48,14 +52,40 @@ type Notifier interface {
 	Send(ctx context.Context, msg discord.Message) error
 }
 
+// Verifier is the bot check on public submissions; a nil Verifier means the check is disabled.
+type Verifier interface {
+	Verify(ctx context.Context, token, remoteIP string) error
+}
+
 type Service struct {
 	repo     *Repo
 	clock    clock.Clock
 	notifier Notifier
+	verifier Verifier
 }
 
-func NewService(repo *Repo, clock clock.Clock, notifier Notifier) *Service {
-	return &Service{repo: repo, clock: clock, notifier: notifier}
+func NewService(repo *Repo, clock clock.Clock, notifier Notifier, verifier Verifier) *Service {
+	return &Service{repo: repo, clock: clock, notifier: notifier, verifier: verifier}
+}
+
+// VerifyHuman returns a ValidationError when the token is missing or rejected,
+// and a plain error when the verification service itself could not be reached.
+func (s *Service) VerifyHuman(ctx context.Context, token, remoteIP string) error {
+	if s.verifier == nil {
+		return nil
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return &ValidationError{Field: "turnstileToken", Problem: "is required"}
+	}
+	err := s.verifier.Verify(ctx, token, remoteIP)
+	if errors.Is(err, turnstile.ErrInvalidToken) {
+		return &ValidationError{Field: "turnstileToken", Problem: "verification failed"}
+	}
+	if err != nil {
+		return fmt.Errorf("verify turnstile token: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) Submit(ctx context.Context, req SubmitRequest) (Submitted, error) {

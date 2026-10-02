@@ -26,10 +26,13 @@ type applicationBody struct {
 	Availability  string `json:"availability"`
 	DiscordHandle string `json:"discordHandle"`
 	Notes         string `json:"notes"`
+
+	TurnstileToken string `json:"turnstileToken"`
 }
 
 func validApplication() applicationBody {
 	return applicationBody{
+		TurnstileToken: testutil.ValidTurnstileToken,
 		ApplicantName: "Mira",
 		CharacterName: "Thornleaf",
 		Class:         "Druid",
@@ -65,6 +68,8 @@ func TestSubmitApplication_ReturnsCreated_WhenBodyIsValid(t *testing.T) {
 		Availability:  "Tue/Thu 8-11pm ET\n",
 		DiscordHandle: "\tmira.heals",
 		Notes:         "  Cleared Mythic Ansurek with my previous guild.  ",
+
+		TurnstileToken: testutil.ValidTurnstileToken,
 	}
 
 	// when I submit the application
@@ -207,6 +212,118 @@ func TestSubmitApplication_DoesNotCallDiscord_WhenWebhookURLIsEmpty(t *testing.T
 	resp.RequireStatus(t, 201)
 	if got := len(srv.Webhook.Bodies()); got != 0 {
 		t.Errorf("expected no webhook posts, got %d", got)
+	}
+}
+
+func TestSubmitApplication_SendsSecretTokenAndClientIPToCloudflare_WhenTokenIsValid(t *testing.T) {
+	// given a deploy with Turnstile configured
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when I submit the application with a valid token
+	resp := srv.Post(t, "/api/applications", validApplication())
+
+	// then I expect a 201 and exactly one siteverify call carrying the secret, the token and an IP
+	resp.RequireStatus(t, 201)
+	requests := srv.Turnstile.Requests()
+	if len(requests) != 1 {
+		t.Fatalf("expected exactly 1 siteverify request, got %d", len(requests))
+	}
+	got := requests[0]
+	if got.Secret != testutil.TurnstileSecretKey || got.Response != testutil.ValidTurnstileToken {
+		t.Errorf("expected secret %q and response %q, got secret %q and response %q",
+			testutil.TurnstileSecretKey, testutil.ValidTurnstileToken, got.Secret, got.Response)
+	}
+	if got.RemoteIP != "127.0.0.1" {
+		t.Errorf("expected remoteip %q, got %q", "127.0.0.1", got.RemoteIP)
+	}
+}
+
+func TestSubmitApplication_ReturnsBadRequest_WhenTurnstileTokenIsInvalid(t *testing.T) {
+	// given a token Cloudflare rejects
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	body := validApplication()
+	body.TurnstileToken = "forged-token"
+
+	// when I submit the application
+	resp := srv.Post(t, "/api/applications", body)
+
+	// then I expect a 400 naming the token, nothing stored and no Discord ping
+	resp.RequireStatus(t, 400)
+	var got errorJSON
+	resp.DecodeJSON(t, &got)
+	if diff := cmp.Diff(errorJSON{Error: "turnstileToken: verification failed"}, got); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+	if n := countApplications(t, db); n != 0 {
+		t.Errorf("expected no stored applications, found %d", n)
+	}
+	if n := len(srv.Webhook.Bodies()); n != 0 {
+		t.Errorf("expected no webhook posts, got %d", n)
+	}
+}
+
+func TestSubmitApplication_ReturnsBadRequest_WhenTurnstileTokenIsMissing(t *testing.T) {
+	// given an application with no Turnstile token
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	body := validApplication()
+	body.TurnstileToken = ""
+
+	// when I submit the application
+	resp := srv.Post(t, "/api/applications", body)
+
+	// then I expect a 400 saying the token is required, and Cloudflare was never called
+	resp.RequireStatus(t, 400)
+	var got errorJSON
+	resp.DecodeJSON(t, &got)
+	if diff := cmp.Diff(errorJSON{Error: "turnstileToken: is required"}, got); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+	if n := len(srv.Turnstile.Requests()); n != 0 {
+		t.Errorf("expected no siteverify requests, got %d", n)
+	}
+	if n := countApplications(t, db); n != 0 {
+		t.Errorf("expected no stored applications, found %d", n)
+	}
+}
+
+func TestSubmitApplication_ReturnsBadGateway_WhenCloudflareIsUnreachable(t *testing.T) {
+	// given a Cloudflare siteverify endpoint that answers 500
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.Turnstile.Status = 500
+
+	// when I submit the application
+	resp := srv.Post(t, "/api/applications", validApplication())
+
+	// then I expect a 502 and nothing stored
+	resp.RequireStatus(t, 502)
+	var got errorJSON
+	resp.DecodeJSON(t, &got)
+	if diff := cmp.Diff(errorJSON{Error: "verification service unavailable"}, got); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+	if n := countApplications(t, db); n != 0 {
+		t.Errorf("expected no stored applications, found %d", n)
+	}
+}
+
+func TestSubmitApplication_SkipsVerification_WhenTurnstileSecretIsNotConfigured(t *testing.T) {
+	// given a deploy without TURNSTILE_SECRET_KEY
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db, testutil.WithoutTurnstile())
+	body := validApplication()
+	body.TurnstileToken = ""
+
+	// when I submit the application without a token
+	resp := srv.Post(t, "/api/applications", body)
+
+	// then I expect a 201 and Cloudflare was never called
+	resp.RequireStatus(t, 201)
+	if n := len(srv.Turnstile.Requests()); n != 0 {
+		t.Errorf("expected no siteverify requests, got %d", n)
 	}
 }
 
