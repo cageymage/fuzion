@@ -80,10 +80,17 @@ func run() error {
 		slog.Info("application notifications disabled: DISCORD_RECRUITING_WEBHOOK_URL is not set")
 	}
 
+	var announcements news.Notifier
+	if cfg.announcementsWebhookURL != "" {
+		announcements = idiscord.NewWebhook(cfg.announcementsWebhookURL, &http.Client{Timeout: 5 * time.Second})
+	} else {
+		slog.Info("news announcements disabled: DISCORD_ANNOUNCEMENTS_WEBHOOK_URL is not set")
+	}
+
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{}, recruiting)),
 		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db))),
-		News:           news.NewHandler(news.NewService(news.NewRepo(db))),
+		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.System{}, announcements, cfg.siteBaseURL)),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.System{})),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),

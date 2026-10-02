@@ -17,6 +17,12 @@ type config struct {
 	// Optional: empty disables the Discord ping for new applications, so local
 	// dev and CI need no real channel.
 	recruitingWebhookURL string
+
+	// Optional: empty disables the Discord cross-post when a news post is published.
+	announcementsWebhookURL string
+
+	// Public address of the site, used for links in announcements, e.g. http://localhost:5173 in dev.
+	siteBaseURL string
 }
 
 // Both values are optional: without them the Home page simply has no suggested
@@ -61,6 +67,10 @@ func loadConfig() (config, error) {
 		return config{}, err
 	}
 
+	if os.Getenv("DISCORD_ANNOUNCEMENTS_WEBHOOK_URL") != "" && os.Getenv("SITE_BASE_URL") == "" {
+		return config{}, errors.New("SITE_BASE_URL is required when DISCORD_ANNOUNCEMENTS_WEBHOOK_URL is set")
+	}
+
 	return config{
 		addr:           addr,
 		databaseURL:    databaseURL,
@@ -70,7 +80,9 @@ func loadConfig() (config, error) {
 			apiKey:     os.Getenv("YOUTUBE_API_KEY"),
 			playlistID: os.Getenv("YOUTUBE_PLAYLIST_ID"),
 		},
-		recruitingWebhookURL: os.Getenv("DISCORD_RECRUITING_WEBHOOK_URL"),
+		recruitingWebhookURL:    os.Getenv("DISCORD_RECRUITING_WEBHOOK_URL"),
+		announcementsWebhookURL: os.Getenv("DISCORD_ANNOUNCEMENTS_WEBHOOK_URL"),
+		siteBaseURL:             os.Getenv("SITE_BASE_URL"),
 	}, nil
 }
 
