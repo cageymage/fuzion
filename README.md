@@ -20,6 +20,10 @@ npm run db:seed # sample news/raid/stream rows so the home page has content
 Open http://localhost:5173. Vite proxies `/api` to the Go API, so the
 browser only ever talks to one origin. Both servers hot-reload on save.
 
+After pulling or merging changes that touch `package.json` or
+`frontend/package.json`, re-run `npm install` and restart `npm run dev` so Vite
+picks up the new packages.
+
 The first `npm run dev` is slow: it pulls the `postgres:16-alpine` image and
 Go downloads/compiles the backend's modules. Subsequent runs take a few
 seconds.
