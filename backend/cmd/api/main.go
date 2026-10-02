@@ -25,6 +25,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/turnstile"
 	"github.com/cageymage/fuzion/backend/internal/youtube"
 	"github.com/cageymage/fuzion/backend/migrations"
 )
@@ -80,6 +81,17 @@ func run() error {
 		slog.Info("application notifications disabled: DISCORD_RECRUITING_WEBHOOK_URL is not set")
 	}
 
+	// Same typed-nil pitfall: assign only when the secret is set.
+	var botCheck applications.Verifier
+	if cfg.turnstileSecretKey != "" {
+		botCheck = turnstile.NewClient(turnstile.Config{
+			SecretKey: cfg.turnstileSecretKey,
+			BaseURL:   turnstile.VerifyBaseURL,
+		}, &http.Client{Timeout: 5 * time.Second})
+	} else {
+		slog.Info("application bot check disabled: TURNSTILE_SECRET_KEY is not set")
+	}
+
 	var announcements news.Notifier
 	if cfg.announcementsWebhookURL != "" {
 		announcements = idiscord.NewWebhook(cfg.announcementsWebhookURL, &http.Client{Timeout: 5 * time.Second})
@@ -88,7 +100,7 @@ func run() error {
 	}
 
 	router := server.New(server.Deps{
-		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{}, recruiting)),
+		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{}, recruiting, botCheck)),
 		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.System{}, announcements, cfg.siteBaseURL)),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),

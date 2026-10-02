@@ -21,6 +21,9 @@ type config struct {
 	// Optional: empty disables the Discord cross-post when a news post is published.
 	announcementsWebhookURL string
 
+	// Optional: empty disables the Turnstile bot check on new applications.
+	turnstileSecretKey string
+
 	// Public address of the site, used for links in announcements, e.g. http://localhost:5173 in dev.
 	siteBaseURL string
 }
@@ -82,6 +85,7 @@ func loadConfig() (config, error) {
 		},
 		recruitingWebhookURL:    os.Getenv("DISCORD_RECRUITING_WEBHOOK_URL"),
 		announcementsWebhookURL: os.Getenv("DISCORD_ANNOUNCEMENTS_WEBHOOK_URL"),
+		turnstileSecretKey:      os.Getenv("TURNSTILE_SECRET_KEY"),
 		siteBaseURL:             os.Getenv("SITE_BASE_URL"),
 	}, nil
 }
