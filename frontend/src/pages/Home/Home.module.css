@@ -21,7 +21,7 @@
 
 .tagline {
   color: var(--muted);
-  font-size: 16px;
+  font-size: 1.375rem;
   font-style: italic;
 }
 
@@ -58,12 +58,15 @@
 }
 
 .sectionTitle {
-  font-size: 21px;
+  font-size: 1.625rem;
   margin: 0;
 }
 
 .viewAll {
-  font-size: 13px;
+  font-size: var(--text-ui);
+  text-decoration: underline;
+  text-decoration-color: rgba(211, 162, 77, 0.5);
+  text-underline-offset: 4px;
 }
 
 .notice {
@@ -73,6 +76,6 @@
 
 .noticeText {
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--text-meta);
   margin: 8px 0 0;
 }

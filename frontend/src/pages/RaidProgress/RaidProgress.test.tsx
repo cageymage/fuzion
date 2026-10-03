@@ -68,7 +68,7 @@ describe('RaidProgress', () => {
 
     expect(await screen.findByRole('heading', { name: "Onyxia's Lair" })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Barrow Deeps' })).toBeInTheDocument()
-    expect(screen.getByText('0 / 1 bosses defeated')).toBeInTheDocument()
+    expect(screen.getByText('0 / 1 boss defeated')).toBeInTheDocument()
     expect(screen.getByText('0 / 0 bosses defeated')).toBeInTheDocument()
   })
 

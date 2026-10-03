@@ -9,7 +9,7 @@
   max-width: calc(100vw - 2 * var(--gutter));
   padding: 12px 16px;
   border-color: var(--gold);
-  font-size: 14px;
+  font-size: var(--text-meta);
 }
 
 .dismiss {

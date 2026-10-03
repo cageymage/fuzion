@@ -11,17 +11,20 @@
   display: inline-block;
   margin-bottom: 20px;
   color: var(--gold);
-  font-size: 14px;
+  font-size: var(--text-ui);
+  text-decoration: underline;
+  text-decoration-color: rgba(211, 162, 77, 0.5);
+  text-underline-offset: 4px;
 }
 
 .noticeText {
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--text-meta);
   margin: 8px 0 0;
 }
 
 .sectionTitle {
-  font-size: 22px;
+  font-size: 1.625rem;
   margin: 24px 0 16px;
 }
 
@@ -82,7 +85,7 @@
 
 .inlineInput {
   padding: 7px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-chip);
   background: var(--bg);
   color: var(--text);
@@ -104,13 +107,13 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 14px;
+  font-size: var(--text-meta);
   color: var(--muted);
 }
 
 .field input {
   padding: 8px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-chip);
   background: var(--bg);
   color: var(--text);
@@ -191,6 +194,6 @@
 
 .error {
   color: var(--live);
-  font-size: 14px;
+  font-size: var(--text-meta);
   margin: 12px 0 0;
 }

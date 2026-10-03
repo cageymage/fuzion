@@ -17,7 +17,18 @@
 
 .viewerCount {
   margin-left: auto;
-  color: var(--muted);
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: var(--text-meta);
   font-weight: 400;
+}
+
+.viewerCount::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--live);
 }
