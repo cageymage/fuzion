@@ -125,10 +125,8 @@
 @media (max-width: 900px) {
   .currentList,
   .historyList {
-  columns: 2;
-  column-gap: 16px;
-  margin-top: 16px;
-}
+    columns: 1;
+  }
 }
 
 .history {
@@ -143,9 +141,8 @@
 }
 
 .historyList {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  columns: 2;
+  column-gap: 16px;
   margin-top: 16px;
 }
 
