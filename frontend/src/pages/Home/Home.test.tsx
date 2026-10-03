@@ -29,7 +29,7 @@ describe('Home', () => {
 
     expect(await screen.findByRole('heading', { name: 'Fuzion', level: 1 })).toBeInTheDocument()
     expect(screen.getByText('Emberreach · US')).toBeInTheDocument()
-    expect(screen.getByText('Raiding · Mythic+ · PvP · Crafting')).toBeInTheDocument()
+    expect(screen.getByText('Raiding · Dungeons · Community')).toBeInTheDocument()
   })
 
   it('should use the first image in the newest post body as the featured thumbnail', async () => {
