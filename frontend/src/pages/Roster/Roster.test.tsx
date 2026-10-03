@@ -78,6 +78,17 @@ describe('Roster', () => {
     expect(screen.queryByText('Ragnok')).not.toBeInTheDocument()
   })
 
+  it('should show the secondary name next to the name when the character has one', async () => {
+    const withSecondaryName: Character = { ...ragnok, secondaryName: 'Ironhide' }
+    server.use(http.get('/api/roster', () => HttpResponse.json([withSecondaryName])))
+
+    renderWithProviders(<Roster />)
+
+    const table = within(await screen.findByRole('table'))
+    expect(table.getByRole('columnheader', { name: 'Secondary name' })).toBeInTheDocument()
+    expect(table.getByText('Ironhide')).toBeInTheDocument()
+  })
+
   it('should link to the roster manager when the visitor is an officer', async () => {
     server.use(
       http.get('/api/roster', () => HttpResponse.json(roster)),

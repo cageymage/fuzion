@@ -94,6 +94,7 @@ export function Roster() {
               <thead>
                 <tr>
                   <th scope="col">Name</th>
+                  <th scope="col">Secondary name</th>
                   <th scope="col">Class</th>
                   <th scope="col">Spec</th>
                   <th scope="col">Role</th>
@@ -105,6 +106,7 @@ export function Roster() {
                 {visibleCharacters.map((character) => (
                   <tr key={character.id}>
                     <td>{character.name}</td>
+                    <td>{character.secondaryName}</td>
                     <td style={{ color: classColor(character.class) }}>{character.class}</td>
                     <td>{specLabel(character)}</td>
                     <td>{roleLabel(character)}</td>
