@@ -92,23 +92,25 @@ function OfficerTools() {
                 <td>{roleLabel(character)}</td>
                 <td>{character.isMain ? 'Main' : 'Alt'}</td>
                 <td>{character.raidTeam ?? '—'}</td>
-                <td className={styles.rowActions}>
-                  <button
-                    type="button"
-                    className={styles.smallButton}
-                    aria-label={`Edit ${character.name}`}
-                    onClick={() => setDialog({ kind: 'edit', character })}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.smallButton}
-                    aria-label={`Delete ${character.name}`}
-                    onClick={() => setDialog({ kind: 'delete', character })}
-                  >
-                    Delete
-                  </button>
+                <td>
+                  <div className={styles.rowActions}>
+                    <button
+                      type="button"
+                      className={styles.smallButton}
+                      aria-label={`Edit ${character.name}`}
+                      onClick={() => setDialog({ kind: 'edit', character })}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.smallButton}
+                      aria-label={`Delete ${character.name}`}
+                      onClick={() => setDialog({ kind: 'delete', character })}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
