@@ -1006,6 +1006,77 @@ func TestPublishNewsPost_PostsToDiscordWebhook(t *testing.T) {
 	}
 }
 
+type embedImageJSON struct {
+	Embeds []struct {
+		Image *struct {
+			URL string `json:"url"`
+		} `json:"image"`
+	} `json:"embeds"`
+}
+
+func publishDraftWithBody(t *testing.T, body string) embedImageJSON {
+	t.Helper()
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Thrall", testutil.AsOfficer())
+	db.MustExec(`
+		INSERT INTO news_posts (id, title, excerpt, category, body, author_name, published_at)
+		VALUES ('22222222-2222-2222-2222-222222222222', 'Server first', 'We did it.', 'raid-progress', $1, 'Officer', NULL)`,
+		body)
+
+	srv.Post(t, "/api/news/22222222-2222-2222-2222-222222222222/publish", nil).RequireStatus(t, 200)
+
+	bodies := srv.Announcements.Bodies()
+	if len(bodies) != 1 {
+		t.Fatalf("expected exactly 1 announcement, got %d", len(bodies))
+	}
+	var msg embedImageJSON
+	if err := json.Unmarshal(bodies[0], &msg); err != nil {
+		t.Fatalf("decode webhook body %q: %v", bodies[0], err)
+	}
+	if len(msg.Embeds) != 1 {
+		t.Fatalf("expected 1 embed, got %d", len(msg.Embeds))
+	}
+	return msg
+}
+
+func TestPublishNewsPost_IncludesFirstBodyImageInDiscordEmbed(t *testing.T) {
+	// given a draft whose body has two images, the first with a title
+
+	// when I publish it
+	msg := publishDraftWithBody(t, "Intro\n\n![first](https://cdn.example/first.png \"A title\")\n\n![second](https://cdn.example/second.png)")
+
+	// then I expect the embed image to be the first body image, without its title
+	if msg.Embeds[0].Image == nil || msg.Embeds[0].Image.URL != "https://cdn.example/first.png" {
+		t.Errorf("expected image https://cdn.example/first.png, got %+v", msg.Embeds[0].Image)
+	}
+}
+
+func TestPublishNewsPost_UsesSiteBaseURL_WhenImagePathIsRelative(t *testing.T) {
+	// given a draft whose body has a relative image path
+
+	// when I publish it
+	msg := publishDraftWithBody(t, "![shot](/api/images/abc)")
+
+	// then I expect the embed image to be an absolute URL on the site
+	want := testutil.SiteBaseURL + "/api/images/abc"
+	if msg.Embeds[0].Image == nil || msg.Embeds[0].Image.URL != want {
+		t.Errorf("expected image %s, got %+v", want, msg.Embeds[0].Image)
+	}
+}
+
+func TestPublishNewsPost_OmitsImage_WhenBodyHasNoImage(t *testing.T) {
+	// given a draft whose body has a link but no image
+
+	// when I publish it
+	msg := publishDraftWithBody(t, "Just text and a [link](https://example.com).")
+
+	// then I expect the embed to have no image
+	if msg.Embeds[0].Image != nil {
+		t.Errorf("expected no image, got %+v", msg.Embeds[0].Image)
+	}
+}
+
 func TestPublishNewsPost_DoesNotPostAgain_WhenPostIsAlreadyPublished(t *testing.T) {
 	// given an already published post and a logged-in officer
 	db := testutil.DB(t)

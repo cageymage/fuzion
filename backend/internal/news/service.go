@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -175,15 +176,32 @@ func (s *Service) announce(ctx context.Context, post Post) {
 	if s.notifier == nil {
 		return
 	}
-	msg := discord.Message{Embeds: []discord.Embed{{
+	embed := discord.Embed{
 		Title:       post.Title,
 		URL:         s.siteBaseURL + "/news/" + post.ID.String(),
 		Description: post.Excerpt,
 		Fields:      []discord.EmbedField{{Name: "Category", Value: post.Category, Inline: true}},
-	}}}
+	}
+	if src := firstImageURL(post.Body); src != "" {
+		if strings.HasPrefix(src, "/") && !strings.HasPrefix(src, "//") {
+			src = s.siteBaseURL + src
+		}
+		embed.Image = &discord.EmbedImage{URL: src}
+	}
+	msg := discord.Message{Embeds: []discord.Embed{embed}}
 	if err := s.notifier.Send(ctx, msg); err != nil {
 		slog.ErrorContext(ctx, "announce published news post", "postID", post.ID, "error", err)
 	}
+}
+
+var markdownImage = regexp.MustCompile(`!\[[^\]]*\]\(\s*<?([^\s)>]+)>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)`)
+
+func firstImageURL(body string) string {
+	match := markdownImage.FindStringSubmatch(body)
+	if match == nil {
+		return ""
+	}
+	return match[1]
 }
 
 func parseID(id string) (uuid.UUID, error) {
