@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { classColor } from '../../lib/classColor'
-import type { Role } from '../../types/roster'
 import { filterRoster, type RoleFilter } from './filterRoster'
 import styles from './Roster.module.css'
+import { roleLabel, specLabel } from './rosterLabels'
 import { useRosterData } from './useRosterData'
 
 const roleFilters: { value: RoleFilter; label: string }[] = [
@@ -12,14 +14,9 @@ const roleFilters: { value: RoleFilter; label: string }[] = [
   { value: 'dps', label: 'DPS' },
 ]
 
-const roleLabels: Record<Role, string> = {
-  tank: 'Tank',
-  healer: 'Healer',
-  dps: 'DPS',
-}
-
 export function Roster() {
   const roster = useRosterData()
+  const currentUser = useCurrentUser()
   const [role, setRole] = useState<RoleFilter>('all')
   const [className, setClassName] = useState('all')
   const [showAlts, setShowAlts] = useState(false)
@@ -34,6 +31,11 @@ export function Roster() {
   return (
     <section className={styles.page}>
       <h1 className={styles.title}>Roster</h1>
+      {currentUser.data?.isOfficer && (
+        <Link to="/officer/roster" className={styles.manageLink}>
+          Manage roster
+        </Link>
+      )}
 
       <div className={styles.filters}>
         <div className={styles.roleFilters}>
@@ -104,8 +106,8 @@ export function Roster() {
                   <tr key={character.id}>
                     <td>{character.name}</td>
                     <td style={{ color: classColor(character.class) }}>{character.class}</td>
-                    <td>{character.spec ?? '—'}</td>
-                    <td>{roleLabels[character.role]}</td>
+                    <td>{specLabel(character)}</td>
+                    <td>{roleLabel(character)}</td>
                     <td>{character.isMain ? 'Main' : 'Alt'}</td>
                     <td>{character.raidTeam ?? '—'}</td>
                   </tr>

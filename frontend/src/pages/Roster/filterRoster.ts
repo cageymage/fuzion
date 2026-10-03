@@ -12,7 +12,9 @@ export interface RosterFilters {
 export function filterRoster(characters: Character[], filters: RosterFilters): Character[] {
   return characters.filter((character) => {
     if (!filters.showAlts && !character.isMain) return false
-    if (filters.role !== 'all' && character.role !== filters.role) return false
+    if (filters.role !== 'all' && character.role !== filters.role && character.role2 !== filters.role) {
+      return false
+    }
     if (filters.className !== 'all' && character.class !== filters.className) return false
     return true
   })
