@@ -9,7 +9,7 @@
 
 .notice {
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--text-meta);
 }
 
 .day {
@@ -18,7 +18,7 @@
 
 .dayHeading {
   margin: 0 0 12px;
-  font-size: 18px;
+  font-size: 1.25rem;
   color: var(--gold);
 }
 
@@ -44,11 +44,11 @@
 }
 
 .raidName {
-  font-size: 15px;
+  font-size: var(--text-ui);
 }
 
 .progress {
   margin-top: 4px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--text-meta);
 }

@@ -19,7 +19,7 @@
 .wordmark {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 19px;
+  font-size: 1.5rem;
   letter-spacing: 0.08em;
 }
 
@@ -30,7 +30,7 @@
 }
 
 .navLink {
-  font-size: 13.5px;
+  font-size: var(--text-ui);
   letter-spacing: 0.03em;
   color: var(--muted);
   padding-bottom: 6px;
@@ -51,7 +51,7 @@
   align-items: center;
   gap: 12px;
   min-height: 32px;
-  font-size: 13.5px;
+  font-size: var(--text-ui);
 }
 
 .loginLink {
@@ -62,7 +62,7 @@
   border-radius: var(--radius-chip);
   color: var(--gold);
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: var(--text-label);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -87,7 +87,7 @@
   background: var(--gold-soft);
   color: var(--gold);
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: var(--text-label);
 }
 
 .username {
@@ -101,7 +101,7 @@
   background: transparent;
   color: var(--muted);
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: var(--text-meta);
   cursor: pointer;
 }
 

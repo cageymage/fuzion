@@ -3,6 +3,6 @@
   padding: 16px var(--gutter);
   border-top: 1px solid var(--border);
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--text-meta);
   letter-spacing: 0.04em;
 }

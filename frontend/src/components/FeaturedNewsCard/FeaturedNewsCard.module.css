@@ -58,19 +58,22 @@
 }
 
 .title {
-  margin: 9px 0 6px;
-  font-size: 18px;
+  margin: 12px 0 6px;
+  font-family: var(--font-body);
+  font-size: 1.625rem;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .excerpt {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--text-meta);
   line-height: 1.5;
 }
 
 .meta {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--text-meta);
   margin-top: 9px;
 }
 

@@ -9,6 +9,6 @@
 
 .note {
   color: var(--muted);
-  font-size: 15px;
+  font-size: var(--text-ui);
   font-style: italic;
 }

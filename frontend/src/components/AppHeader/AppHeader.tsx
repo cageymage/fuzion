@@ -9,9 +9,22 @@ export function AppHeader() {
   return (
     <header className={styles.header}>
       <Link to="/" className={styles.brand}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 2 L20 12 L12 22 L4 12 Z" stroke="var(--gold)" strokeWidth="1.5" />
-          <path d="M12 2 L20 12 L12 22 L4 12 Z" fill="var(--gold)" fillOpacity="0.15" />
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <defs>
+            <clipPath id="fuzion-left-diamond">
+              <path d="M14 3 L25 20 L14 37 L3 20 Z" />
+            </clipPath>
+          </defs>
+          <path d="M14 3 L25 20 L14 37 L3 20 Z" fill="var(--gold)" fillOpacity="0.1" />
+          <path d="M26 3 L37 20 L26 37 L15 20 Z" fill="var(--gold)" fillOpacity="0.1" />
+          <path
+            d="M26 3 L37 20 L26 37 L15 20 Z"
+            fill="var(--gold)"
+            fillOpacity="0.85"
+            clipPath="url(#fuzion-left-diamond)"
+          />
+          <path d="M14 3 L25 20 L14 37 L3 20 Z" stroke="var(--gold)" strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="M26 3 L37 20 L26 37 L15 20 Z" stroke="var(--gold-hover)" strokeWidth="1.5" strokeLinejoin="round" />
         </svg>
         <span className={styles.wordmark}>FUZION</span>
       </Link>

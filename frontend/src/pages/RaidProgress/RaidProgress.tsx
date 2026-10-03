@@ -46,7 +46,7 @@ function TierCard({ name, killed, total, bosses, muted }: TierCardProps) {
     <div className={muted ? `card ${styles.card} ${styles.historyCard}` : `card ${styles.card}`}>
       <h3 className={styles.tierName}>{name}</h3>
       <p className={styles.summary}>
-        {killed} / {total} bosses defeated
+        {killed} / {total} {total === 1 ? 'boss' : 'bosses'} defeated
       </p>
       <progress className={styles.bar} value={killed} max={total} />
       <BossList bosses={bosses} />

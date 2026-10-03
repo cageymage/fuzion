@@ -27,14 +27,14 @@
 
 .name {
   font-weight: 600;
-  font-size: 18px;
+  font-size: 1.25rem;
 }
 
 .liveBadge {
   background: var(--live);
   color: #fff;
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: var(--text-label);
   letter-spacing: 0.08em;
   padding: 4px 10px;
   border-radius: var(--radius-chip);
@@ -46,7 +46,7 @@
   gap: 8px;
   margin-top: 8px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--text-meta);
 }
 
 .streamer {
@@ -58,7 +58,7 @@
 
 .title {
   margin: 8px 0 0;
-  font-size: 15px;
+  font-size: var(--text-ui);
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;

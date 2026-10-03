@@ -13,8 +13,6 @@
 
 .name {
   font-weight: 600;
-  font-size: 13.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: var(--text-ui);
+  overflow-wrap: anywhere;
 }
