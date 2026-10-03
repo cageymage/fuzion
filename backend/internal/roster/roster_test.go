@@ -23,6 +23,8 @@ type characterJSON struct {
 	Class         string  `json:"class"`
 	Spec          *string `json:"spec"`
 	Role          string  `json:"role"`
+	Spec2         *string `json:"spec2"`
+	Role2         *string `json:"role2"`
 	IsMain        bool    `json:"isMain"`
 	RaidTeam      *string `json:"raidTeam"`
 	CreatedAt     string  `json:"createdAt"`
@@ -556,4 +558,366 @@ func TestDeleteCharacter_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T)
 
 	// then I expect a 401
 	resp.RequireStatus(t, http.StatusUnauthorized)
+}
+
+func TestListRoster_ReturnsSecondSpecAndRole_WhenCharacterHasOne(t *testing.T) {
+	// given a rogue who runs a second spec in a different role than the first
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, created_at)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Yorick', 'Nightblade', 'Emberreach', 'Rogue', 'Assassination', 'dps', 'Combat', 'tank', true, '2026-09-01T12:00:00Z')`)
+
+	// when I ask for the roster
+	resp := srv.Get(t, "/api/roster")
+
+	// then I expect both specs and both roles
+	resp.RequireStatus(t, 200)
+	var characters []characterJSON
+	resp.DecodeJSON(t, &characters)
+
+	assassination := "Assassination"
+	combat := "Combat"
+	tank := "tank"
+	want := []characterJSON{
+		{
+			ID:            "11111111-1111-1111-1111-111111111111",
+			Name:          "Yorick",
+			SecondaryName: "Nightblade",
+			Realm:         "Emberreach",
+			Class:         "Rogue",
+			Spec:          &assassination,
+			Role:          "dps",
+			Spec2:         &combat,
+			Role2:         &tank,
+			IsMain:        true,
+			CreatedAt:     "2026-09-01T12:00:00Z",
+		},
+	}
+	if diff := cmp.Diff(want, characters); diff != "" {
+		t.Errorf("unexpected roster (-want +got):\n%s", diff)
+	}
+}
+
+func TestListRoster_ReturnsNullSecondSpecAndRole_ForSingleSpecCharacters(t *testing.T) {
+	// given a character with only one spec
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, is_main, created_at)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'Holy', 'healer', true, '2026-09-01T12:00:00Z')`)
+
+	// when I ask for the roster
+	resp := srv.Get(t, "/api/roster")
+
+	// then I expect spec2 and role2 to be explicit nulls
+	resp.RequireStatus(t, 200)
+	var characters []map[string]any
+	resp.DecodeJSON(t, &characters)
+	if len(characters) != 1 {
+		t.Fatalf("expected one character, got %d", len(characters))
+	}
+	for _, field := range []string{"spec2", "role2"} {
+		value, present := characters[0][field]
+		if !present || value != nil {
+			t.Errorf("expected %s to be present and null, got present=%v value=%v", field, present, value)
+		}
+	}
+}
+
+func TestCreateCharacter_ReturnsCreatedCharacter_WhenBothSpecsAndRolesAreSent(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a rogue with two specs and a role for each
+	resp := srv.Post(t, "/api/roster", map[string]any{
+		"name":          "Yorick",
+		"secondaryName": "Nightblade",
+		"class":         "Rogue",
+		"spec":          "Assassination",
+		"role":          "dps",
+		"spec2":         " Combat ",
+		"role2":         "tank",
+	})
+
+	// then I expect a 201 with both specs and roles stored
+	resp.RequireStatus(t, http.StatusCreated)
+	var created characterJSON
+	resp.DecodeJSON(t, &created)
+
+	assassination := "Assassination"
+	combat := "Combat"
+	tank := "tank"
+	want := characterJSON{
+		ID:            created.ID,
+		Name:          "Yorick",
+		SecondaryName: "Nightblade",
+		Realm:         "Emberreach",
+		Class:         "Rogue",
+		Spec:          &assassination,
+		Role:          "dps",
+		Spec2:         &combat,
+		Role2:         &tank,
+		IsMain:        false,
+		CreatedAt:     created.CreatedAt,
+	}
+	if diff := cmp.Diff(want, created); diff != "" {
+		t.Errorf("unexpected created character (-want +got):\n%s", diff)
+	}
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenRole2IsSetWithoutSpec2(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a character with a second role but no second spec
+	resp := srv.Post(t, "/api/roster", map[string]any{
+		"name": "Aeliana", "secondaryName": "Dawnsong", "class": "Priest",
+		"spec": "Holy", "role": "healer", "role2": "dps",
+	})
+
+	// then I expect a 400 naming spec2 and nothing stored
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "spec2: must be set together with role2")
+	if got := countCharacters(t, db); got != 0 {
+		t.Errorf("expected no characters to be stored, found %d", got)
+	}
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenSpec2IsSetWithoutRole2(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a character with a second spec but no second role
+	resp := srv.Post(t, "/api/roster", map[string]any{
+		"name": "Aeliana", "secondaryName": "Dawnsong", "class": "Priest",
+		"spec": "Holy", "role": "healer", "spec2": "Shadow",
+	})
+
+	// then I expect a 400 naming role2
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "role2: must be set together with spec2")
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenRole2IsInvalid(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a character with an unknown second role
+	resp := srv.Post(t, "/api/roster", map[string]any{
+		"name": "Aeliana", "secondaryName": "Dawnsong", "class": "Priest",
+		"spec": "Holy", "role": "healer", "spec2": "Shadow", "role2": "bard",
+	})
+
+	// then I expect a 400 naming role2
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "role2: must be one of tank, healer, dps")
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenSpec2EqualsSpec(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a character whose second spec repeats the first
+	resp := srv.Post(t, "/api/roster", map[string]any{
+		"name": "Aeliana", "secondaryName": "Dawnsong", "class": "Priest",
+		"spec": "Holy", "role": "healer", "spec2": "Holy", "role2": "healer",
+	})
+
+	// then I expect a 400 naming spec2
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "spec2: must differ from spec")
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenSpecIsNotInTheClassSpecList(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a priest with a warrior spec
+	resp := srv.Post(t, "/api/roster", map[string]any{
+		"name": "Aeliana", "secondaryName": "Dawnsong", "class": "Priest",
+		"spec": "Fury", "role": "healer",
+	})
+
+	// then I expect a 400 listing the priest specs
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "spec: must be one of Discipline, Holy, Shadow")
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenSpec2IsNotInTheClassSpecList(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a priest whose second spec belongs to another class
+	resp := srv.Post(t, "/api/roster", map[string]any{
+		"name": "Aeliana", "secondaryName": "Dawnsong", "class": "Priest",
+		"spec": "Holy", "role": "healer", "spec2": "Fury", "role2": "dps",
+	})
+
+	// then I expect a 400 listing the priest specs
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "spec2: must be one of Discipline, Holy, Shadow")
+}
+
+func TestUpdateCharacter_SetsSecondSpecAndRole_WhenBothAreSent(t *testing.T) {
+	// given a single-spec character
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, is_main, created_at)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'Holy', 'healer', true, '2026-09-01T12:00:00Z')`)
+
+	// when I add a second spec and role
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{
+		"spec2": "Shadow",
+		"role2": "dps",
+	})
+
+	// then I expect a 200 where only the second spec and role were added
+	resp.RequireStatus(t, http.StatusOK)
+	var updated characterJSON
+	resp.DecodeJSON(t, &updated)
+
+	holy := "Holy"
+	shadow := "Shadow"
+	dps := "dps"
+	want := characterJSON{
+		ID:            "11111111-1111-1111-1111-111111111111",
+		Name:          "Aeliana",
+		SecondaryName: "Dawnsong",
+		Realm:         "Emberreach",
+		Class:         "Priest",
+		Spec:          &holy,
+		Role:          "healer",
+		Spec2:         &shadow,
+		Role2:         &dps,
+		IsMain:        true,
+		CreatedAt:     "2026-09-01T12:00:00Z",
+	}
+	if diff := cmp.Diff(want, updated); diff != "" {
+		t.Errorf("unexpected updated character (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateCharacter_ClearsSecondSpecAndRole_WhenBothAreEmptyStrings(t *testing.T) {
+	// given a dual-spec character
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, created_at)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'Holy', 'healer', 'Shadow', 'dps', true, '2026-09-01T12:00:00Z')`)
+
+	// when I send empty strings for the second spec and role
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{
+		"spec2": "",
+		"role2": "",
+	})
+
+	// then I expect a 200 where the second spec and role are null
+	resp.RequireStatus(t, http.StatusOK)
+	var updated characterJSON
+	resp.DecodeJSON(t, &updated)
+
+	holy := "Holy"
+	want := characterJSON{
+		ID:            "11111111-1111-1111-1111-111111111111",
+		Name:          "Aeliana",
+		SecondaryName: "Dawnsong",
+		Realm:         "Emberreach",
+		Class:         "Priest",
+		Spec:          &holy,
+		Role:          "healer",
+		IsMain:        true,
+		CreatedAt:     "2026-09-01T12:00:00Z",
+	}
+	if diff := cmp.Diff(want, updated); diff != "" {
+		t.Errorf("unexpected updated character (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateCharacter_ReturnsBadRequest_WhenOnlyRole2IsCleared(t *testing.T) {
+	// given a dual-spec character
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'Holy', 'healer', 'Shadow', 'dps')`)
+
+	// when I clear only the second role
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{"role2": ""})
+
+	// then I expect a 400 and the stored pair left intact
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "role2: must be set together with spec2")
+	var stored string
+	if err := db.Get(&stored, `SELECT role2 FROM characters WHERE id = '11111111-1111-1111-1111-111111111111'`); err != nil || stored != "dps" {
+		t.Errorf("expected role2 to remain dps, got %q (err %v)", stored, err)
+	}
+}
+
+func TestUpdateCharacter_ReturnsBadRequest_WhenSpec2IsChangedToTheStoredSpec(t *testing.T) {
+	// given a dual-spec character
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'Holy', 'healer', 'Shadow', 'dps')`)
+
+	// when I change the second spec to match the first
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{"spec2": "Holy"})
+
+	// then I expect a 400 naming spec2
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "spec2: must differ from spec")
+}
+
+func TestUpdateCharacter_ReturnsBadRequest_WhenClassChangeInvalidatesTheStoredSpec(t *testing.T) {
+	// given a holy priest
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'Holy', 'healer')`)
+
+	// when I change only the class to Mage
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{"class": "Mage"})
+
+	// then I expect a 400 because Holy is not a mage spec
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "spec: must be one of Arcane, Fire, Frost")
+}
+
+func TestUpdateCharacter_ChangesRaidTeam_WhenStoredSpecIsOutsideTheClassSpecList(t *testing.T) {
+	// given a character whose free-text spec predates the spec list
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'Holy/Disc', 'healer')`)
+
+	// when I change only the raid team
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{"raidTeam": "Team 2"})
+
+	// then I expect a 200 because the untouched spec is not re-validated
+	resp.RequireStatus(t, http.StatusOK)
 }

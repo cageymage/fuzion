@@ -1,0 +1,85 @@
+import type {
+  Character,
+  CreateCharacterRequest,
+  Role,
+  UpdateCharacterRequest,
+} from '../../types/roster'
+
+export interface CharacterFormValues {
+  name: string
+  secondaryName: string
+  realm: string
+  class: string
+  spec: string
+  role: Role
+  spec2: string
+  role2: Role | ''
+  isMain: boolean
+  raidTeam: string
+}
+
+export const emptyCharacterForm: CharacterFormValues = {
+  name: '',
+  secondaryName: '',
+  realm: '',
+  class: '',
+  spec: '',
+  role: 'dps',
+  spec2: '',
+  role2: '',
+  isMain: true,
+  raidTeam: '',
+}
+
+export function formValuesFor(character: Character): CharacterFormValues {
+  return {
+    name: character.name,
+    secondaryName: character.secondaryName,
+    realm: character.realm,
+    class: character.class,
+    spec: character.spec ?? '',
+    role: character.role,
+    spec2: character.spec2 ?? '',
+    role2: character.role2 ?? '',
+    isMain: character.isMain,
+    raidTeam: character.raidTeam ?? '',
+  }
+}
+
+export function buildCreateRequest(values: CharacterFormValues): CreateCharacterRequest {
+  const request: CreateCharacterRequest = {
+    name: values.name,
+    secondaryName: values.secondaryName,
+    class: values.class,
+    spec: values.spec,
+    role: values.role,
+    isMain: values.isMain,
+  }
+  if (values.realm !== '') request.realm = values.realm
+  if (values.spec2 !== '' && values.role2 !== '') {
+    request.spec2 = values.spec2
+    request.role2 = values.role2
+  }
+  if (values.raidTeam !== '') request.raidTeam = values.raidTeam
+  return request
+}
+
+export function buildUpdateRequest(
+  initial: CharacterFormValues,
+  current: CharacterFormValues,
+): UpdateCharacterRequest {
+  const request: UpdateCharacterRequest = {}
+  if (current.name !== initial.name) request.name = current.name
+  if (current.secondaryName !== initial.secondaryName) request.secondaryName = current.secondaryName
+  if (current.realm !== initial.realm) request.realm = current.realm
+  if (current.class !== initial.class) request.class = current.class
+  if (current.spec !== initial.spec) request.spec = current.spec
+  if (current.role !== initial.role) request.role = current.role
+  if (current.spec2 !== initial.spec2 || current.role2 !== initial.role2) {
+    request.spec2 = current.spec2
+    request.role2 = current.role2
+  }
+  if (current.isMain !== initial.isMain) request.isMain = current.isMain
+  if (current.raidTeam !== initial.raidTeam) request.raidTeam = current.raidTeam
+  return request
+}

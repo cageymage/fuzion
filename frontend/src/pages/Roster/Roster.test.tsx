@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
@@ -15,6 +15,8 @@ const ragnok: Character = {
   class: 'Warrior',
   spec: 'Protection',
   role: 'tank',
+  spec2: null,
+  role2: null,
   isMain: true,
   raidTeam: 'Team Alpha',
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -73,6 +75,83 @@ describe('Roster', () => {
     await user.click(screen.getByRole('button', { name: 'Healer' }))
 
     expect(screen.getByText('Selene')).toBeInTheDocument()
+    expect(screen.queryByText('Ragnok')).not.toBeInTheDocument()
+  })
+
+  it('should show the secondary name next to the name when the character has one', async () => {
+    const withSecondaryName: Character = { ...ragnok, secondaryName: 'Ironhide' }
+    server.use(http.get('/api/roster', () => HttpResponse.json([withSecondaryName])))
+
+    renderWithProviders(<Roster />)
+
+    const table = within(await screen.findByRole('table'))
+    expect(table.getByRole('columnheader', { name: 'Secondary name' })).toBeInTheDocument()
+    expect(table.getByText('Ironhide')).toBeInTheDocument()
+  })
+
+  it('should link to the roster manager when the visitor is an officer', async () => {
+    server.use(
+      http.get('/api/roster', () => HttpResponse.json(roster)),
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ id: 'user-1', username: 'Officer', avatarUrl: null, isOfficer: true }),
+      ),
+    )
+
+    renderWithProviders(<Roster />)
+
+    expect(await screen.findByRole('link', { name: 'Manage roster' })).toHaveAttribute('href', '/officer/roster')
+  })
+
+  it('should not link to the roster manager when the visitor is anonymous', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json(roster)))
+
+    renderWithProviders(<Roster />)
+    await screen.findByText('Ragnok')
+
+    expect(screen.queryByRole('link', { name: 'Manage roster' })).not.toBeInTheDocument()
+  })
+
+  it('should show both specs joined by a slash when the character has a second spec', async () => {
+    const dualSpec: Character = { ...selene, spec: 'Holy', spec2: 'Shadow', role2: 'dps' }
+    server.use(http.get('/api/roster', () => HttpResponse.json([dualSpec])))
+
+    renderWithProviders(<Roster />)
+
+    expect(await screen.findByText('Holy/Shadow')).toBeInTheDocument()
+  })
+
+  it('should show both roles joined by a slash when the second role differs from the first', async () => {
+    const dualRole: Character = { ...selene, spec: 'Holy', spec2: 'Shadow', role2: 'dps' }
+    server.use(http.get('/api/roster', () => HttpResponse.json([dualRole])))
+
+    renderWithProviders(<Roster />)
+
+    expect(await screen.findByText('Healer/DPS')).toBeInTheDocument()
+  })
+
+  it('should show a single role when the second role matches the first', async () => {
+    const sameRole: Character = { ...ragnok, spec: 'Protection', spec2: 'Arms', role2: 'tank' }
+    server.use(http.get('/api/roster', () => HttpResponse.json([sameRole])))
+
+    renderWithProviders(<Roster />)
+
+    const table = within(await screen.findByRole('table'))
+    expect(table.getByText('Protection/Arms')).toBeInTheDocument()
+    expect(table.getByText('Tank')).toBeInTheDocument()
+    expect(table.queryByText('Tank/Tank')).not.toBeInTheDocument()
+  })
+
+  it('should include a character whose second role matches when the Healer role filter is selected', async () => {
+    const tankHealer: Character = { ...ragnok, id: 'char-5', name: 'Aeliana', spec2: 'Holy', role2: 'healer' }
+    server.use(http.get('/api/roster', () => HttpResponse.json([ragnok, selene, tankHealer])))
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    await screen.findByText('Ragnok')
+
+    await user.click(screen.getByRole('button', { name: 'Healer' }))
+
+    expect(screen.getByText('Selene')).toBeInTheDocument()
+    expect(screen.getByText('Aeliana')).toBeInTheDocument()
     expect(screen.queryByText('Ragnok')).not.toBeInTheDocument()
   })
 

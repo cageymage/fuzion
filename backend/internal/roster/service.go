@@ -25,6 +25,20 @@ var (
 	// Mirrors the CHECK constraint on characters.class.
 	classes = []string{"Warrior", "Paladin", "Hunter", "Rogue", "Priest", "Shaman", "Mage", "Warlock", "Druid"}
 	roles   = []string{"tank", "healer", "dps"}
+
+	// Standard three-tree names; spec stays free text in the database so rows that
+	// predate this list are left alone until an officer edits their spec.
+	classSpecs = map[string][]string{
+		"Warrior": {"Arms", "Fury", "Protection"},
+		"Paladin": {"Holy", "Protection", "Retribution"},
+		"Hunter":  {"Beast Mastery", "Marksmanship", "Survival"},
+		"Rogue":   {"Assassination", "Combat", "Subtlety"},
+		"Priest":  {"Discipline", "Holy", "Shadow"},
+		"Shaman":  {"Elemental", "Enhancement", "Restoration"},
+		"Mage":    {"Arcane", "Fire", "Frost"},
+		"Warlock": {"Affliction", "Demonology", "Destruction"},
+		"Druid":   {"Balance", "Feral", "Restoration"},
+	}
 )
 
 type ValidationError struct {
@@ -43,6 +57,8 @@ type CreateRequest struct {
 	Class         string  `json:"class"`
 	Spec          *string `json:"spec"`
 	Role          string  `json:"role"`
+	Spec2         *string `json:"spec2"`
+	Role2         *string `json:"role2"`
 	IsMain        bool    `json:"isMain"`
 	RaidTeam      *string `json:"raidTeam"`
 }
@@ -54,6 +70,8 @@ type UpdateRequest struct {
 	Class         *string `json:"class"`
 	Spec          *string `json:"spec"`
 	Role          *string `json:"role"`
+	Spec2         *string `json:"spec2"`
+	Role2         *string `json:"role2"`
 	IsMain        *bool   `json:"isMain"`
 	RaidTeam      *string `json:"raidTeam"`
 }
@@ -83,6 +101,8 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, err
 		Class:         strings.TrimSpace(req.Class),
 		Spec:          trimOptional(req.Spec),
 		Role:          strings.TrimSpace(req.Role),
+		Spec2:         blankToNil(req.Spec2),
+		Role2:         blankToNil(req.Role2),
 		IsMain:        req.IsMain,
 		RaidTeam:      trimOptional(req.RaidTeam),
 	}
@@ -101,7 +121,10 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, err
 	if err := validateClass(character.Class); err != nil {
 		return Character{}, err
 	}
-	if err := validateRole(character.Role); err != nil {
+	if err := validateRole("role", character.Role); err != nil {
+		return Character{}, err
+	}
+	if err := validateSpecs(character.Class, character.Spec, character.Spec2, character.Role2, allSpecChecks); err != nil {
 		return Character{}, err
 	}
 
@@ -119,6 +142,8 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateRequest) (
 	req.Class = trimOptional(req.Class)
 	req.Spec = trimOptional(req.Spec)
 	req.Role = trimOptional(req.Role)
+	req.Spec2 = trimOptional(req.Spec2)
+	req.Role2 = trimOptional(req.Role2)
 	req.RaidTeam = trimOptional(req.RaidTeam)
 
 	if req.Name != nil {
@@ -142,12 +167,17 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateRequest) (
 		}
 	}
 	if req.Role != nil {
-		if err := validateRole(*req.Role); err != nil {
+		if err := validateRole("role", *req.Role); err != nil {
 			return Character{}, err
 		}
 	}
 
-	updated, err := s.repo.Update(ctx, id, req)
+	second, err := s.resolveSecondSpec(ctx, id, req)
+	if err != nil {
+		return Character{}, err
+	}
+
+	updated, err := s.repo.Update(ctx, id, req, second)
 	if err != nil {
 		return Character{}, fmt.Errorf("update character %s: %w", id, err)
 	}
@@ -159,6 +189,58 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 		return fmt.Errorf("delete character %s: %w", id, err)
 	}
 	return nil
+}
+
+// resolveSecondSpec validates the class, spec and second spec as they will be
+// stored after req is applied. It returns the second spec to write when req
+// touches it, or nil to leave the stored one unchanged.
+func (s *Service) resolveSecondSpec(ctx context.Context, id uuid.UUID, req UpdateRequest) (*secondSpec, error) {
+	touchesSecond := req.Spec2 != nil || req.Role2 != nil
+	if req.Class == nil && req.Spec == nil && !touchesSecond {
+		return nil, nil
+	}
+
+	current, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("load character %s: %w", id, err)
+	}
+
+	class := current.Class
+	if req.Class != nil {
+		class = *req.Class
+	}
+	spec := current.Spec
+	if req.Spec != nil {
+		spec = req.Spec
+	}
+	spec2, role2 := current.Spec2, current.Role2
+	if req.Spec2 != nil {
+		spec2 = blankToNil(req.Spec2)
+	}
+	if req.Role2 != nil {
+		role2 = blankToNil(req.Role2)
+	}
+
+	checks := specChecks{
+		spec:  req.Class != nil || req.Spec != nil,
+		spec2: req.Class != nil || req.Spec2 != nil,
+		role2: req.Role2 != nil,
+	}
+	if err := validateSpecs(class, spec, spec2, role2, checks); err != nil {
+		return nil, err
+	}
+	if !touchesSecond {
+		return nil, nil
+	}
+	return &secondSpec{spec: spec2, role: role2}, nil
+}
+
+func blankToNil(value *string) *string {
+	trimmed := trimOptional(value)
+	if trimmed == nil || *trimmed == "" {
+		return nil
+	}
+	return trimmed
 }
 
 func trimOptional(value *string) *string {
@@ -190,9 +272,56 @@ func validateClass(class string) error {
 	return nil
 }
 
-func validateRole(role string) error {
+func validateRole(field, role string) error {
 	if !slices.Contains(roles, role) {
-		return &ValidationError{Field: "role", Problem: "must be one of " + strings.Join(roles, ", ")}
+		return &ValidationError{Field: field, Problem: "must be one of " + strings.Join(roles, ", ")}
+	}
+	return nil
+}
+
+// specChecks selects which fields to validate against the class's spec list, so
+// an update that leaves a legacy free-text spec alone does not trip over it.
+type specChecks struct {
+	spec, spec2, role2 bool
+}
+
+var allSpecChecks = specChecks{spec: true, spec2: true, role2: true}
+
+func validateSpecs(class string, spec, spec2, role2 *string, checks specChecks) error {
+	if checks.spec && spec != nil && *spec != "" {
+		if err := validateClassSpec("spec", class, *spec); err != nil {
+			return err
+		}
+	}
+	if spec2 == nil && role2 != nil {
+		return &ValidationError{Field: "spec2", Problem: "must be set together with role2"}
+	}
+	if spec2 != nil && role2 == nil {
+		return &ValidationError{Field: "role2", Problem: "must be set together with spec2"}
+	}
+	if spec2 == nil {
+		return nil
+	}
+	if checks.role2 {
+		if err := validateRole("role2", *role2); err != nil {
+			return err
+		}
+	}
+	if checks.spec2 {
+		if err := validateClassSpec("spec2", class, *spec2); err != nil {
+			return err
+		}
+	}
+	if spec != nil && *spec == *spec2 {
+		return &ValidationError{Field: "spec2", Problem: "must differ from spec"}
+	}
+	return nil
+}
+
+func validateClassSpec(field, class, spec string) error {
+	specs := classSpecs[class]
+	if !slices.Contains(specs, spec) {
+		return &ValidationError{Field: field, Problem: "must be one of " + strings.Join(specs, ", ")}
 	}
 	return nil
 }

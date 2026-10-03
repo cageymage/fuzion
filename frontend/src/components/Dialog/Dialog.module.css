@@ -1,0 +1,19 @@
+.dialog {
+  width: min(560px, calc(100vw - 2 * var(--gutter)));
+  max-height: calc(100vh - 2 * var(--gutter));
+  padding: 24px 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  color: var(--text);
+  overflow-y: auto;
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 0.6);
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: 22px;
+}

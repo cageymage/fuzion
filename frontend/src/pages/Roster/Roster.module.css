@@ -7,6 +7,13 @@
   font-size: 38px;
 }
 
+.manageLink {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: var(--gold);
+  font-size: 14px;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
