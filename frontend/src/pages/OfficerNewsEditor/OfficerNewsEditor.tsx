@@ -1,8 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import MDEditor, { commands, type ICommand } from '@uiw/react-md-editor/nohighlight'
+import MDEditor, {
+  commands,
+  TextAreaCommandOrchestrator,
+  type ICommand,
+  type TextAreaTextApi,
+} from '@uiw/react-md-editor/nohighlight'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
+import { uploadImage } from '../../api/images'
 import { editablePostKey, fetchEditablePost, publishNewsPost } from '../../api/news'
 import { LightboxImage } from '../../components/LightboxImage/LightboxImage'
 import { OfficerOnly } from '../../components/OfficerOnly/OfficerOnly'
@@ -14,21 +20,41 @@ import { useAutosave, type SaveStatus } from './useAutosave'
 
 const categories: NewsCategory[] = ['guild-news', 'raid-progress', 'recruitment', 'patch-notes']
 
-// Interim until image upload (#7): ask for a URL instead of opening a file picker.
-const insertImage: ICommand = {
-  name: 'image',
-  keyCommand: 'image',
-  buttonProps: { 'aria-label': 'Insert image', title: 'Insert image' },
-  icon: <span aria-hidden="true">🖼</span>,
-  execute: (_state, api) => {
-    const url = window.prompt('Image URL')?.trim()
-    if (url) api.replaceSelection(`![](${url})`)
-  },
+interface ImageCommandOptions {
+  uploading: boolean
+  chooseFile: (api: TextAreaTextApi) => void
+  enterUrl: (api: TextAreaTextApi) => void
 }
 
-const toolbarCommands = commands
-  .getCommands()
-  .map((command) => (command.keyCommand === 'image' ? insertImage : command))
+function imageCommand({ uploading, chooseFile, enterUrl }: ImageCommandOptions): ICommand {
+  return {
+    name: 'image',
+    keyCommand: 'group',
+    groupName: 'image',
+    buttonProps: { 'aria-label': 'Insert image', title: 'Insert image', disabled: uploading },
+    icon: <span aria-hidden="true">🖼</span>,
+    children: [
+      {
+        name: 'upload-image',
+        keyCommand: 'upload-image',
+        buttonProps: { 'aria-label': 'Upload image', title: 'Upload image' },
+        icon: <span>Upload</span>,
+        execute: (_state, api) => chooseFile(api),
+      },
+      {
+        name: 'image-from-url',
+        keyCommand: 'image-from-url',
+        buttonProps: { 'aria-label': 'From URL', title: 'From URL' },
+        icon: <span>From URL</span>,
+        execute: (_state, api) => enterUrl(api),
+      },
+    ],
+  }
+}
+
+function firstImageFile(files: FileList | undefined): File | undefined {
+  return Array.from(files ?? []).find((file) => file.type.startsWith('image/'))
+}
 
 function statusText(status: SaveStatus): string {
   switch (status.state) {
@@ -80,6 +106,68 @@ function PostEditor({ post }: PostEditorProps) {
   })
 
   const blocker = useBlocker(dirty)
+
+  const [imageError, setImageError] = useState<string | null>(null)
+  const [draggingImage, setDraggingImage] = useState(false)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const pendingApi = useRef<TextAreaTextApi | null>(null)
+  const upload = useMutation({ mutationFn: uploadImage })
+
+  function uploadInto(file: File, api: TextAreaTextApi) {
+    setImageError(null)
+    upload.mutate(file, {
+      onSuccess: (image) => api.replaceSelection(`![](${image.url})`),
+      onError: (error) => setImageError(error.message),
+    })
+  }
+
+  function enterImageUrl(api: TextAreaTextApi) {
+    const url = window.prompt('Image URL')?.trim()
+    if (!url) return
+    if (!url.startsWith('https://')) {
+      setImageError('Image URL must start with https://')
+      return
+    }
+    setImageError(null)
+    api.replaceSelection(`![](${url})`)
+  }
+
+  function uploadPastedImage(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const file = firstImageFile(event.clipboardData.files)
+    if (!file) return
+    event.preventDefault()
+    uploadInto(file, new TextAreaCommandOrchestrator(event.currentTarget).textApi)
+  }
+
+  function allowImageDrop(event: DragEvent<HTMLDivElement>) {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+    setDraggingImage(true)
+  }
+
+  function dropImage(event: DragEvent<HTMLDivElement>) {
+    const file = firstImageFile(event.dataTransfer.files)
+    if (!file) return
+    event.preventDefault()
+    setDraggingImage(false)
+    const textarea = event.currentTarget.querySelector('textarea')
+    if (textarea) uploadInto(file, new TextAreaCommandOrchestrator(textarea).textApi)
+  }
+
+  const toolbarCommands = commands
+    .getCommands()
+    .map((command) =>
+      command.keyCommand === 'image'
+        ? imageCommand({
+            uploading: upload.isPending,
+            chooseFile: (api) => {
+              pendingApi.current = api
+              fileInput.current?.click()
+            },
+            enterUrl: enterImageUrl,
+          })
+        : command,
+    )
 
   // beforeunload covers closing the tab; useBlocker covers in-app route changes.
   useEffect(() => {
@@ -138,7 +226,14 @@ function PostEditor({ post }: PostEditorProps) {
           <span>Pinned</span>
         </label>
 
-        <div className={styles.editor} data-color-mode="dark">
+        <div
+          className={`${styles.editor} ${draggingImage ? styles.dropTarget : ''}`}
+          data-color-mode="dark"
+          data-testid="body-editor"
+          onDragOver={allowImageDrop}
+          onDragLeave={() => setDraggingImage(false)}
+          onDrop={dropImage}
+        >
           <MDEditor
             value={fields.body}
             onChange={(value) => change({ body: value ?? '' })}
@@ -146,9 +241,30 @@ function PostEditor({ post }: PostEditorProps) {
             preview="live"
             previewOptions={{ components: { img: LightboxImage } }}
             height={420}
-            textareaProps={{ 'aria-label': 'Body' }}
+            textareaProps={{
+              'aria-label': 'Body',
+              onPaste: uploadPastedImage,
+            }}
           />
         </div>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          aria-label="Image file"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            event.target.value = ''
+            if (file && pendingApi.current) uploadInto(file, pendingApi.current)
+          }}
+        />
+        {upload.isPending && <p role="status">Uploading image…</p>}
+        {imageError && (
+          <p role="alert" className={styles.error}>
+            {imageError}
+          </p>
+        )}
 
         <div className={styles.actions}>
           <p role="status" className={styles.status}>

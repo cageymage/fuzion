@@ -1065,6 +1065,19 @@ func TestPublishNewsPost_UsesSiteBaseURL_WhenImagePathIsRelative(t *testing.T) {
 	}
 }
 
+func TestPublishNewsPost_UsesThumbnail_WhenImageIsAnUploadedImage(t *testing.T) {
+	// given a draft whose body has an uploaded image
+
+	// when I publish it
+	msg := publishDraftWithBody(t, "![shot](/api/images/2f1c0b9e-1111-4222-8333-444455556666)")
+
+	// then I expect the embed image to be the thumbnail on the site
+	want := testutil.SiteBaseURL + "/api/images/2f1c0b9e-1111-4222-8333-444455556666/thumb"
+	if msg.Embeds[0].Image == nil || msg.Embeds[0].Image.URL != want {
+		t.Errorf("expected image %s, got %+v", want, msg.Embeds[0].Image)
+	}
+}
+
 func TestPublishNewsPost_OmitsImage_WhenBodyHasNoImage(t *testing.T) {
 	// given a draft whose body has a link but no image
 

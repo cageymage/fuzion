@@ -3,10 +3,13 @@ package testutil
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/textproto"
 	"net/url"
 	"strings"
 	"testing"
@@ -20,6 +23,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/auth"
 	"github.com/cageymage/fuzion/backend/internal/clock"
 	"github.com/cageymage/fuzion/backend/internal/discord"
+	"github.com/cageymage/fuzion/backend/internal/images"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/professions"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
@@ -124,6 +128,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting, verifier)),
 		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db))),
+		Images:         images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL)),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.Fixed(FixedNow))),
@@ -286,6 +291,34 @@ func (s *Server) Post(t *testing.T, path string, body any) Response {
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	return s.do(t, req)
+}
+
+// PostFile uploads data as a multipart form file, declaring contentType on the part.
+func (s *Server) PostFile(t *testing.T, path, field, filename, contentType string, data []byte) Response {
+	t.Helper()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	header := textproto.MIMEHeader{}
+	header.Set("Content-Disposition", fmt.Sprintf(`form-data; name=%q; filename=%q`, field, filename))
+	header.Set("Content-Type", contentType)
+	part, err := writer.CreatePart(header)
+	if err != nil {
+		t.Fatalf("create multipart part for POST %s: %v", path, err)
+	}
+	if _, err := part.Write(data); err != nil {
+		t.Fatalf("write multipart part for POST %s: %v", path, err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart body for POST %s: %v", path, err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, s.URL+path, &body)
+	if err != nil {
+		t.Fatalf("build POST %s: %v", path, err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 	return s.do(t, req)
 }
 

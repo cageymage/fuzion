@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { Link, Route, Routes } from 'react-router-dom'
@@ -55,6 +55,10 @@ function recordPatches() {
     }),
   )
   return patches
+}
+
+function pngFile() {
+  return new File([new Uint8Array([137, 80, 78, 71])], 'kill.png', { type: 'image/png' })
 }
 
 afterEach(() => {
@@ -260,7 +264,7 @@ describe('OfficerNewsEditor', () => {
     expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument()
   })
 
-  it('should insert a Markdown image into the body when an image URL is entered', async () => {
+  it('should insert a markdown image with the pasted url when an officer chooses the from-URL option', async () => {
     signInAs(officer)
     vi.spyOn(window, 'prompt').mockReturnValue('https://cdn.example/boss.png')
     const user = userEvent.setup()
@@ -268,8 +272,131 @@ describe('OfficerNewsEditor', () => {
     const body = await screen.findByRole('textbox', { name: 'Body' })
 
     await user.click(screen.getByRole('button', { name: 'Insert image' }))
+    await user.click(screen.getByRole('button', { name: 'From URL' }))
 
     await waitFor(() => expect(body).toHaveValue('![](https://cdn.example/boss.png)## Changes'))
+  })
+
+  it('should reject the image url when it does not start with https', async () => {
+    signInAs(officer)
+    vi.spyOn(window, 'prompt').mockReturnValue('javascript:alert(1)')
+    const user = userEvent.setup()
+    renderEditor()
+    const body = await screen.findByRole('textbox', { name: 'Body' })
+
+    await user.click(screen.getByRole('button', { name: 'Insert image' }))
+    await user.click(screen.getByRole('button', { name: 'From URL' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Image URL must start with https://')
+    expect(body).toHaveValue('## Changes')
+  })
+
+  it('should insert the uploaded image url at the cursor when an officer picks a file', async () => {
+    signInAs(officer)
+    server.use(
+      http.post('/api/images', () =>
+        HttpResponse.json({ id: 'img-1', url: '/api/images/img-1' }, { status: 201 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderEditor()
+    const body = await screen.findByRole('textbox', { name: 'Body' })
+
+    await user.click(screen.getByRole('button', { name: 'Insert image' }))
+    await user.click(screen.getByRole('button', { name: 'Upload image' }))
+    await user.upload(screen.getByLabelText('Image file'), pngFile())
+
+    await waitFor(() => expect(body).toHaveValue('![](/api/images/img-1)## Changes'))
+  })
+
+  it('should insert the uploaded image url when an officer pastes an image from the clipboard', async () => {
+    signInAs(officer)
+    server.use(
+      http.post('/api/images', () =>
+        HttpResponse.json({ id: 'img-2', url: '/api/images/img-2' }, { status: 201 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderEditor()
+    const body = await screen.findByRole('textbox', { name: 'Body' })
+
+    await user.click(body)
+    fireEvent.paste(body, { clipboardData: { files: [pngFile()], types: ['Files'] } })
+
+    await waitFor(() => expect(body).toHaveValue('## Changes![](/api/images/img-2)'))
+  })
+
+  it('should accept a dragged image file when it is held over the editor', async () => {
+    signInAs(officer)
+    renderEditor()
+    await screen.findByRole('textbox', { name: 'Body' })
+
+    const allowed = fireEvent.dragOver(screen.getByTestId('body-editor'), {
+      dataTransfer: { files: [pngFile()], types: ['Files'] },
+    })
+
+    expect(allowed).toBe(false)
+  })
+
+  it('should insert the uploaded image url when an officer drops an image file on the editor', async () => {
+    signInAs(officer)
+    server.use(
+      http.post('/api/images', () =>
+        HttpResponse.json({ id: 'img-4', url: '/api/images/img-4' }, { status: 201 }),
+      ),
+    )
+    renderEditor()
+    const body = await screen.findByRole('textbox', { name: 'Body' })
+
+    fireEvent.drop(screen.getByTestId('body-editor'), {
+      dataTransfer: { files: [pngFile()], types: ['Files'] },
+    })
+
+    await waitFor(() => expect(body).toHaveValue('![](/api/images/img-4)## Changes'))
+  })
+
+  it('should show an upload error when the server rejects the file', async () => {
+    signInAs(officer)
+    server.use(
+      http.post('/api/images', () =>
+        HttpResponse.json({ error: 'file: must be at most 10 MiB' }, { status: 413 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderEditor()
+    const body = await screen.findByRole('textbox', { name: 'Body' })
+
+    await user.click(screen.getByRole('button', { name: 'Insert image' }))
+    await user.click(screen.getByRole('button', { name: 'Upload image' }))
+    await user.upload(screen.getByLabelText('Image file'), pngFile())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('file: must be at most 10 MiB')
+    expect(body).toHaveValue('## Changes')
+  })
+
+  it('should disable the insert action while an upload is in progress', async () => {
+    signInAs(officer)
+    let finishUpload: () => void = () => {}
+    server.use(
+      http.post('/api/images', async () => {
+        await new Promise<void>((resolve) => {
+          finishUpload = resolve
+        })
+        return HttpResponse.json({ id: 'img-3', url: '/api/images/img-3' }, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderEditor()
+    await screen.findByRole('textbox', { name: 'Body' })
+
+    await user.click(screen.getByRole('button', { name: 'Insert image' }))
+    await user.click(screen.getByRole('button', { name: 'Upload image' }))
+    await user.upload(screen.getByLabelText('Image file'), pngFile())
+
+    expect(await screen.findByRole('button', { name: 'Insert image' })).toBeDisabled()
+    expect(screen.getByText('Uploading image…')).toBeInTheDocument()
+    finishUpload()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Insert image' })).toBeEnabled())
   })
 
   it('should show images in the live preview as lightbox thumbnails', async () => {

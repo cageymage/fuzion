@@ -10,6 +10,7 @@ import (
 
 	"github.com/cageymage/fuzion/backend/internal/applications"
 	"github.com/cageymage/fuzion/backend/internal/auth"
+	"github.com/cageymage/fuzion/backend/internal/images"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/professions"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
@@ -21,6 +22,7 @@ import (
 type Deps struct {
 	Applications   *applications.Handler
 	Auth          *auth.Handler
+	Images         *images.Handler
 	News           *news.Handler
 	Professions    *professions.Handler
 	RaidProgress   *raidprogress.Handler
@@ -53,6 +55,7 @@ func New(deps Deps) *chi.Mux {
 		api.Get("/health", health)
 		deps.Applications.Register(api)
 		deps.Auth.Register(api)
+		deps.Images.Register(api)
 		deps.News.Register(api)
 		deps.Professions.Register(api)
 		deps.RaidProgress.Register(api)
