@@ -81,7 +81,7 @@ Open a **new** terminal afterwards so `node` and `npm` are on `PATH`.
 - **Linux:** tarball from https://go.dev/dl, or your distro's package.
 
 Open a new terminal afterwards. If your installed Go is older than the
-`go 1.25.0` line in [backend/go.mod](backend/go.mod), Go 1.21+ will
+`go 1.26.0` line in [backend/go.mod](backend/go.mod), Go 1.21+ will
 auto-download the right toolchain on first build — no manual action needed.
 
 ### Docker
