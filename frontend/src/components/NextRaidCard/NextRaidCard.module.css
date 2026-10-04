@@ -11,12 +11,12 @@
 }
 
 .detail {
-  font-size: 14px;
+  font-size: var(--text-meta);
   margin-top: 4px;
 }
 
 .progress {
-  font-size: 12px;
+  font-size: var(--text-meta);
   color: var(--muted);
   margin-top: 8px;
 }

@@ -8,19 +8,19 @@
 }
 
 .sectionTitle {
-  font-size: 22px;
+  font-size: 1.625rem;
   margin: 24px 0 12px;
 }
 
 .notice {
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--text-meta);
   margin: 8px 0 0;
 }
 
 .error {
   color: var(--live);
-  font-size: 14px;
+  font-size: var(--text-meta);
   margin: 8px 0 0;
 }
 

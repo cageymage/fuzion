@@ -1,7 +1,13 @@
 :root {
+  --text-label: 0.875rem;
+  --text-meta: 1.0625rem;
+  --text-ui: 1.125rem;
+  --text-body: 1.1875rem;
+
   --bg: #15100b;
   --surface: #201811;
   --border: #3c2d1e;
+  --border-strong: #7d6542;
   --text: #f1e6d6;
   --muted: #a8977f;
   --gold: #d3a24d;
@@ -37,7 +43,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
-  font-size: 16px;
+  font-size: var(--text-body);
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -71,8 +78,8 @@ a:hover {
 
 .eyebrow {
   font-family: var(--font-display);
-  font-size: 12px;
-  letter-spacing: 0.18em;
+  font-size: 0.9375rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--gold);
 }

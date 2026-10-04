@@ -69,53 +69,55 @@ function OfficerTools() {
       {roster.isSuccess && roster.data.length === 0 && <p className={styles.noticeText}>No characters yet.</p>}
 
       {roster.isSuccess && roster.data.length > 0 && (
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Secondary name</th>
-              <th scope="col">Class</th>
-              <th scope="col">Spec</th>
-              <th scope="col">Role</th>
-              <th scope="col">Main/Alt</th>
-              <th scope="col">Raid Team</th>
-              <th scope="col">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {roster.data.map((character) => (
-              <tr key={character.id}>
-                <td>{character.name}</td>
-                <td>{character.secondaryName}</td>
-                <td style={{ color: classColor(character.class) }}>{character.class}</td>
-                <td>{specLabel(character)}</td>
-                <td>{roleLabel(character)}</td>
-                <td>{character.isMain ? 'Main' : 'Alt'}</td>
-                <td>{character.raidTeam ?? '—'}</td>
-                <td>
-                  <div className={styles.rowActions}>
-                    <button
-                      type="button"
-                      className={styles.smallButton}
-                      aria-label={`Edit ${character.name}`}
-                      onClick={() => setDialog({ kind: 'edit', character })}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.smallButton}
-                      aria-label={`Delete ${character.name}`}
-                      onClick={() => setDialog({ kind: 'delete', character })}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
+        <div className={styles.tableScroll} role="region" aria-label="Officer roster table" tabIndex={0}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Secondary name</th>
+                <th scope="col">Class</th>
+                <th scope="col">Spec</th>
+                <th scope="col">Role</th>
+                <th scope="col">Main/Alt</th>
+                <th scope="col">Raid Team</th>
+                <th scope="col">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {roster.data.map((character) => (
+                <tr key={character.id}>
+                  <td>{character.name}</td>
+                  <td>{character.secondaryName}</td>
+                  <td style={{ color: classColor(character.class) }}>{character.class}</td>
+                  <td>{specLabel(character)}</td>
+                  <td>{roleLabel(character)}</td>
+                  <td>{character.isMain ? 'Main' : 'Alt'}</td>
+                  <td>{character.raidTeam ?? '—'}</td>
+                  <td>
+                    <div className={styles.rowActions}>
+                      <button
+                        type="button"
+                        className={styles.smallButton}
+                        aria-label={`Edit ${character.name}`}
+                        onClick={() => setDialog({ kind: 'edit', character })}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.smallButton}
+                        aria-label={`Delete ${character.name}`}
+                        onClick={() => setDialog({ kind: 'delete', character })}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {dialog?.kind === 'add' && <CharacterDialog onClose={closeDialog} />}

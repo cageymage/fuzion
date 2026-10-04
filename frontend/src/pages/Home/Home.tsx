@@ -24,7 +24,7 @@ export function Home() {
         <div>
           <div className="eyebrow">Emberreach · US</div>
           <h1 className={styles.title}>Fuzion</h1>
-          <div className={styles.tagline}>Raiding · Mythic+ · PvP · Crafting</div>
+          <div className={styles.tagline}>Raiding · Dungeons · Community</div>
         </div>
         {nextRaid.data ? (
           <NextRaidCard raid={nextRaid.data} />

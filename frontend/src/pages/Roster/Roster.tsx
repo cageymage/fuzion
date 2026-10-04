@@ -90,32 +90,34 @@ export function Roster() {
           {visibleCharacters.length === 0 ? (
             <p className={styles.noticeText}>No characters match.</p>
           ) : (
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Secondary name</th>
-                  <th scope="col">Class</th>
-                  <th scope="col">Spec</th>
-                  <th scope="col">Role</th>
-                  <th scope="col">Main/Alt</th>
-                  <th scope="col">Raid Team</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleCharacters.map((character) => (
-                  <tr key={character.id}>
-                    <td>{character.name}</td>
-                    <td>{character.secondaryName}</td>
-                    <td style={{ color: classColor(character.class) }}>{character.class}</td>
-                    <td>{specLabel(character)}</td>
-                    <td>{roleLabel(character)}</td>
-                    <td>{character.isMain ? 'Main' : 'Alt'}</td>
-                    <td>{character.raidTeam ?? '—'}</td>
+            <div className={styles.tableScroll} role="region" aria-label="Roster table" tabIndex={0}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Secondary name</th>
+                    <th scope="col">Class</th>
+                    <th scope="col">Spec</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Main/Alt</th>
+                    <th scope="col">Raid Team</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {visibleCharacters.map((character) => (
+                    <tr key={character.id}>
+                      <td>{character.name}</td>
+                      <td>{character.secondaryName}</td>
+                      <td style={{ color: classColor(character.class) }}>{character.class}</td>
+                      <td>{specLabel(character)}</td>
+                      <td>{roleLabel(character)}</td>
+                      <td>{character.isMain ? 'Main' : 'Alt'}</td>
+                      <td>{character.raidTeam ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </>
       )}
