@@ -7,8 +7,11 @@ interface LightboxImageProps {
   alt?: string
 }
 
+const uploadedImagePath = /^\/api\/images\/[0-9a-f-]{36}$/i
+
 export function LightboxImage({ src, alt = '' }: LightboxImageProps) {
   const [open, setOpen] = useState(false)
+  const thumbnailSrc = src && uploadedImagePath.test(src) ? `${src}/thumb` : src
 
   useEffect(() => {
     if (!open) return
@@ -27,7 +30,7 @@ export function LightboxImage({ src, alt = '' }: LightboxImageProps) {
         aria-label={alt ? `Open image: ${alt}` : 'Open image'}
         onClick={() => setOpen(true)}
       >
-        <img className={styles.thumbnail} src={src} alt={alt} />
+        <img className={styles.thumbnail} src={thumbnailSrc} alt={alt} />
       </button>
       {open &&
         // A portal, because Markdown puts images inside <p>, which cannot contain a <div>.

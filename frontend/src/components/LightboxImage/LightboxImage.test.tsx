@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { LightboxImage } from './LightboxImage'
@@ -49,5 +49,22 @@ describe('LightboxImage', () => {
     render(<LightboxImage src="https://cdn.example/boss.png" />)
 
     expect(screen.getByRole('button', { name: 'Open image' })).toBeInTheDocument()
+  })
+
+  it('should show the thumbnail variant and open the full-size image when the image is an uploaded one', async () => {
+    const user = userEvent.setup()
+    render(<LightboxImage src="/api/images/2f1c0b9e-1111-4222-8333-444455556666" alt="Boss kill" />)
+
+    expect(screen.getByRole('img', { name: 'Boss kill' })).toHaveAttribute(
+      'src',
+      '/api/images/2f1c0b9e-1111-4222-8333-444455556666/thumb',
+    )
+    await user.click(screen.getByRole('button', { name: 'Open image: Boss kill' }))
+
+    const lightbox = screen.getByRole('dialog', { name: 'Image preview' })
+    expect(within(lightbox).getByRole('img', { name: 'Boss kill' })).toHaveAttribute(
+      'src',
+      '/api/images/2f1c0b9e-1111-4222-8333-444455556666',
+    )
   })
 })
