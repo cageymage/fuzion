@@ -183,6 +183,9 @@ func (s *Service) announce(ctx context.Context, post Post) {
 		Fields:      []discord.EmbedField{{Name: "Category", Value: post.Category, Inline: true}},
 	}
 	if src := firstImageURL(post.Body); src != "" {
+		if uploadedImagePath.MatchString(src) {
+			src += "/thumb"
+		}
 		if strings.HasPrefix(src, "/") && !strings.HasPrefix(src, "//") {
 			src = s.siteBaseURL + src
 		}
@@ -194,7 +197,9 @@ func (s *Service) announce(ctx context.Context, post Post) {
 	}
 }
 
-var markdownImage = regexp.MustCompile(`!\[[^\]]*\]\(\s*<?([^\s)>]+)>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)`)
+var uploadedImagePath = regexp.MustCompile(`^/api/images/[0-9a-fA-F-]{36}$`)
+
+var markdownImage =regexp.MustCompile(`!\[[^\]]*\]\(\s*<?([^\s)>]+)>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)`)
 
 func firstImageURL(body string) string {
 	match := markdownImage.FindStringSubmatch(body)
