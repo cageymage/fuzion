@@ -18,6 +18,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/auth"
 	"github.com/cageymage/fuzion/backend/internal/clock"
 	idiscord "github.com/cageymage/fuzion/backend/internal/discord"
+	"github.com/cageymage/fuzion/backend/internal/images"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/professions"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
@@ -102,6 +103,7 @@ func run() error {
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{}, recruiting, botCheck)),
 		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db))),
+		Images:         images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.System{}, announcements, cfg.siteBaseURL)),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.System{})),
