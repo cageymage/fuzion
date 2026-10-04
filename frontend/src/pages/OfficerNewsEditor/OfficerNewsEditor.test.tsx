@@ -326,6 +326,35 @@ describe('OfficerNewsEditor', () => {
     await waitFor(() => expect(body).toHaveValue('## Changes![](/api/images/img-2)'))
   })
 
+  it('should accept a dragged image file when it is held over the editor', async () => {
+    signInAs(officer)
+    renderEditor()
+    await screen.findByRole('textbox', { name: 'Body' })
+
+    const allowed = fireEvent.dragOver(screen.getByTestId('body-editor'), {
+      dataTransfer: { files: [pngFile()], types: ['Files'] },
+    })
+
+    expect(allowed).toBe(false)
+  })
+
+  it('should insert the uploaded image url when an officer drops an image file on the editor', async () => {
+    signInAs(officer)
+    server.use(
+      http.post('/api/images', () =>
+        HttpResponse.json({ id: 'img-4', url: '/api/images/img-4' }, { status: 201 }),
+      ),
+    )
+    renderEditor()
+    const body = await screen.findByRole('textbox', { name: 'Body' })
+
+    fireEvent.drop(screen.getByTestId('body-editor'), {
+      dataTransfer: { files: [pngFile()], types: ['Files'] },
+    })
+
+    await waitFor(() => expect(body).toHaveValue('![](/api/images/img-4)## Changes'))
+  })
+
   it('should show an upload error when the server rejects the file', async () => {
     signInAs(officer)
     server.use(

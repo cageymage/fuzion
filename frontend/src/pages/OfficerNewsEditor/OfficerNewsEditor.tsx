@@ -108,6 +108,7 @@ function PostEditor({ post }: PostEditorProps) {
   const blocker = useBlocker(dirty)
 
   const [imageError, setImageError] = useState<string | null>(null)
+  const [draggingImage, setDraggingImage] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const pendingApi = useRef<TextAreaTextApi | null>(null)
   const upload = useMutation({ mutationFn: uploadImage })
@@ -131,14 +132,26 @@ function PostEditor({ post }: PostEditorProps) {
     api.replaceSelection(`![](${url})`)
   }
 
-  function uploadFromTextarea(
-    event: ClipboardEvent<HTMLTextAreaElement> | DragEvent<HTMLTextAreaElement>,
-    files: FileList | undefined,
-  ) {
-    const file = firstImageFile(files)
+  function uploadPastedImage(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const file = firstImageFile(event.clipboardData.files)
     if (!file) return
     event.preventDefault()
     uploadInto(file, new TextAreaCommandOrchestrator(event.currentTarget).textApi)
+  }
+
+  function allowImageDrop(event: DragEvent<HTMLDivElement>) {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+    setDraggingImage(true)
+  }
+
+  function dropImage(event: DragEvent<HTMLDivElement>) {
+    const file = firstImageFile(event.dataTransfer.files)
+    if (!file) return
+    event.preventDefault()
+    setDraggingImage(false)
+    const textarea = event.currentTarget.querySelector('textarea')
+    if (textarea) uploadInto(file, new TextAreaCommandOrchestrator(textarea).textApi)
   }
 
   const toolbarCommands = commands
@@ -213,7 +226,14 @@ function PostEditor({ post }: PostEditorProps) {
           <span>Pinned</span>
         </label>
 
-        <div className={styles.editor} data-color-mode="dark">
+        <div
+          className={`${styles.editor} ${draggingImage ? styles.dropTarget : ''}`}
+          data-color-mode="dark"
+          data-testid="body-editor"
+          onDragOver={allowImageDrop}
+          onDragLeave={() => setDraggingImage(false)}
+          onDrop={dropImage}
+        >
           <MDEditor
             value={fields.body}
             onChange={(value) => change({ body: value ?? '' })}
@@ -223,8 +243,7 @@ function PostEditor({ post }: PostEditorProps) {
             height={420}
             textareaProps={{
               'aria-label': 'Body',
-              onPaste: (event) => uploadFromTextarea(event, event.clipboardData.files),
-              onDrop: (event) => uploadFromTextarea(event, event.dataTransfer.files),
+              onPaste: uploadPastedImage,
             }}
           />
         </div>
