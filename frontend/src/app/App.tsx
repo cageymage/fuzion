@@ -11,6 +11,7 @@ import { News } from '../pages/News/News'
 import { OfficerNews } from '../pages/OfficerNews/OfficerNews'
 import { OfficerRaidProgress } from '../pages/OfficerRaidProgress/OfficerRaidProgress'
 import { OfficerRoster } from '../pages/OfficerRoster/OfficerRoster'
+import { Professions } from '../pages/Professions/Professions'
 import { RaidProgress } from '../pages/RaidProgress/RaidProgress'
 import { Roster } from '../pages/Roster/Roster'
 import { Streams } from '../pages/Streams/Streams'
@@ -61,6 +62,7 @@ export function App() {
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/streams" element={<Streams />} />
             <Route path="/applications" element={<Applications />} />
+            <Route path="/professions" element={<Professions />} />
             {navItems
               .filter(
                 (item) =>
@@ -72,6 +74,7 @@ export function App() {
                     '/calendar',
                     '/streams',
                     '/applications',
+                    '/professions',
                   ].includes(item.path),
               )
               .map((item) => (
