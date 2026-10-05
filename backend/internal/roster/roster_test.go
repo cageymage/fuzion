@@ -1,6 +1,7 @@
 package roster_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"testing"
@@ -920,4 +921,101 @@ func TestUpdateCharacter_ChangesRaidTeam_WhenStoredSpecIsOutsideTheClassSpecList
 
 	// then I expect a 200 because the untouched spec is not re-validated
 	resp.RequireStatus(t, http.StatusOK)
+}
+
+type rosterProfessionsJSON struct {
+	Name        string `json:"name"`
+	Professions []struct {
+		Profession string `json:"profession"`
+		SkillLevel int    `json:"skillLevel"`
+	} `json:"professions"`
+}
+
+func TestListRoster_IncludesProfessions_ForCharacterWithPrimaryProfessions(t *testing.T) {
+	// given a character who knows two professions at different skill levels
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'healer', true)`)
+	db.MustExec(`
+		INSERT INTO professions (id, character_id, profession, skill_level)
+		VALUES
+			('a1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'Alchemy', 225),
+			('a2222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Herbalism', 300)`)
+
+	// when I ask for the roster
+	resp := srv.Get(t, "/api/roster")
+
+	// then I expect the character's professions embedded, highest skill first
+	resp.RequireStatus(t, http.StatusOK)
+	var characters []rosterProfessionsJSON
+	resp.DecodeJSON(t, &characters)
+
+	if len(characters) != 1 {
+		t.Fatalf("expected 1 character, got %d", len(characters))
+	}
+	want := []struct {
+		Profession string `json:"profession"`
+		SkillLevel int    `json:"skillLevel"`
+	}{
+		{Profession: "Herbalism", SkillLevel: 300},
+		{Profession: "Alchemy", SkillLevel: 225},
+	}
+	if diff := cmp.Diff(want, characters[0].Professions); diff != "" {
+		t.Errorf("unexpected professions (-want +got):\n%s", diff)
+	}
+}
+
+func TestListRoster_ReturnsEmptyProfessionsArray_ForCharacterWithNoProfessions(t *testing.T) {
+	// given a character with no professions
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'healer', true)`)
+
+	// when I ask for the roster
+	resp := srv.Get(t, "/api/roster")
+
+	// then I expect an empty professions array, not null
+	resp.RequireStatus(t, http.StatusOK)
+	var raw []map[string]json.RawMessage
+	resp.DecodeJSON(t, &raw)
+
+	if len(raw) != 1 {
+		t.Fatalf("expected 1 character, got %d", len(raw))
+	}
+	if got := string(raw[0]["professions"]); got != "[]" {
+		t.Errorf("expected professions to be [], got %s", got)
+	}
+}
+
+func TestUpdateCharacter_ReturnsProfessions_WhenCharacterHasProfessions(t *testing.T) {
+	// given I am an officer and a character who knows Mining
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'healer', true)`)
+	db.MustExec(`
+		INSERT INTO professions (id, character_id, profession, skill_level)
+		VALUES ('a1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'Mining', 150)`)
+
+	// when I change her raid team
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{"raidTeam": "Team 1"})
+
+	// then I expect the updated character to carry her professions
+	resp.RequireStatus(t, http.StatusOK)
+	var updated rosterProfessionsJSON
+	resp.DecodeJSON(t, &updated)
+
+	want := []struct {
+		Profession string `json:"profession"`
+		SkillLevel int    `json:"skillLevel"`
+	}{{Profession: "Mining", SkillLevel: 150}}
+	if diff := cmp.Diff(want, updated.Professions); diff != "" {
+		t.Errorf("unexpected professions (-want +got):\n%s", diff)
+	}
 }

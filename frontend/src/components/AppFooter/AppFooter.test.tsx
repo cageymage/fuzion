@@ -10,4 +10,10 @@ describe('AppFooter', () => {
       screen.getByText('Fuzion · Emberreach · World of Warcraft: Forever'),
     ).toBeInTheDocument()
   })
+
+  it('should credit Blizzard Entertainment when profession icons are shown on the site', () => {
+    render(<AppFooter />)
+
+    expect(screen.getByText('Profession icons © Blizzard Entertainment')).toBeInTheDocument()
+  })
 })

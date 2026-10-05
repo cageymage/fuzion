@@ -18,6 +18,11 @@ export type UpdateCharacterRequest = Partial<Omit<CreateCharacterRequest, 'role2
   role2?: Role | ''
 }
 
+export interface CharacterProfession {
+  profession: string
+  skillLevel: number
+}
+
 export interface Character {
   id: string
   name: string
@@ -31,4 +36,5 @@ export interface Character {
   isMain: boolean
   raidTeam: string | null
   createdAt: string
+  professions: CharacterProfession[]
 }

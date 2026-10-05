@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { classColor } from '../../lib/classColor'
+import { primaryProfessionIcons } from '../../lib/professionIcon'
 import { filterRoster, type RoleFilter } from './filterRoster'
 import styles from './Roster.module.css'
 import { roleLabel, specLabel } from './rosterLabels'
@@ -101,6 +102,7 @@ export function Roster() {
                     <th scope="col">Role</th>
                     <th scope="col">Main/Alt</th>
                     <th scope="col">Raid Team</th>
+                    <th scope="col">Professions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -113,6 +115,21 @@ export function Roster() {
                       <td>{roleLabel(character)}</td>
                       <td>{character.isMain ? 'Main' : 'Alt'}</td>
                       <td>{character.raidTeam ?? '—'}</td>
+                      <td>
+                        <span className={styles.professionIcons}>
+                          {primaryProfessionIcons(character.professions).map(({ profession, iconUrl }) => (
+                            <img
+                              key={profession}
+                              className={styles.professionIcon}
+                              src={iconUrl}
+                              alt={profession}
+                              title={profession}
+                              width={24}
+                              height={24}
+                            />
+                          ))}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
