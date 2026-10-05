@@ -53,7 +53,7 @@ export function Professions() {
                     </span>{' '}
                     <span className={styles.secondaryName}>{entry.character.secondaryName}</span>
                   </span>
-                  <span className={styles.skill}>{entry.skillLevel}</span>
+                  <span className={styles.skill}>{entry.skillLevel > 0 ? entry.skillLevel : '—'}</span>
                 </li>
               ))}
             </ul>

@@ -13,18 +13,18 @@ import (
 )
 
 type Character struct {
-	ID            uuid.UUID `db:"id"             json:"id"`
-	Name          string    `db:"name"           json:"name"`
-	SecondaryName string    `db:"secondary_name" json:"secondaryName"`
-	Realm         string    `db:"realm"          json:"realm"`
-	Class         string    `db:"class"          json:"class"`
-	Spec          *string   `db:"spec"           json:"spec"`
-	Role          string    `db:"role"           json:"role"`
-	Spec2         *string   `db:"spec2"          json:"spec2"`
-	Role2         *string   `db:"role2"          json:"role2"`
-	IsMain        bool      `db:"is_main"        json:"isMain"`
-	RaidTeam      *string   `db:"raid_team"      json:"raidTeam"`
-	CreatedAt     time.Time `db:"created_at"     json:"createdAt"`
+	ID            uuid.UUID             `db:"id"             json:"id"`
+	Name          string                `db:"name"           json:"name"`
+	SecondaryName string                `db:"secondary_name" json:"secondaryName"`
+	Realm         string                `db:"realm"          json:"realm"`
+	Class         string                `db:"class"          json:"class"`
+	Spec          *string               `db:"spec"           json:"spec"`
+	Role          string                `db:"role"           json:"role"`
+	Spec2         *string               `db:"spec2"          json:"spec2"`
+	Role2         *string               `db:"role2"          json:"role2"`
+	IsMain        bool                  `db:"is_main"        json:"isMain"`
+	RaidTeam      *string               `db:"raid_team"      json:"raidTeam"`
+	CreatedAt     time.Time             `db:"created_at"     json:"createdAt"`
 	Professions   []CharacterProfession `db:"-" json:"professions"`
 }
 
@@ -95,18 +95,35 @@ const returningColumns = `id, name, secondary_name, realm, class, spec, role, sp
 
 const uniqueViolationCode = "23505"
 
-func (r *Repo) Create(ctx context.Context, c Character) (Character, error) {
+func (r *Repo) Create(ctx context.Context, c Character, professions []string) (Character, error) {
 	const query = `
 		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING ` + returningColumns
 
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return Character{}, fmt.Errorf("begin create character: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // no-op once committed
+
 	var created Character
-	if err := r.db.GetContext(ctx, &created, query, c.ID, c.Name, c.SecondaryName, c.Realm, c.Class, c.Spec, c.Role, c.Spec2, c.Role2, c.IsMain, c.RaidTeam); err != nil {
+	if err := tx.GetContext(ctx, &created, query, c.ID, c.Name, c.SecondaryName, c.Realm, c.Class, c.Spec, c.Role, c.Spec2, c.Role2, c.IsMain, c.RaidTeam); err != nil {
 		return Character{}, mapWriteError(err)
 	}
+	if err := replaceProfessions(ctx, tx, created.ID, professions); err != nil {
+		return Character{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Character{}, fmt.Errorf("commit create character: %w", err)
+	}
+
 	created.CreatedAt = created.CreatedAt.UTC()
-	created.Professions = []CharacterProfession{}
+	stored, err := r.professionsByCharacter(ctx, &created.ID)
+	if err != nil {
+		return Character{}, err
+	}
+	created.Professions = append([]CharacterProfession{}, stored[created.ID]...)
 	return created, nil
 }
 
@@ -132,8 +149,9 @@ func (r *Repo) Get(ctx context.Context, id uuid.UUID) (Character, error) {
 }
 
 // Update applies req with COALESCE semantics; second, when non-nil, overwrites
-// spec2 and role2 outright so they can be cleared.
-func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, second *secondSpec) (Character, error) {
+// spec2 and role2 outright so they can be cleared. professions, when non-nil,
+// replaces the character's whole profession set.
+func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, second *secondSpec, professions *[]string) (Character, error) {
 	const query = `
 		UPDATE characters SET
 			name           = COALESCE($2, name),
@@ -154,18 +172,50 @@ func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, seco
 		spec2, role2 = second.spec, second.role
 	}
 
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return Character{}, fmt.Errorf("begin update character: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // no-op once committed
+
 	var updated Character
-	if err := r.db.GetContext(ctx, &updated, query, id, req.Name, req.SecondaryName, req.Realm, req.Class, req.Spec, req.Role, req.IsMain, req.RaidTeam, second != nil, spec2, role2); err != nil {
+	if err := tx.GetContext(ctx, &updated, query, id, req.Name, req.SecondaryName, req.Realm, req.Class, req.Spec, req.Role, req.IsMain, req.RaidTeam, second != nil, spec2, role2); err != nil {
 		return Character{}, mapWriteError(err)
 	}
-	updated.CreatedAt = updated.CreatedAt.UTC()
+	if professions != nil {
+		if err := replaceProfessions(ctx, tx, id, *professions); err != nil {
+			return Character{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return Character{}, fmt.Errorf("commit update character: %w", err)
+	}
 
-	professions, err := r.professionsByCharacter(ctx, &id)
+	updated.CreatedAt = updated.CreatedAt.UTC()
+	stored, err := r.professionsByCharacter(ctx, &id)
 	if err != nil {
 		return Character{}, err
 	}
-	updated.Professions = append([]CharacterProfession{}, professions[id]...)
+	updated.Professions = append([]CharacterProfession{}, stored[id]...)
 	return updated, nil
+}
+
+// replaceProfessions makes names the character's whole profession set. A profession
+// that stays keeps its stored skill level; a new one starts at 0.
+func replaceProfessions(ctx context.Context, tx *sqlx.Tx, characterID uuid.UUID, names []string) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM professions WHERE character_id = $1 AND NOT (profession = ANY($2::text[]))`, characterID, names); err != nil {
+		return fmt.Errorf("delete dropped professions: %w", err)
+	}
+	for _, name := range names {
+		const insert = `
+			INSERT INTO professions (id, character_id, profession, skill_level)
+			VALUES ($1, $2, $3, 0)
+			ON CONFLICT (character_id, profession) DO NOTHING`
+		if _, err := tx.ExecContext(ctx, insert, uuid.New(), characterID, name); err != nil {
+			return fmt.Errorf("insert profession %q: %w", name, err)
+		}
+	}
+	return nil
 }
 
 func (r *Repo) Delete(ctx context.Context, id uuid.UUID) error {

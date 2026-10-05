@@ -11,6 +11,7 @@ export interface CreateCharacterRequest {
   role2?: Role
   isMain: boolean
   raidTeam?: string
+  professions?: string[]
 }
 
 // An empty string for spec2 and role2 clears the second spec; omitting them leaves it unchanged.
