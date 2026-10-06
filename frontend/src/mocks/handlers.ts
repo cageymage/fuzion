@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw'
 import type { EditablePost, NewsPage, NewsPost } from '../types/news'
 import type { RaidProgress, RaidTier } from '../types/raidProgress'
 import type { Raid } from '../types/raids'
+import type { ProfessionEntry } from '../types/professions'
 import type { Character } from '../types/roster'
 import type { Stream } from '../types/streams'
 
@@ -265,6 +266,21 @@ const raidTiers: RaidTier[] = [
   },
 ]
 
+const professionEntries: ProfessionEntry[] = [
+  {
+    id: 'profession-1',
+    profession: 'Alchemy',
+    skillLevel: 300,
+    character: { id: 'char-1', name: 'Aeliana', secondaryName: 'Dawnsong', class: 'Priest' },
+  },
+  {
+    id: 'profession-2',
+    profession: 'Blacksmithing',
+    skillLevel: 225,
+    character: { id: 'char-2', name: 'Zephyrion', secondaryName: 'Ironhide', class: 'Warrior' },
+  },
+]
+
 export const handlers = [
   http.post('/api/applications', () => HttpResponse.json({ id: 'app-1' }, { status: 201 })),
   http.get('/api/auth/me', () => HttpResponse.json({ error: 'login required' }, { status: 401 })),
@@ -282,6 +298,7 @@ export const handlers = [
   http.post('/api/news/:id/publish', () =>
     HttpResponse.json({ ...draftPost, publishedAt: new Date().toISOString() }),
   ),
+  http.get('/api/professions', () => HttpResponse.json(professionEntries)),
   http.get('/api/raid-progress', () => HttpResponse.json([raidProgress])),
   http.get('/api/raid-tiers', () => HttpResponse.json(raidTiers)),
   http.post('/api/raid-tiers', () =>
