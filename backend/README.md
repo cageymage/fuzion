@@ -50,6 +50,9 @@ is no separate migrate step.
 | ------ | ------------------- | --------------------------------------------------- |
 | GET    | `/api/health`       | `{"status":"ok"}`                                   |
 | GET    | `/api/professions`  | crafting directory with each character embedded, sorted by profession, then skill; optional `?profession=` (case-insensitive, `[]` when nothing matches) |
+| POST   | `/api/professions`  | officer only: `{characterId, profession, skillLevel}`; 201 with the same shape the list returns; 400 for an unknown `characterId`, a blank `profession` or a negative `skillLevel`; 409 when the character already has that profession |
+| PATCH  | `/api/professions/{id}` | officer only: any of `profession`, `skillLevel`; 200 with the updated row; 404 for an unknown or malformed id; 409 when it would duplicate another of the character's professions |
+| DELETE | `/api/professions/{id}` | officer only: 204; 404 for an unknown or malformed id |
 | GET    | `/api/news`         | one page of news posts as HAL: `{total, _links: {self, first, last, prev?, next?}, _embedded: {news: [...]}}`, newest first (`news` is `[]` when none); `?limit=` 1 to 50 (default 10), `?offset=` 0 or more (default 0), `?category=raid-progress\|recruitment\|guild-news`, else 400; `total` counts the category matches, ignoring limit and offset; links keep the filters and leave out defaults (`offset=0` never appears, `limit` only when you sent it) |
 | GET    | `/api/raids/next`   | soonest upcoming raid, or `null` when none scheduled |
 | GET    | `/api/streams/live` | live streamers, most viewers first (`[]` when none) |
