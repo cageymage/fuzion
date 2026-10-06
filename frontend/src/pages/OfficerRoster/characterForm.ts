@@ -1,3 +1,4 @@
+import { isPrimaryProfession, isSecondaryProfession } from '../../lib/professions'
 import type {
   Character,
   CreateCharacterRequest,
@@ -16,6 +17,9 @@ export interface CharacterFormValues {
   role2: Role | ''
   isMain: boolean
   raidTeam: string
+  primaryProfession1: string
+  primaryProfession2: string
+  secondaryProfessions: string[]
 }
 
 export const emptyCharacterForm: CharacterFormValues = {
@@ -29,10 +33,35 @@ export const emptyCharacterForm: CharacterFormValues = {
   role2: '',
   isMain: true,
   raidTeam: '',
+  primaryProfession1: '',
+  primaryProfession2: '',
+  secondaryProfessions: [],
+}
+
+// Names a character has that the form no longer offers (or a third primary) are not shown.
+function professionChoices(character: Character) {
+  const names = character.professions.map(({ profession }) => profession)
+  const primaries = names.filter(isPrimaryProfession)
+  return {
+    primaryProfession1: primaries[0] ?? '',
+    primaryProfession2: primaries[1] ?? '',
+    secondaryProfessions: names.filter(isSecondaryProfession),
+  }
+}
+
+function professionList(values: CharacterFormValues): string[] {
+  return [values.primaryProfession1, values.primaryProfession2, ...values.secondaryProfessions].filter(
+    (name) => name !== '',
+  )
+}
+
+function sameProfessions(a: string[], b: string[]): boolean {
+  return a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n')
 }
 
 export function formValuesFor(character: Character): CharacterFormValues {
   return {
+    ...professionChoices(character),
     name: character.name,
     secondaryName: character.secondaryName,
     realm: character.realm,
@@ -61,6 +90,8 @@ export function buildCreateRequest(values: CharacterFormValues): CreateCharacter
     request.role2 = values.role2
   }
   if (values.raidTeam !== '') request.raidTeam = values.raidTeam
+  const professions = professionList(values)
+  if (professions.length > 0) request.professions = professions
   return request
 }
 
@@ -81,5 +112,8 @@ export function buildUpdateRequest(
   }
   if (current.isMain !== initial.isMain) request.isMain = current.isMain
   if (current.raidTeam !== initial.raidTeam) request.raidTeam = current.raidTeam
+  if (!sameProfessions(professionList(initial), professionList(current))) {
+    request.professions = professionList(current)
+  }
   return request
 }

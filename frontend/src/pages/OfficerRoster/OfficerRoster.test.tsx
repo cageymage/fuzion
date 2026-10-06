@@ -306,6 +306,113 @@ describe('OfficerRoster', () => {
     expect(calls.updated).toEqual([{ id: 'char-2', body: { spec2: '', role2: '' } }])
   })
 
+  it('should send the chosen professions when an officer adds a character', async () => {
+    signInAs(officer)
+    const calls = serveRoster([])
+    const user = userEvent.setup()
+    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    const dialog = await openAddDialog(user)
+
+    await user.type(dialog.getByLabelText('Name'), 'Aeliana')
+    await user.type(dialog.getByLabelText('Secondary name'), 'Stormwind')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Class' }), 'Priest')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Spec' }), 'Holy')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Primary profession 1' }), 'Mining')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Primary profession 2' }), 'Herbalism')
+    await user.click(dialog.getByRole('checkbox', { name: 'Cooking' }))
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    await waitForDialogToClose()
+    expect(calls.created).toEqual([
+      {
+        name: 'Aeliana',
+        secondaryName: 'Stormwind',
+        class: 'Priest',
+        spec: 'Holy',
+        role: 'dps',
+        isMain: true,
+        professions: ['Mining', 'Herbalism', 'Cooking'],
+      },
+    ])
+  })
+
+  it("should prefill the professions when an officer edits a character who already has some", async () => {
+    signInAs(officer)
+    serveRoster([
+      {
+        ...ragnok,
+        professions: [
+          { profession: 'Mining', skillLevel: 300 },
+          { profession: 'Skinning', skillLevel: 200 },
+          { profession: 'Fishing', skillLevel: 75 },
+        ],
+      },
+    ])
+    const user = userEvent.setup()
+    renderWithProviders(<OfficerRoster />, '/officer/roster')
+
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    expect(dialog.getByRole('combobox', { name: 'Primary profession 1' })).toHaveValue('Mining')
+    expect(dialog.getByRole('combobox', { name: 'Primary profession 2' })).toHaveValue('Skinning')
+    expect(dialog.getByRole('checkbox', { name: 'Fishing' })).toBeChecked()
+    expect(dialog.getByRole('checkbox', { name: 'Cooking' })).not.toBeChecked()
+  })
+
+  it('should not offer the first primary profession in the second dropdown when it is already chosen', async () => {
+    signInAs(officer)
+    serveRoster([])
+    const user = userEvent.setup()
+    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    const dialog = await openAddDialog(user)
+
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Primary profession 1' }), 'Mining')
+
+    const options = within(dialog.getByRole('combobox', { name: 'Primary profession 2' }))
+      .getAllByRole('option')
+      .map((option) => option.textContent)
+    expect(options).toEqual([
+      'None',
+      'Alchemy',
+      'Blacksmithing',
+      'Enchanting',
+      'Engineering',
+      'Herbalism',
+      'Leatherworking',
+      'Skinning',
+      'Tailoring',
+    ])
+  })
+
+  it('should send no professions when an officer edits a character without changing them', async () => {
+    signInAs(officer)
+    const calls = serveRoster([{ ...ragnok, professions: [{ profession: 'Mining', skillLevel: 300 }] }])
+    const user = userEvent.setup()
+    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    await user.clear(dialog.getByLabelText('Raid team'))
+    await user.type(dialog.getByLabelText('Raid team'), 'Team Beta')
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    await waitForDialogToClose()
+    expect(calls.updated).toEqual([{ id: 'char-1', body: { raidTeam: 'Team Beta' } }])
+  })
+
+  it('should send the new professions when an officer changes a primary profession', async () => {
+    signInAs(officer)
+    const calls = serveRoster([{ ...ragnok, professions: [{ profession: 'Mining', skillLevel: 300 }] }])
+    const user = userEvent.setup()
+    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Primary profession 1' }), 'Blacksmithing')
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    await waitForDialogToClose()
+    expect(calls.updated).toEqual([{ id: 'char-1', body: { professions: ['Blacksmithing'] } }])
+  })
+
   it('should remove the character from the list when an officer confirms deletion', async () => {
     signInAs(officer)
     const calls = serveRoster([ragnok, selene])

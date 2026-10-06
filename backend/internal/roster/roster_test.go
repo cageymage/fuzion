@@ -1019,3 +1019,190 @@ func TestUpdateCharacter_ReturnsProfessions_WhenCharacterHasProfessions(t *testi
 		t.Errorf("unexpected professions (-want +got):\n%s", diff)
 	}
 }
+
+type professionJSON struct {
+	Profession string `json:"profession"`
+	SkillLevel int    `json:"skillLevel"`
+}
+
+const seedAeliana = `
+	INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main)
+	VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'healer', true)`
+
+func createBody(professions any) map[string]any {
+	return map[string]any{
+		"name":          "Aeliana",
+		"secondaryName": "Dawnsong",
+		"class":         "Priest",
+		"role":          "healer",
+		"professions":   professions,
+	}
+}
+
+func TestCreateCharacter_StoresProfessions_WhenProfessionsAreGiven(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a character with two primary and one secondary profession
+	resp := srv.Post(t, "/api/roster", createBody([]string{"Mining", "Herbalism", "Cooking"}))
+
+	// then I expect the character back with those professions at skill level 0
+	resp.RequireStatus(t, http.StatusCreated)
+	var created struct {
+		Professions []professionJSON `json:"professions"`
+	}
+	resp.DecodeJSON(t, &created)
+
+	want := []professionJSON{
+		{Profession: "Cooking", SkillLevel: 0},
+		{Profession: "Herbalism", SkillLevel: 0},
+		{Profession: "Mining", SkillLevel: 0},
+	}
+	if diff := cmp.Diff(want, created.Professions); diff != "" {
+		t.Errorf("unexpected professions (-want +got):\n%s", diff)
+	}
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenProfessionIsUnknown(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a character with a profession that does not exist in Forever
+	resp := srv.Post(t, "/api/roster", createBody([]string{"Jewelcrafting"}))
+
+	// then I expect a 400 naming the profession and no character stored
+	resp.RequireStatus(t, http.StatusBadRequest)
+	var body map[string]string
+	resp.DecodeJSON(t, &body)
+	if diff := cmp.Diff(map[string]string{"error": `professions: "Jewelcrafting" is not a known profession`}, body); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+	var count int
+	if err := db.Get(&count, `SELECT count(*) FROM characters`); err != nil {
+		t.Fatalf("count characters: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected no character to be stored, got %d", count)
+	}
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenMoreThanTwoPrimaryProfessionsAreGiven(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a character with three primary professions
+	resp := srv.Post(t, "/api/roster", createBody([]string{"Mining", "Herbalism", "Skinning"}))
+
+	// then I expect a 400
+	resp.RequireStatus(t, http.StatusBadRequest)
+	var body map[string]string
+	resp.DecodeJSON(t, &body)
+	if diff := cmp.Diff(map[string]string{"error": "professions: at most 2 primary professions are allowed"}, body); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenProfessionIsRepeated(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a character with the same profession twice
+	resp := srv.Post(t, "/api/roster", createBody([]string{"Mining", "Mining"}))
+
+	// then I expect a 400
+	resp.RequireStatus(t, http.StatusBadRequest)
+	var body map[string]string
+	resp.DecodeJSON(t, &body)
+	if diff := cmp.Diff(map[string]string{"error": `professions: "Mining" is listed more than once`}, body); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateCharacter_ReplacesProfessionsAndKeepsSkill_WhenProfessionsAreGiven(t *testing.T) {
+	// given I am an officer and a character who knows Mining at 300 and Herbalism at 150
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(seedAeliana)
+	db.MustExec(`
+		INSERT INTO professions (id, character_id, profession, skill_level)
+		VALUES
+			('a1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'Mining', 300),
+			('a2222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Herbalism', 150)`)
+
+	// when I set her professions to Mining and Cooking
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{"professions": []string{"Mining", "Cooking"}})
+
+	// then I expect Mining to keep its skill, Herbalism gone, and Cooking added at 0
+	resp.RequireStatus(t, http.StatusOK)
+	var updated struct {
+		Professions []professionJSON `json:"professions"`
+	}
+	resp.DecodeJSON(t, &updated)
+
+	want := []professionJSON{
+		{Profession: "Mining", SkillLevel: 300},
+		{Profession: "Cooking", SkillLevel: 0},
+	}
+	if diff := cmp.Diff(want, updated.Professions); diff != "" {
+		t.Errorf("unexpected professions (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateCharacter_LeavesProfessionsAlone_WhenProfessionsAreOmitted(t *testing.T) {
+	// given I am an officer and a character who knows Mining
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(seedAeliana)
+	db.MustExec(`
+		INSERT INTO professions (id, character_id, profession, skill_level)
+		VALUES ('a1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'Mining', 300)`)
+
+	// when I change only her raid team
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{"raidTeam": "Team 1"})
+
+	// then I expect her professions unchanged
+	resp.RequireStatus(t, http.StatusOK)
+	var updated struct {
+		Professions []professionJSON `json:"professions"`
+	}
+	resp.DecodeJSON(t, &updated)
+
+	if diff := cmp.Diff([]professionJSON{{Profession: "Mining", SkillLevel: 300}}, updated.Professions); diff != "" {
+		t.Errorf("unexpected professions (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateCharacter_ClearsProfessions_WhenProfessionsIsEmpty(t *testing.T) {
+	// given I am an officer and a character who knows Mining
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(seedAeliana)
+	db.MustExec(`
+		INSERT INTO professions (id, character_id, profession, skill_level)
+		VALUES ('a1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'Mining', 300)`)
+
+	// when I set her professions to an empty list
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{"professions": []string{}})
+
+	// then I expect no professions left
+	resp.RequireStatus(t, http.StatusOK)
+	var updated struct {
+		Professions []professionJSON `json:"professions"`
+	}
+	resp.DecodeJSON(t, &updated)
+
+	if diff := cmp.Diff([]professionJSON{}, updated.Professions); diff != "" {
+		t.Errorf("unexpected professions (-want +got):\n%s", diff)
+	}
+}

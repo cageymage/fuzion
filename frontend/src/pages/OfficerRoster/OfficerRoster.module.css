@@ -139,3 +139,19 @@
   font-size: var(--text-meta);
   margin: 0;
 }
+
+.checkboxGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: var(--text-meta);
+  color: var(--muted);
+}
+
+.checkboxGroup legend {
+  padding: 0;
+  margin-bottom: 4px;
+}

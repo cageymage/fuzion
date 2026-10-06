@@ -1,10 +1,10 @@
 import type { CharacterProfession } from '../types/roster'
+import { isPrimaryProfession, type PrimaryProfession } from './professions'
 
 const iconBaseUrl = 'https://render.worldofwarcraft.com/us/icons/36'
 const maxPrimaryProfessions = 2
 
-// Jewelcrafting and Inscription are left out until Forever adds them.
-const primaryIconNames: Record<string, string> = {
+const primaryIconNames: Record<PrimaryProfession, string> = {
   Alchemy: 'trade_alchemy',
   Blacksmithing: 'trade_blacksmithing',
   Enchanting: 'trade_engraving',
@@ -22,7 +22,7 @@ export interface ProfessionIcon {
 }
 
 export function professionIcon(profession: string): string | null {
-  const name = primaryIconNames[profession]
+  const name = isPrimaryProfession(profession) ? primaryIconNames[profession] : null
   return name ? `${iconBaseUrl}/${name}.jpg` : null
 }
 

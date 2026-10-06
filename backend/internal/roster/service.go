@@ -16,6 +16,8 @@ const (
 	maxNameLength = 12
 	// Mirrors the default of the characters.realm column.
 	defaultRealm = "Emberreach"
+
+	maxPrimaryProfessions = 2
 )
 
 var (
@@ -25,6 +27,10 @@ var (
 	// Mirrors the CHECK constraint on characters.class.
 	classes = []string{"Warrior", "Paladin", "Hunter", "Rogue", "Priest", "Shaman", "Mage", "Warlock", "Druid"}
 	roles   = []string{"tank", "healer", "dps"}
+
+	// Mirrors what Forever has; Jewelcrafting and Inscription are left out until it adds them.
+	primaryProfessions   = []string{"Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Herbalism", "Leatherworking", "Mining", "Skinning", "Tailoring"}
+	secondaryProfessions = []string{"Cooking", "Fishing", "First Aid"}
 
 	// Standard three-tree names; spec stays free text in the database so rows that
 	// predate this list are left alone until an officer edits their spec.
@@ -51,29 +57,31 @@ func (e *ValidationError) Error() string {
 }
 
 type CreateRequest struct {
-	Name          string  `json:"name"`
-	SecondaryName string  `json:"secondaryName"`
-	Realm         *string `json:"realm"`
-	Class         string  `json:"class"`
-	Spec          *string `json:"spec"`
-	Role          string  `json:"role"`
-	Spec2         *string `json:"spec2"`
-	Role2         *string `json:"role2"`
-	IsMain        bool    `json:"isMain"`
-	RaidTeam      *string `json:"raidTeam"`
+	Name          string   `json:"name"`
+	SecondaryName string   `json:"secondaryName"`
+	Realm         *string  `json:"realm"`
+	Class         string   `json:"class"`
+	Spec          *string  `json:"spec"`
+	Role          string   `json:"role"`
+	Spec2         *string  `json:"spec2"`
+	Role2         *string  `json:"role2"`
+	IsMain        bool     `json:"isMain"`
+	RaidTeam      *string  `json:"raidTeam"`
+	Professions   []string `json:"professions"`
 }
 
 type UpdateRequest struct {
-	Name          *string `json:"name"`
-	SecondaryName *string `json:"secondaryName"`
-	Realm         *string `json:"realm"`
-	Class         *string `json:"class"`
-	Spec          *string `json:"spec"`
-	Role          *string `json:"role"`
-	Spec2         *string `json:"spec2"`
-	Role2         *string `json:"role2"`
-	IsMain        *bool   `json:"isMain"`
-	RaidTeam      *string `json:"raidTeam"`
+	Name          *string   `json:"name"`
+	SecondaryName *string   `json:"secondaryName"`
+	Realm         *string   `json:"realm"`
+	Class         *string   `json:"class"`
+	Spec          *string   `json:"spec"`
+	Role          *string   `json:"role"`
+	Spec2         *string   `json:"spec2"`
+	Role2         *string   `json:"role2"`
+	IsMain        *bool     `json:"isMain"`
+	RaidTeam      *string   `json:"raidTeam"`
+	Professions   *[]string `json:"professions"`
 }
 
 type Service struct {
@@ -128,7 +136,12 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, err
 		return Character{}, err
 	}
 
-	created, err := s.repo.Create(ctx, character)
+	professions, err := validateProfessions(req.Professions)
+	if err != nil {
+		return Character{}, err
+	}
+
+	created, err := s.repo.Create(ctx, character, professions)
 	if err != nil {
 		return Character{}, fmt.Errorf("create character: %w", err)
 	}
@@ -172,12 +185,21 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateRequest) (
 		}
 	}
 
+	var professions *[]string
+	if req.Professions != nil {
+		validated, err := validateProfessions(*req.Professions)
+		if err != nil {
+			return Character{}, err
+		}
+		professions = &validated
+	}
+
 	second, err := s.resolveSecondSpec(ctx, id, req)
 	if err != nil {
 		return Character{}, err
 	}
 
-	updated, err := s.repo.Update(ctx, id, req, second)
+	updated, err := s.repo.Update(ctx, id, req, second, professions)
 	if err != nil {
 		return Character{}, fmt.Errorf("update character %s: %w", id, err)
 	}
@@ -324,4 +346,28 @@ func validateClassSpec(field, class, spec string) error {
 		return &ValidationError{Field: field, Problem: "must be one of " + strings.Join(specs, ", ")}
 	}
 	return nil
+}
+
+// validateProfessions trims the names and returns them as a non-nil slice.
+func validateProfessions(names []string) ([]string, error) {
+	validated := make([]string, 0, len(names))
+	primaries := 0
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		isPrimary := slices.Contains(primaryProfessions, name)
+		if !isPrimary && !slices.Contains(secondaryProfessions, name) {
+			return nil, &ValidationError{Field: "professions", Problem: fmt.Sprintf("%q is not a known profession", name)}
+		}
+		if slices.Contains(validated, name) {
+			return nil, &ValidationError{Field: "professions", Problem: fmt.Sprintf("%q is listed more than once", name)}
+		}
+		if isPrimary {
+			primaries++
+		}
+		validated = append(validated, name)
+	}
+	if primaries > maxPrimaryProfessions {
+		return nil, &ValidationError{Field: "professions", Problem: fmt.Sprintf("at most %d primary professions are allowed", maxPrimaryProfessions)}
+	}
+	return validated, nil
 }

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Dialog } from '../../components/Dialog/Dialog'
+import { primaryProfessions, secondaryProfessions } from '../../lib/professions'
 import { classSpecs, wowClasses, type WowClass } from '../../lib/wowClasses'
 import type { Character, Role } from '../../types/roster'
 import { roleLabels } from '../Roster/rosterLabels'
@@ -37,6 +38,14 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
 
   function changeSecondSpec(spec2: string) {
     change({ spec2, role2: spec2 === '' ? '' : values.role2 || values.role })
+  }
+
+  function toggleSecondaryProfession(profession: string, checked: boolean) {
+    change({
+      secondaryProfessions: checked
+        ? [...values.secondaryProfessions, profession]
+        : values.secondaryProfessions.filter((name) => name !== profession),
+    })
   }
 
   function submit(event: FormEvent) {
@@ -153,6 +162,51 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
           <span>Raid team</span>
           <input value={values.raidTeam} onChange={(event) => change({ raidTeam: event.target.value })} />
         </label>
+        <label className={styles.field}>
+          <span>Primary profession 1</span>
+          <select
+            value={values.primaryProfession1}
+            onChange={(event) => change({ primaryProfession1: event.target.value })}
+          >
+            <option value="">None</option>
+            {primaryProfessions
+              .filter((profession) => profession !== values.primaryProfession2)
+              .map((profession) => (
+                <option key={profession} value={profession}>
+                  {profession}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label className={styles.field}>
+          <span>Primary profession 2</span>
+          <select
+            value={values.primaryProfession2}
+            onChange={(event) => change({ primaryProfession2: event.target.value })}
+          >
+            <option value="">None</option>
+            {primaryProfessions
+              .filter((profession) => profession !== values.primaryProfession1)
+              .map((profession) => (
+                <option key={profession} value={profession}>
+                  {profession}
+                </option>
+              ))}
+          </select>
+        </label>
+        <fieldset className={styles.checkboxGroup}>
+          <legend>Secondary professions</legend>
+          {secondaryProfessions.map((profession) => (
+            <label key={profession} className={styles.toggle}>
+              <input
+                type="checkbox"
+                checked={values.secondaryProfessions.includes(profession)}
+                onChange={(event) => toggleSecondaryProfession(profession, event.target.checked)}
+              />
+              <span>{profession}</span>
+            </label>
+          ))}
+        </fieldset>
         <label className={styles.toggle}>
           <input
             type="checkbox"

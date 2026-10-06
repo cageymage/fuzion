@@ -84,6 +84,16 @@ describe('Professions', () => {
     expect(screen.getByRole('region', { name: 'Blacksmithing' })).toBeInTheDocument()
   })
 
+  it('should show a dash instead of a skill level when none is recorded', async () => {
+    respondWith([{ id: 'p8', profession: 'Cooking', skillLevel: 0, character: aeliana }])
+
+    renderWithProviders(<Professions />)
+
+    const cooking = await screen.findByRole('region', { name: 'Cooking' })
+    expect(within(cooking).getByRole('listitem')).toHaveTextContent('—')
+    expect(within(cooking).getByRole('listitem')).not.toHaveTextContent('0')
+  })
+
   it('should show a no-matches message when the search matches nothing', async () => {
     respondWith(professions)
     const user = userEvent.setup()

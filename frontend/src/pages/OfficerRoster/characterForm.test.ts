@@ -114,3 +114,84 @@ describe('buildUpdateRequest', () => {
     expect(request).toEqual({ spec2: '', role2: '' })
   })
 })
+
+describe('formValuesFor professions', () => {
+  it('should split the professions into two primary choices and the secondary ones when the character has both kinds', () => {
+    const values = formValuesFor({
+      ...aeliana,
+      professions: [
+        { profession: 'Mining', skillLevel: 300 },
+        { profession: 'Cooking', skillLevel: 150 },
+        { profession: 'Skinning', skillLevel: 100 },
+      ],
+    })
+
+    expect(values.primaryProfession1).toBe('Mining')
+    expect(values.primaryProfession2).toBe('Skinning')
+    expect(values.secondaryProfessions).toEqual(['Cooking'])
+  })
+
+  it('should ignore a profession that is no longer offered when the character still has it stored', () => {
+    const values = formValuesFor({ ...aeliana, professions: [{ profession: 'Jewelcrafting', skillLevel: 300 }] })
+
+    expect(values.primaryProfession1).toBe('')
+    expect(values.primaryProfession2).toBe('')
+    expect(values.secondaryProfessions).toEqual([])
+  })
+})
+
+describe('profession requests', () => {
+  const named: CharacterFormValues = {
+    ...emptyCharacterForm,
+    name: 'Aeliana',
+    secondaryName: 'Dawnsong',
+    class: 'Priest',
+    spec: 'Holy',
+    role: 'healer',
+  }
+
+  it('should send the primary professions before the secondary ones when a character is created', () => {
+    const request = buildCreateRequest({
+      ...named,
+      primaryProfession1: 'Mining',
+      primaryProfession2: 'Herbalism',
+      secondaryProfessions: ['Cooking'],
+    })
+
+    expect(request.professions).toEqual(['Mining', 'Herbalism', 'Cooking'])
+  })
+
+  it('should send the full professions list when a profession is added to a character', () => {
+    const initial = formValuesFor({ ...aeliana, professions: [{ profession: 'Mining', skillLevel: 300 }] })
+
+    const request = buildUpdateRequest(initial, { ...initial, primaryProfession2: 'Herbalism' })
+
+    expect(request).toEqual({ professions: ['Mining', 'Herbalism'] })
+  })
+
+  it('should send an empty list when every profession is removed from a character', () => {
+    const initial = formValuesFor({ ...aeliana, professions: [{ profession: 'Mining', skillLevel: 300 }] })
+
+    const request = buildUpdateRequest(initial, { ...initial, primaryProfession1: '' })
+
+    expect(request).toEqual({ professions: [] })
+  })
+
+  it('should send nothing for professions when only their order changed', () => {
+    const initial = formValuesFor({
+      ...aeliana,
+      professions: [
+        { profession: 'Mining', skillLevel: 300 },
+        { profession: 'Herbalism', skillLevel: 200 },
+      ],
+    })
+
+    const request = buildUpdateRequest(initial, {
+      ...initial,
+      primaryProfession1: 'Herbalism',
+      primaryProfession2: 'Mining',
+    })
+
+    expect(request).toEqual({})
+  })
+})
