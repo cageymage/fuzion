@@ -25,6 +25,12 @@ type Character struct {
 	IsMain        bool      `db:"is_main"        json:"isMain"`
 	RaidTeam      *string   `db:"raid_team"      json:"raidTeam"`
 	CreatedAt     time.Time `db:"created_at"     json:"createdAt"`
+	Professions   []CharacterProfession `db:"-" json:"professions"`
+}
+
+type CharacterProfession struct {
+	Profession string `json:"profession"`
+	SkillLevel int    `json:"skillLevel"`
 }
 
 type Repo struct {
@@ -49,7 +55,40 @@ func (r *Repo) List(ctx context.Context) ([]Character, error) {
 	for i := range characters {
 		characters[i].CreatedAt = characters[i].CreatedAt.UTC()
 	}
+
+	professions, err := r.professionsByCharacter(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	for i := range characters {
+		characters[i].Professions = append([]CharacterProfession{}, professions[characters[i].ID]...)
+	}
 	return characters, nil
+}
+
+// professionsByCharacter returns every character's professions, highest skill first.
+// Characters without any are absent from the map, so callers get empty slices.
+func (r *Repo) professionsByCharacter(ctx context.Context, only *uuid.UUID) (map[uuid.UUID][]CharacterProfession, error) {
+	const query = `
+		SELECT character_id, profession, skill_level
+		FROM professions
+		WHERE $1::uuid IS NULL OR character_id = $1
+		ORDER BY skill_level DESC, profession ASC`
+
+	var rows []struct {
+		CharacterID uuid.UUID `db:"character_id"`
+		Profession  string    `db:"profession"`
+		SkillLevel  int       `db:"skill_level"`
+	}
+	if err := r.db.SelectContext(ctx, &rows, query, only); err != nil {
+		return nil, fmt.Errorf("select professions: %w", err)
+	}
+
+	byCharacter := make(map[uuid.UUID][]CharacterProfession)
+	for _, row := range rows {
+		byCharacter[row.CharacterID] = append(byCharacter[row.CharacterID], CharacterProfession{Profession: row.Profession, SkillLevel: row.SkillLevel})
+	}
+	return byCharacter, nil
 }
 
 const returningColumns = `id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, created_at`
@@ -67,6 +106,7 @@ func (r *Repo) Create(ctx context.Context, c Character) (Character, error) {
 		return Character{}, mapWriteError(err)
 	}
 	created.CreatedAt = created.CreatedAt.UTC()
+	created.Professions = []CharacterProfession{}
 	return created, nil
 }
 
@@ -119,6 +159,12 @@ func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, seco
 		return Character{}, mapWriteError(err)
 	}
 	updated.CreatedAt = updated.CreatedAt.UTC()
+
+	professions, err := r.professionsByCharacter(ctx, &id)
+	if err != nil {
+		return Character{}, err
+	}
+	updated.Professions = append([]CharacterProfession{}, professions[id]...)
 	return updated, nil
 }
 

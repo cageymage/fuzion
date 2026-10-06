@@ -20,6 +20,7 @@ const ragnok: Character = {
   isMain: true,
   raidTeam: 'Team Alpha',
   createdAt: '2026-01-01T00:00:00.000Z',
+  professions: [],
 }
 
 const selene: Character = {
@@ -188,5 +189,45 @@ describe('Roster', () => {
     renderWithProviders(<Roster />)
 
     expect(await screen.findByText('The roster could not be loaded.')).toBeInTheDocument()
+  })
+
+  it('should show two profession icons for a character with two primary professions', async () => {
+    const crafter: Character = {
+      ...ragnok,
+      professions: [
+        { profession: 'Mining', skillLevel: 300 },
+        { profession: 'Blacksmithing', skillLevel: 225 },
+      ],
+    }
+    server.use(http.get('/api/roster', () => HttpResponse.json([crafter])))
+
+    renderWithProviders(<Roster />)
+
+    const row = (await screen.findByText('Ragnok')).closest('tr') as HTMLElement
+    const icons = within(row).getAllByRole('img')
+    expect(icons.map((icon) => icon.getAttribute('alt'))).toEqual(['Mining', 'Blacksmithing'])
+    expect(icons[0]).toHaveAttribute(
+      'src',
+      'https://render.worldofwarcraft.com/us/icons/36/trade_mining.jpg',
+    )
+  })
+
+  it('should show no profession icons when the character has only a secondary profession', async () => {
+    const cook: Character = { ...ragnok, professions: [{ profession: 'Cooking', skillLevel: 300 }] }
+    server.use(http.get('/api/roster', () => HttpResponse.json([cook])))
+
+    renderWithProviders(<Roster />)
+
+    const row = (await screen.findByText('Ragnok')).closest('tr') as HTMLElement
+    expect(within(row).queryByRole('img')).not.toBeInTheDocument()
+  })
+
+  it('should show no profession icons when the character has no professions', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
+
+    renderWithProviders(<Roster />)
+
+    const row = (await screen.findByText('Ragnok')).closest('tr') as HTMLElement
+    expect(within(row).queryByRole('img')).not.toBeInTheDocument()
   })
 })

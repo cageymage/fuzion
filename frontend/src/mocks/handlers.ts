@@ -162,6 +162,7 @@ const rosterCharacters: Character[] = [
     isMain: true,
     raidTeam: 'Team Alpha',
     createdAt: new Date().toISOString(),
+    professions: [{ profession: 'Mining', skillLevel: 300 }, { profession: 'Blacksmithing', skillLevel: 275 }],
   },
   {
     id: 'char-2',
@@ -176,6 +177,7 @@ const rosterCharacters: Character[] = [
     isMain: true,
     raidTeam: 'Team Beta',
     createdAt: new Date().toISOString(),
+    professions: [{ profession: 'Herbalism', skillLevel: 225 }, { profession: 'Alchemy', skillLevel: 150 }],
   },
   {
     id: 'char-3',
@@ -190,6 +192,7 @@ const rosterCharacters: Character[] = [
     isMain: true,
     raidTeam: 'Team Alpha',
     createdAt: new Date().toISOString(),
+    professions: [],
   },
   {
     id: 'char-4',
@@ -204,6 +207,7 @@ const rosterCharacters: Character[] = [
     isMain: true,
     raidTeam: 'Team Beta',
     createdAt: new Date().toISOString(),
+    professions: [],
   },
   {
     id: 'char-5',
@@ -218,6 +222,7 @@ const rosterCharacters: Character[] = [
     isMain: true,
     raidTeam: 'Team Alpha',
     createdAt: new Date().toISOString(),
+    professions: [],
   },
   {
     id: 'char-6',
@@ -232,6 +237,7 @@ const rosterCharacters: Character[] = [
     isMain: false,
     raidTeam: null,
     createdAt: new Date().toISOString(),
+    professions: [],
   },
 ]
 

@@ -117,3 +117,13 @@
 .table tbody tr:hover {
   background: var(--gold-soft);
 }
+
+.professionIcons {
+  display: flex;
+  gap: 6px;
+}
+
+.professionIcon {
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+}
