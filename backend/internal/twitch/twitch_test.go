@@ -119,6 +119,47 @@ func TestLiveStreams_ReturnsLiveChannels_WhenTwitchResponds(t *testing.T) {
 	}
 }
 
+func TestLiveStreams_ReplacesThumbnailSizePlaceholders_WhenTwitchReturnsTemplateUrl(t *testing.T) {
+	// given Twitch returns a thumbnail URL with size placeholders
+	fake := newFakeTwitch(t)
+	fake.live = []map[string]any{{
+		"user_login":    "Thundermane",
+		"thumbnail_url": "https://static-cdn.jtvnw.net/previews-ttv/live_user_thundermane-{width}x{height}.jpg",
+	}}
+
+	// when I ask which channels are live
+	got, err := fake.client().LiveStreams(context.Background(), []string{"thundermane"})
+
+	// then I expect the thumbnail URL to hold a fixed size and no placeholders
+	if err != nil {
+		t.Fatalf("LiveStreams: %v", err)
+	}
+	want := "https://static-cdn.jtvnw.net/previews-ttv/live_user_thundermane-440x248.jpg"
+	if len(got) != 1 || got[0].ThumbnailURL != want {
+		t.Errorf("thumbnail URL = %+v, want %q", got, want)
+	}
+}
+
+func TestLiveStreams_ReturnsTitle_WhenTwitchResponds(t *testing.T) {
+	// given Twitch reports a live channel with a title
+	fake := newFakeTwitch(t)
+	fake.live = []map[string]any{{
+		"user_login": "Thundermane",
+		"title":      "Mythic Queen Ansurek progress",
+	}}
+
+	// when I ask which channels are live
+	got, err := fake.client().LiveStreams(context.Background(), []string{"thundermane"})
+
+	// then I expect the stream title to come back
+	if err != nil {
+		t.Fatalf("LiveStreams: %v", err)
+	}
+	if len(got) != 1 || got[0].Title != "Mythic Queen Ansurek progress" {
+		t.Errorf("title = %+v, want %q", got, "Mythic Queen Ansurek progress")
+	}
+}
+
 func TestLiveStreams_FetchesAppToken_BeforeFirstCall(t *testing.T) {
 	// given a fake Twitch that has not yet handed out a token
 	fake := newFakeTwitch(t)

@@ -104,6 +104,29 @@ func TestUpdateLiveStatus_MarksReturnedChannelsLiveAndOthersOffline(t *testing.T
 	}
 }
 
+func TestUpdateLiveStatus_ClearsTitle_WhenChannelGoesOffline(t *testing.T) {
+	// given a live channel with a title
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, stream_title, viewer_count, channel_url, is_live, twitch_login)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Emberfist', 'World of Warcraft', 'Mythic progress', 310, 'https://twitch.tv/emberfist', true, 'emberfist')`)
+
+	// when I apply a Twitch result with nobody live
+	err := streams.NewRepo(db).UpdateLiveStatus(context.Background(), map[string]twitch.LiveStream{})
+
+	// then I expect the title to be empty
+	if err != nil {
+		t.Fatalf("UpdateLiveStatus: %v", err)
+	}
+	var title string
+	if err := db.Get(&title, `SELECT stream_title FROM streams`); err != nil {
+		t.Fatalf("select stream_title: %v", err)
+	}
+	if title != "" {
+		t.Errorf("stream_title = %q, want it cleared", title)
+	}
+}
+
 func TestUpdateLiveStatus_LeavesChannelsWithoutTwitchLoginUntouched(t *testing.T) {
 	// given a live channel that has no twitch login recorded
 	db := testutil.DB(t)
