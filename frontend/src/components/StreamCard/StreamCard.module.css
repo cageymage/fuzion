@@ -49,6 +49,10 @@
   font-size: var(--text-meta);
 }
 
+.viewerCount {
+  margin-left: auto;
+}
+
 .streamer {
   display: flex;
   align-items: center;

@@ -31,7 +31,6 @@ export function LiveStreamCard({ stream }: LiveStreamCardProps) {
           {stream.title}
         </p>
       )}
-      <div className={styles.game}>{stream.gameName}</div>
       <a className={styles.watchLink} href={stream.channelUrl} target="_blank" rel="noreferrer">
         Watch on Twitch →
       </a>

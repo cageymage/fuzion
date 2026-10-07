@@ -24,8 +24,8 @@ export function StreamCard({ stream }: StreamCardProps) {
         </p>
       )}
       <div className={styles.details}>
-        <span>{stream.gameName}</span>
-        <span>{formatViewerCount(stream.viewerCount)}</span>
+        {stream.isLiveOtherGame && <span>{stream.gameName}</span>}
+        <span className={styles.viewerCount}>{formatViewerCount(stream.viewerCount)}</span>
       </div>
     </a>
   )

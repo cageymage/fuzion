@@ -13,4 +13,5 @@ export interface Stream {
   avatarUrl: string | null
   channelUrl: string
   isLive: boolean
+  isLiveOtherGame: boolean
 }

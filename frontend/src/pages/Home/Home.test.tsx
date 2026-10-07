@@ -17,6 +17,7 @@ const centrifuze: Stream = {
   avatarUrl: null,
   channelUrl: 'https://www.twitch.tv/centrifuze',
   isLive: true,
+  isLiveOtherGame: false,
 }
 
 describe('Home', () => {
