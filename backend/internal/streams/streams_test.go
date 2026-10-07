@@ -14,15 +14,16 @@ func TestMain(m *testing.M) {
 }
 
 type streamJSON struct {
-	ID           string  `json:"id"`
-	StreamerName string  `json:"streamerName"`
-	GameName     string  `json:"gameName"`
-	ViewerCount  int     `json:"viewerCount"`
-	Title        string  `json:"title"`
-	ThumbnailURL *string `json:"thumbnailUrl"`
-	AvatarURL    *string `json:"avatarUrl"`
-	ChannelURL   string  `json:"channelUrl"`
-	IsLive       bool    `json:"isLive"`
+	ID              string  `json:"id"`
+	StreamerName    string  `json:"streamerName"`
+	GameName        string  `json:"gameName"`
+	ViewerCount     int     `json:"viewerCount"`
+	Title           string  `json:"title"`
+	ThumbnailURL    *string `json:"thumbnailUrl"`
+	AvatarURL       *string `json:"avatarUrl"`
+	ChannelURL      string  `json:"channelUrl"`
+	IsLive          bool    `json:"isLive"`
+	IsLiveOtherGame bool    `json:"isLiveOtherGame"`
 }
 
 func TestListLiveStreams_ReturnsLiveStreamersOrderedByViewerCount(t *testing.T) {
@@ -279,5 +280,59 @@ func TestStreamsInsert_KeepsProvidedId_WhenIdIsGiven(t *testing.T) {
 	}
 	if id != providedID {
 		t.Errorf("expected id %q, got %q", providedID, id)
+	}
+}
+
+func TestListStreams_ReturnsIsLiveOtherGame_WhenStreamerPlaysAnotherGame(t *testing.T) {
+	// given a streamer who is live in another game
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, viewer_count, thumbnail_url, channel_url, is_live, is_live_other_game)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Thundermane', 'Call of Duty: Warzone', 87, NULL, 'https://twitch.tv/thundermane', false, true)`)
+
+	// when I ask for every stream channel
+	resp := srv.Get(t, "/api/streams")
+
+	// then I expect the channel with isLive false, isLiveOtherGame true and the game they play
+	resp.RequireStatus(t, 200)
+	var all []streamJSON
+	resp.DecodeJSON(t, &all)
+
+	want := []streamJSON{
+		{
+			ID:              "11111111-1111-1111-1111-111111111111",
+			StreamerName:    "Thundermane",
+			GameName:        "Call of Duty: Warzone",
+			ViewerCount:     87,
+			ChannelURL:      "https://twitch.tv/thundermane",
+			IsLive:          false,
+			IsLiveOtherGame: true,
+		},
+	}
+	if diff := cmp.Diff(want, all); diff != "" {
+		t.Errorf("unexpected streams (-want +got):\n%s", diff)
+	}
+}
+
+func TestListLiveStreams_ExcludesStreamer_WhenPlayingAnotherGame(t *testing.T) {
+	// given one streamer live in WoW and one live in another game
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, viewer_count, thumbnail_url, channel_url, is_live, is_live_other_game)
+		VALUES
+			('11111111-1111-1111-1111-111111111111', 'Thundermane', 'World of Warcraft: Forever', 1240, NULL, 'https://twitch.tv/thundermane', true, false),
+			('22222222-2222-2222-2222-222222222222', 'Emberfist', 'Call of Duty: Warzone', 310, NULL, 'https://twitch.tv/emberfist', false, true)`)
+
+	// when I ask who is live
+	resp := srv.Get(t, "/api/streams/live")
+
+	// then I expect only the WoW streamer
+	resp.RequireStatus(t, 200)
+	var live []streamJSON
+	resp.DecodeJSON(t, &live)
+	if len(live) != 1 || live[0].StreamerName != "Thundermane" {
+		t.Errorf("expected only Thundermane, got %q", resp.Body)
 	}
 }
