@@ -13,6 +13,7 @@ const offlineStream: Stream = {
   avatarUrl: 'https://cdn.example/moonveil.png',
   channelUrl: 'https://twitch.tv/moonveil',
   isLive: false,
+  isLiveOtherGame: false,
 }
 
 describe('OfflineStreamCard', () => {

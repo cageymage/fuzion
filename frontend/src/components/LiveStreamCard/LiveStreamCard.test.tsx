@@ -13,14 +13,20 @@ const stream: Stream = {
   avatarUrl: null,
   channelUrl: 'https://twitch.tv/thundermane',
   isLive: true,
+  isLiveOtherGame: false,
 }
 
 describe('LiveStreamCard', () => {
-  it('should name the streamer and the game being played', () => {
+  it('should name the streamer', () => {
     render(<LiveStreamCard stream={stream} />)
 
     expect(screen.getByText('Thundermane is live')).toBeInTheDocument()
-    expect(screen.getByText('World of Warcraft: Forever')).toBeInTheDocument()
+  })
+
+  it('should not show the game name', () => {
+    render(<LiveStreamCard stream={stream} />)
+
+    expect(screen.queryByText('World of Warcraft: Forever')).not.toBeInTheDocument()
   })
 
   it('should show the stream title', () => {

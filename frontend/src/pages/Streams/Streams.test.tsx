@@ -16,6 +16,7 @@ const offlineStream: Stream = {
   avatarUrl: null,
   channelUrl: 'https://twitch.tv/emberfist',
   isLive: false,
+  isLiveOtherGame: false,
 }
 
 const liveStream: Stream = {
@@ -28,6 +29,20 @@ const liveStream: Stream = {
   avatarUrl: null,
   channelUrl: 'https://twitch.tv/thundermane',
   isLive: true,
+  isLiveOtherGame: false,
+}
+
+const otherGameStream: Stream = {
+  id: 'stream-7',
+  streamerName: 'Aelith',
+  gameName: 'Call of Duty: Warzone',
+  title: 'Warzone night',
+  viewerCount: 87,
+  thumbnailUrl: null,
+  avatarUrl: null,
+  channelUrl: 'https://twitch.tv/aelith',
+  isLive: false,
+  isLiveOtherGame: true,
 }
 
 describe('Streams', () => {
@@ -66,10 +81,10 @@ describe('Streams', () => {
     expect(moonveil).toHaveAttribute('target', '_blank')
   })
 
-  it('should list live channels under Live now and offline channels under Offline', async () => {
+  it('should list live channels under Live in World of Warcraft and offline channels under Offline', async () => {
     renderWithProviders(<Streams />)
 
-    const live = within(await screen.findByRole('region', { name: 'Live now' }))
+    const live = within(await screen.findByRole('region', { name: 'Live in World of Warcraft' }))
     const offline = within(screen.getByRole('region', { name: 'Offline' }))
     expect(live.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
       'https://twitch.tv/thundermane',
@@ -101,7 +116,7 @@ describe('Streams', () => {
     renderWithProviders(<Streams />)
 
     expect(await screen.findByText('Nobody is live right now.')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Live now' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Live in World of Warcraft' })).not.toBeInTheDocument()
     expect(
       within(screen.getByRole('region', { name: 'Offline' })).getByRole('link', {
         name: 'Emberfist',
@@ -109,14 +124,60 @@ describe('Streams', () => {
     ).toBeInTheDocument()
   })
 
+  it('should not show the nobody-is-live message when a streamer is live in another game', async () => {
+    server.use(http.get('/api/streams', () => HttpResponse.json([otherGameStream, offlineStream])))
+
+    renderWithProviders(<Streams />)
+
+    await screen.findByRole('region', { name: 'Live in another game' })
+    expect(screen.queryByText('Nobody is live right now.')).not.toBeInTheDocument()
+  })
+
   it('should not show the Offline section when every channel is live', async () => {
     server.use(http.get('/api/streams', () => HttpResponse.json([liveStream])))
 
     renderWithProviders(<Streams />)
 
-    await screen.findByRole('region', { name: 'Live now' })
+    await screen.findByRole('region', { name: 'Live in World of Warcraft' })
     expect(screen.queryByRole('region', { name: 'Offline' })).not.toBeInTheDocument()
     expect(screen.queryByText('Nobody is live right now.')).not.toBeInTheDocument()
+  })
+
+  it('should show a streamer in the other-game section when they are live in a non-WoW game', async () => {
+    server.use(http.get('/api/streams', () => HttpResponse.json([liveStream, otherGameStream, offlineStream])))
+
+    renderWithProviders(<Streams />)
+
+    const otherGame = within(await screen.findByRole('region', { name: 'Live in another game' }))
+    expect(otherGame.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      'https://twitch.tv/aelith',
+    ])
+    expect(otherGame.getByRole('link', { name: /Aelith/ })).toHaveTextContent('Call of Duty: Warzone')
+    const offline = within(screen.getByRole('region', { name: 'Offline' }))
+    expect(offline.queryByRole('link', { name: /Aelith/ })).not.toBeInTheDocument()
+  })
+
+  it('should hide the other-game section when nobody is playing another game', async () => {
+    renderWithProviders(<Streams />)
+
+    await screen.findByRole('region', { name: 'Live in World of Warcraft' })
+    expect(screen.queryByRole('region', { name: 'Live in another game' })).not.toBeInTheDocument()
+  })
+
+  it('should list a streamer only under offline when they are not live', async () => {
+    server.use(http.get('/api/streams', () => HttpResponse.json([otherGameStream, offlineStream])))
+
+    renderWithProviders(<Streams />)
+
+    const offline = within(await screen.findByRole('region', { name: 'Offline' }))
+    expect(offline.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      'https://twitch.tv/emberfist',
+    ])
+    expect(
+      within(screen.getByRole('region', { name: 'Live in another game' })).queryByRole('link', {
+        name: /Emberfist/,
+      }),
+    ).not.toBeInTheDocument()
   })
 
   it('should show a loading message when the request is still in flight', () => {

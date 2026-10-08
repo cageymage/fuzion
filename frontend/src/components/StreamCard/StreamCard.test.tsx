@@ -13,18 +13,34 @@ const liveStream: Stream = {
   avatarUrl: null,
   channelUrl: 'https://twitch.tv/thundermane',
   isLive: true,
+  isLiveOtherGame: false,
 }
 
 describe('StreamCard', () => {
-  it('should show the LIVE badge, viewer count and game', () => {
+  it('should show the LIVE badge and viewer count', () => {
     render(<StreamCard stream={liveStream} />)
 
     expect(screen.getByText('LIVE')).toBeInTheDocument()
     expect(screen.getByText('1.2K')).toBeInTheDocument()
-    expect(screen.getByText('World of Warcraft: Forever')).toBeInTheDocument()
   })
 
-  it('should show the stream title when the channel is live',() => {
+  it('should not show the game name when the streamer is live in WoW', () => {
+    render(<StreamCard stream={liveStream} />)
+
+    expect(screen.queryByText('World of Warcraft: Forever')).not.toBeInTheDocument()
+  })
+
+  it('should show the game name when the streamer is live in another game', () => {
+    render(
+      <StreamCard
+        stream={{ ...liveStream, isLive: false, isLiveOtherGame: true, gameName: 'Call of Duty: Warzone' }}
+      />,
+    )
+
+    expect(screen.getByText('Call of Duty: Warzone')).toBeInTheDocument()
+  })
+
+  it('should show the stream title when the channel is live', () => {
     render(<StreamCard stream={liveStream} />)
 
     expect(screen.getByText('Mythic Queen Ansurek progress')).toBeInTheDocument()

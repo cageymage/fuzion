@@ -58,12 +58,6 @@
   font-size: var(--text-ui);
 }
 
-.game {
-  color: var(--muted);
-  font-size: var(--text-meta);
-  margin-top: 2px;
-}
-
 .watchLink {
   display: block;
   margin-top: 9px;
