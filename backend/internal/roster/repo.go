@@ -24,6 +24,9 @@ type Character struct {
 	Role2         *string               `db:"role2"          json:"role2"`
 	IsMain        bool                  `db:"is_main"        json:"isMain"`
 	RaidTeam      *string               `db:"raid_team"      json:"raidTeam"`
+	Race          *string               `db:"race"           json:"race"`
+	Level         *int                  `db:"level"          json:"level"`
+	Faction       *string               `db:"-"              json:"faction"`
 	CreatedAt     time.Time             `db:"created_at"     json:"createdAt"`
 	Professions   []CharacterProfession `db:"-" json:"professions"`
 }
@@ -43,7 +46,7 @@ func NewRepo(db *sqlx.DB) *Repo {
 
 func (r *Repo) List(ctx context.Context) ([]Character, error) {
 	const query = `
-		SELECT id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, created_at
+		SELECT id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, created_at
 		FROM characters
 		ORDER BY is_main DESC, name ASC, secondary_name ASC`
 
@@ -91,14 +94,14 @@ func (r *Repo) professionsByCharacter(ctx context.Context, only *uuid.UUID) (map
 	return byCharacter, nil
 }
 
-const returningColumns = `id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, created_at`
+const returningColumns = `id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, created_at`
 
 const uniqueViolationCode = "23505"
 
 func (r *Repo) Create(ctx context.Context, c Character, professions []string) (Character, error) {
 	const query = `
-		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING ` + returningColumns
 
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -108,7 +111,7 @@ func (r *Repo) Create(ctx context.Context, c Character, professions []string) (C
 	defer func() { _ = tx.Rollback() }() // no-op once committed
 
 	var created Character
-	if err := tx.GetContext(ctx, &created, query, c.ID, c.Name, c.SecondaryName, c.Realm, c.Class, c.Spec, c.Role, c.Spec2, c.Role2, c.IsMain, c.RaidTeam); err != nil {
+	if err := tx.GetContext(ctx, &created, query, c.ID, c.Name, c.SecondaryName, c.Realm, c.Class, c.Spec, c.Role, c.Spec2, c.Role2, c.IsMain, c.RaidTeam, c.Race, c.Level); err != nil {
 		return Character{}, mapWriteError(err)
 	}
 	if err := replaceProfessions(ctx, tx, created.ID, professions); err != nil {
@@ -163,7 +166,9 @@ func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, seco
 			is_main        = COALESCE($8, is_main),
 			raid_team      = COALESCE($9, raid_team),
 			spec2          = CASE WHEN $10::boolean THEN $11::text ELSE spec2 END,
-			role2          = CASE WHEN $10::boolean THEN $12::text ELSE role2 END
+			role2          = CASE WHEN $10::boolean THEN $12::text ELSE role2 END,
+			race           = COALESCE($13, race),
+			level          = COALESCE($14, level)
 		WHERE id = $1
 		RETURNING ` + returningColumns
 
@@ -179,7 +184,7 @@ func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, seco
 	defer func() { _ = tx.Rollback() }() // no-op once committed
 
 	var updated Character
-	if err := tx.GetContext(ctx, &updated, query, id, req.Name, req.SecondaryName, req.Realm, req.Class, req.Spec, req.Role, req.IsMain, req.RaidTeam, second != nil, spec2, role2); err != nil {
+	if err := tx.GetContext(ctx, &updated, query, id, req.Name, req.SecondaryName, req.Realm, req.Class, req.Spec, req.Role, req.IsMain, req.RaidTeam, second != nil, spec2, role2, req.Race, req.Level); err != nil {
 		return Character{}, mapWriteError(err)
 	}
 	if professions != nil {

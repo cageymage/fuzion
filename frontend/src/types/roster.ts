@@ -11,6 +11,8 @@ export interface CreateCharacterRequest {
   role2?: Role
   isMain: boolean
   raidTeam?: string
+  race?: string
+  level?: number
   professions?: string[]
 }
 
@@ -36,6 +38,9 @@ export interface Character {
   role2: Role | null
   isMain: boolean
   raidTeam: string | null
+  race: string | null
+  level: number | null
+  faction: string | null
   createdAt: string
   professions: CharacterProfession[]
 }

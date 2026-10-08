@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createCharacter, deleteCharacter, updateCharacter } from '../../api/roster'
 import type { UpdateCharacterRequest } from '../../types/roster'
 
-export function useOfficerRoster() {
+export function useRosterManagement() {
   const queryClient = useQueryClient()
   const refetchRoster = () => queryClient.invalidateQueries({ queryKey: ['roster'] })
 

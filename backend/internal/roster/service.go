@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -18,6 +19,8 @@ const (
 	defaultRealm = "Emberreach"
 
 	maxPrimaryProfessions = 2
+
+	maxLevel = 60
 )
 
 var (
@@ -27,6 +30,13 @@ var (
 	// Mirrors the CHECK constraint on characters.class.
 	classes = []string{"Warrior", "Paladin", "Hunter", "Rogue", "Priest", "Shaman", "Mage", "Warlock", "Druid"}
 	roles   = []string{"tank", "healer", "dps"}
+
+	// Mirrors the CHECK constraint on characters.race. Skyborne can join either faction, so
+	// each faction has its own variant and faction stays derivable from race.
+	raceFactions = map[string]string{
+		"Human": "Alliance", "Dwarf": "Alliance", "Night Elf": "Alliance", "Gnome": "Alliance", "Skyborne (High Order)": "Alliance",
+		"Orc": "Horde", "Undead": "Horde", "Tauren": "Horde", "Troll": "Horde", "Skyborne (Windshaper)": "Horde",
+	}
 
 	// Mirrors what Forever has; Jewelcrafting and Inscription are left out until it adds them.
 	primaryProfessions   = []string{"Alchemy", "Blacksmithing", "Enchanting", "Engineering", "Herbalism", "Leatherworking", "Mining", "Skinning", "Tailoring"}
@@ -68,6 +78,8 @@ type CreateRequest struct {
 	IsMain        bool     `json:"isMain"`
 	RaidTeam      *string  `json:"raidTeam"`
 	Professions   []string `json:"professions"`
+	Race          *string  `json:"race"`
+	Level         *int     `json:"level"`
 }
 
 type UpdateRequest struct {
@@ -82,6 +94,8 @@ type UpdateRequest struct {
 	IsMain        *bool     `json:"isMain"`
 	RaidTeam      *string   `json:"raidTeam"`
 	Professions   *[]string `json:"professions"`
+	Race          *string   `json:"race"`
+	Level         *int      `json:"level"`
 }
 
 type Service struct {
@@ -96,6 +110,9 @@ func (s *Service) Roster(ctx context.Context) ([]Character, error) {
 	characters, err := s.repo.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("roster: %w", err)
+	}
+	for i := range characters {
+		characters[i].Faction = factionOf(characters[i].Race)
 	}
 	return characters, nil
 }
@@ -113,6 +130,8 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, err
 		Role2:         blankToNil(req.Role2),
 		IsMain:        req.IsMain,
 		RaidTeam:      trimOptional(req.RaidTeam),
+		Race:          blankToNil(req.Race),
+		Level:         req.Level,
 	}
 	if req.Realm != nil {
 		character.Realm = strings.TrimSpace(*req.Realm)
@@ -136,6 +155,13 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, err
 		return Character{}, err
 	}
 
+	if err := validateRace(character.Race); err != nil {
+		return Character{}, err
+	}
+	if err := validateLevel(character.Level); err != nil {
+		return Character{}, err
+	}
+
 	professions, err := validateProfessions(req.Professions)
 	if err != nil {
 		return Character{}, err
@@ -145,6 +171,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, err
 	if err != nil {
 		return Character{}, fmt.Errorf("create character: %w", err)
 	}
+	created.Faction = factionOf(created.Race)
 	return created, nil
 }
 
@@ -158,6 +185,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateRequest) (
 	req.Spec2 = trimOptional(req.Spec2)
 	req.Role2 = trimOptional(req.Role2)
 	req.RaidTeam = trimOptional(req.RaidTeam)
+	req.Race = trimOptional(req.Race)
 
 	if req.Name != nil {
 		if err := validateName("name", *req.Name); err != nil {
@@ -185,6 +213,13 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateRequest) (
 		}
 	}
 
+	if err := validateRace(req.Race); err != nil {
+		return Character{}, err
+	}
+	if err := validateLevel(req.Level); err != nil {
+		return Character{}, err
+	}
+
 	var professions *[]string
 	if req.Professions != nil {
 		validated, err := validateProfessions(*req.Professions)
@@ -203,6 +238,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateRequest) (
 	if err != nil {
 		return Character{}, fmt.Errorf("update character %s: %w", id, err)
 	}
+	updated.Faction = factionOf(updated.Race)
 	return updated, nil
 }
 
@@ -370,4 +406,30 @@ func validateProfessions(names []string) ([]string, error) {
 		return nil, &ValidationError{Field: "professions", Problem: fmt.Sprintf("at most %d primary professions are allowed", maxPrimaryProfessions)}
 	}
 	return validated, nil
+}
+
+func validateRace(race *string) error {
+	if race == nil {
+		return nil
+	}
+	if _, ok := raceFactions[*race]; !ok {
+		races := slices.Sorted(maps.Keys(raceFactions))
+		return &ValidationError{Field: "race", Problem: "must be one of " + strings.Join(races, ", ")}
+	}
+	return nil
+}
+
+func validateLevel(level *int) error {
+	if level != nil && (*level < 1 || *level > maxLevel) {
+		return &ValidationError{Field: "level", Problem: fmt.Sprintf("must be between 1 and %d", maxLevel)}
+	}
+	return nil
+}
+
+func factionOf(race *string) *string {
+	if race == nil {
+		return nil
+	}
+	faction := raceFactions[*race]
+	return &faction
 }

@@ -17,6 +17,8 @@ export interface CharacterFormValues {
   role2: Role | ''
   isMain: boolean
   raidTeam: string
+  race: string
+  level: string
   primaryProfession1: string
   primaryProfession2: string
   secondaryProfessions: string[]
@@ -33,6 +35,8 @@ export const emptyCharacterForm: CharacterFormValues = {
   role2: '',
   isMain: true,
   raidTeam: '',
+  race: '',
+  level: '',
   primaryProfession1: '',
   primaryProfession2: '',
   secondaryProfessions: [],
@@ -72,6 +76,8 @@ export function formValuesFor(character: Character): CharacterFormValues {
     role2: character.role2 ?? '',
     isMain: character.isMain,
     raidTeam: character.raidTeam ?? '',
+    race: character.race ?? '',
+    level: character.level === null ? '' : String(character.level),
   }
 }
 
@@ -90,6 +96,8 @@ export function buildCreateRequest(values: CharacterFormValues): CreateCharacter
     request.role2 = values.role2
   }
   if (values.raidTeam !== '') request.raidTeam = values.raidTeam
+  if (values.race !== '') request.race = values.race
+  if (values.level !== '') request.level = Number(values.level)
   const professions = professionList(values)
   if (professions.length > 0) request.professions = professions
   return request
@@ -112,6 +120,9 @@ export function buildUpdateRequest(
   }
   if (current.isMain !== initial.isMain) request.isMain = current.isMain
   if (current.raidTeam !== initial.raidTeam) request.raidTeam = current.raidTeam
+  // The backend can set race and level but not clear them, so an emptied field is left out.
+  if (current.race !== initial.race && current.race !== '') request.race = current.race
+  if (current.level !== initial.level && current.level !== '') request.level = Number(current.level)
   if (!sameProfessions(professionList(initial), professionList(current))) {
     request.professions = professionList(current)
   }
