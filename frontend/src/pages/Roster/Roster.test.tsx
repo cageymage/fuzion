@@ -229,7 +229,7 @@ describe('Roster race and level', () => {
     expect(within(row).queryByText('Orc')).not.toBeInTheDocument()
   })
 
-  it('should show the race name as text when the race has no icon', async () => {
+  it('should show a generic badge with the race name as its accessible name when the race has no icon', async () => {
     server.use(
       http.get('/api/roster', () =>
         HttpResponse.json([{ ...ragnok, race: 'Skyborne (Windshaper)', level: 12, faction: 'Horde' }]),
@@ -239,7 +239,7 @@ describe('Roster race and level', () => {
     renderWithProviders(<Roster />)
 
     const row = (await screen.findByText('Ragnok')).closest('tr') as HTMLElement
-    expect(within(row).getByText('Skyborne (Windshaper)')).toBeInTheDocument()
+    expect(within(row).getByRole('img', { name: 'Skyborne (Windshaper)' })).toBeInTheDocument()
   })
 
   it('should show the level when the character has one', async () => {

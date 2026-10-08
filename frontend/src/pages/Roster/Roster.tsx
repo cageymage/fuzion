@@ -78,10 +78,33 @@ function TrashIcon() {
   )
 }
 
+// Stands in for races Blizzard has no icon for, so every race stays one icon wide.
+function GenericRaceBadge({ race }: { race: string }) {
+  return (
+    <svg
+      className={styles.raceIcon}
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--gold)"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      role="img"
+      aria-label={race}
+    >
+      <title>{race}</title>
+      <path d="M4 8h10a2.5 2.5 0 1 0-2.5-2.5" />
+      <path d="M4 12.5h14a2.5 2.5 0 1 1-2.5 2.5" />
+      <path d="M4 17h7a2 2 0 1 1-2 2" />
+    </svg>
+  )
+}
+
 function RaceCell({ race }: { race: string | null }) {
   if (race === null) return null
   const iconUrl = raceIcon(race)
-  if (iconUrl === null) return <span>{race}</span>
+  if (iconUrl === null) return <GenericRaceBadge race={race} />
   return <img className={styles.raceIcon} src={iconUrl} alt={race} title={race} width={24} height={24} />
 }
 
