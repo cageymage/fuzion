@@ -20,6 +20,9 @@ const aeliana: Character = {
   role2: null,
   isMain: true,
   raidTeam: 'Team 1',
+  race: null,
+  level: null,
+  faction: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   professions: [],
 }
@@ -193,5 +196,52 @@ describe('profession requests', () => {
     })
 
     expect(request).toEqual({})
+  })
+})
+
+describe('race and level', () => {
+  const filled: CharacterFormValues = {
+    ...emptyCharacterForm,
+    name: 'Aeliana',
+    secondaryName: 'Dawnsong',
+    class: 'Priest',
+    spec: 'Holy',
+    role: 'healer',
+  }
+
+  it('should send the race and level as a number when a character is created with both', () => {
+    const request = buildCreateRequest({ ...filled, race: 'Night Elf', level: '58' })
+
+    expect(request.race).toBe('Night Elf')
+    expect(request.level).toBe(58)
+  })
+
+  it('should omit the race and level when they are left blank on creation', () => {
+    const request = buildCreateRequest(filled)
+
+    expect(request).not.toHaveProperty('race')
+    expect(request).not.toHaveProperty('level')
+  })
+
+  it('should fill the form with the stored race and level when editing a character that has them', () => {
+    const values = formValuesFor({ ...aeliana, race: 'Gnome', level: 42, faction: 'Alliance' })
+
+    expect(values.race).toBe('Gnome')
+    expect(values.level).toBe('42')
+  })
+
+  it('should send the race and level when they changed', () => {
+    const initial = formValuesFor(aeliana)
+
+    expect(buildUpdateRequest(initial, { ...initial, race: 'Dwarf', level: '60' })).toEqual({
+      race: 'Dwarf',
+      level: 60,
+    })
+  })
+
+  it('should send nothing for race and level when the fields were emptied, because the backend cannot clear them', () => {
+    const initial = formValuesFor({ ...aeliana, race: 'Gnome', level: 42, faction: 'Alliance' })
+
+    expect(buildUpdateRequest(initial, { ...initial, race: '', level: '' })).toEqual({})
   })
 })

@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { Dialog } from '../../components/Dialog/Dialog'
 import { primaryProfessions, secondaryProfessions } from '../../lib/professions'
+import { maxLevel, races } from '../../lib/races'
 import { classSpecs, wowClasses, type WowClass } from '../../lib/wowClasses'
 import type { Character, Role } from '../../types/roster'
-import { roleLabels } from '../Roster/rosterLabels'
+import { roleLabels } from './rosterLabels'
 import {
   buildCreateRequest,
   buildUpdateRequest,
@@ -11,8 +12,8 @@ import {
   formValuesFor,
   type CharacterFormValues,
 } from './characterForm'
-import styles from './OfficerRoster.module.css'
-import { useOfficerRoster } from './useOfficerRoster'
+import styles from './Roster.module.css'
+import { useRosterManagement } from './useRosterManagement'
 
 const roles = Object.keys(roleLabels) as Role[]
 
@@ -26,7 +27,7 @@ interface CharacterDialogProps {
 }
 
 export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
-  const { create, update } = useOfficerRoster()
+  const { create, update } = useRosterManagement()
   const initial = character ? formValuesFor(character) : emptyCharacterForm
   const [values, setValues] = useState<CharacterFormValues>(initial)
   const mutation = character ? update : create
@@ -83,6 +84,27 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
             placeholder="Emberreach"
             value={values.realm}
             onChange={(event) => change({ realm: event.target.value })}
+          />
+        </label>
+        <label className={styles.field}>
+          <span>Race</span>
+          <select value={values.race} onChange={(event) => change({ race: event.target.value })}>
+            <option value="">Not set</option>
+            {races.map((race) => (
+              <option key={race} value={race}>
+                {race}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.field}>
+          <span>Level</span>
+          <input
+            type="number"
+            min={1}
+            max={maxLevel}
+            value={values.level}
+            onChange={(event) => change({ level: event.target.value })}
           />
         </label>
         <label className={styles.field}>

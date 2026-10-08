@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { server } from '../../mocks/server'
 import { renderWithProviders } from '../../testUtils'
 import type { Character } from '../../types/roster'
-import { OfficerRoster } from './OfficerRoster'
+import { Roster } from './Roster'
 
 const officer = { id: 'user-1', username: 'Officer', avatarUrl: null, isOfficer: true }
 const member = { id: 'user-2', username: 'Member', avatarUrl: null, isOfficer: false }
@@ -22,6 +22,9 @@ const ragnok: Character = {
   role2: null,
   isMain: true,
   raidTeam: 'Team Alpha',
+  race: null,
+  level: null,
+  faction: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   professions: [],
 }
@@ -67,7 +70,7 @@ function serveRoster(initial: Character[]) {
     http.get('/api/roster', () => HttpResponse.json(characters)),
     http.post('/api/roster', async ({ request }) => {
       calls.created.push(await request.json())
-      const created: Character = { ...zaldrix, id: 'char-new', name: 'Aeliana', secondaryName: 'Stormwind' }
+      const created: Character = { ...zaldrix, id: 'char-new', name: 'Aeliana', secondaryName: 'Stormwind', isMain: true }
       characters = [...characters, created]
       return HttpResponse.json(created, { status: 201 })
     }),
@@ -94,61 +97,69 @@ async function openEditDialog(user: ReturnType<typeof userEvent.setup>, name: st
   return within(screen.getByRole('dialog', { name: `Edit ${name}` }))
 }
 
-describe('OfficerRoster', () => {
-  it('should show an officers-only message when the visitor is not an officer', async () => {
-    signInAs(member)
-
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
-
-    expect(await screen.findByText('Only officers can manage the roster.')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Add character' })).not.toBeInTheDocument()
-  })
-
-  it('should show a login link when the visitor is anonymous', async () => {
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
-
-    expect(await screen.findByText('Only officers can manage the roster.')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Log in with Discord' })).toHaveAttribute(
-      'href',
-      'http://localhost:3000/api/auth/login',
-    )
-  })
-
-  it('should list every character including alts when the visitor is an officer', async () => {
+describe('Roster management', () => {
+  it('should show Add and row actions when the user is an officer', async () => {
     signInAs(officer)
-    serveRoster([ragnok, selene, zaldrix])
+    serveRoster([ragnok])
 
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
 
-    expect(await screen.findByText('Ragnok')).toBeInTheDocument()
-    expect(screen.getByText('Selene')).toBeInTheDocument()
-    expect(screen.getByText('Zaldrix')).toBeInTheDocument()
-    expect(screen.getByText('Holy/Shadow')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Add character' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit Ragnok' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete Ragnok' })).toBeInTheDocument()
   })
+
+  it('should hide Add and row actions when the user is a member', async () => {
+    signInAs(member)
+    serveRoster([ragnok])
+
+    renderWithProviders(<Roster />)
+
+    await screen.findByText('Ragnok')
+    expect(screen.queryByRole('button', { name: 'Add character' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit Ragnok' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete Ragnok' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument()
+  })
+
+  it('should hide Add and row actions when the visitor is anonymous', async () => {
+    serveRoster([ragnok])
+
+    renderWithProviders(<Roster />)
+
+    await screen.findByText('Ragnok')
+    expect(screen.queryByRole('button', { name: 'Add character' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit Ragnok' })).not.toBeInTheDocument()
+  })
+
+  it('should let an officer edit an alt after showing alts', async () => {
+    signInAs(officer)
+    serveRoster([ragnok, zaldrix])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    await screen.findByText('Ragnok')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Show alts' }))
+    await user.click(screen.getByRole('button', { name: 'Edit Zaldrix' }))
+
+    expect(screen.getByRole('dialog', { name: 'Edit Zaldrix' })).toBeInTheDocument()
+  })
+
 
   it('should show an error message when the roster cannot be loaded', async () => {
     signInAs(officer)
     server.use(http.get('/api/roster', () => new HttpResponse(null, { status: 500 })))
 
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
 
     expect(await screen.findByText('The roster could not be loaded.')).toBeInTheDocument()
-  })
-
-  it('should show an empty message when the roster has no characters', async () => {
-    signInAs(officer)
-    serveRoster([])
-
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
-
-    expect(await screen.findByText('No characters yet.')).toBeInTheDocument()
   })
 
   it('should offer only the specs of the chosen class when an officer picks a class', async () => {
     signInAs(officer)
     serveRoster([])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openAddDialog(user)
 
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Class' }), 'Priest')
@@ -163,7 +174,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     serveRoster([ragnok])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openEditDialog(user, 'Ragnok')
     expect(dialog.getByRole('combobox', { name: 'Spec' })).toHaveValue('Protection')
 
@@ -176,7 +187,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     serveRoster([])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openAddDialog(user)
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Class' }), 'Rogue')
     expect(dialog.queryByRole('combobox', { name: 'Second role' })).not.toBeInTheDocument()
@@ -190,7 +201,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     const calls = serveRoster([ragnok])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openAddDialog(user)
 
     await user.type(dialog.getByLabelText('Name'), 'Aeliana')
@@ -214,6 +225,36 @@ describe('OfficerRoster', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('should post the race and level when an officer fills them in on the add dialog', async () => {
+    signInAs(officer)
+    const calls = serveRoster([])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    const dialog = await openAddDialog(user)
+
+    await user.type(dialog.getByLabelText('Name'), 'Aeliana')
+    await user.type(dialog.getByLabelText('Secondary name'), 'Stormwind')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Race' }), 'Skyborne (High Order)')
+    await user.type(dialog.getByRole('spinbutton', { name: 'Level' }), '12')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Class' }), 'Mage')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Spec' }), 'Frost')
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    await screen.findByText('Aeliana')
+    expect(calls.created).toEqual([
+      {
+        name: 'Aeliana',
+        secondaryName: 'Stormwind',
+        class: 'Mage',
+        spec: 'Frost',
+        role: 'dps',
+        isMain: true,
+        race: 'Skyborne (High Order)',
+        level: 12,
+      },
+    ])
+  })
+
   it('should show the server message and keep the dialog open when the API rejects a new character with 400', async () => {
     signInAs(officer)
     serveRoster([])
@@ -223,7 +264,7 @@ describe('OfficerRoster', () => {
       ),
     )
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openAddDialog(user)
     await user.type(dialog.getByLabelText('Name'), 'A')
     await user.type(dialog.getByLabelText('Secondary name'), 'Stormwind')
@@ -248,7 +289,7 @@ describe('OfficerRoster', () => {
       ),
     )
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openAddDialog(user)
     await user.type(dialog.getByLabelText('Name'), 'Ragnok')
     await user.type(dialog.getByLabelText('Secondary name'), 'Ironhide')
@@ -266,7 +307,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     const calls = serveRoster([ragnok, selene])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openEditDialog(user, 'Ragnok')
 
     await user.clear(dialog.getByLabelText('Raid team'))
@@ -281,7 +322,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     const calls = serveRoster([ragnok])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openEditDialog(user, 'Ragnok')
 
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Second spec' }), 'Arms')
@@ -296,7 +337,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     const calls = serveRoster([selene])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openEditDialog(user, 'Selene')
 
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Second spec' }), 'None')
@@ -310,7 +351,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     const calls = serveRoster([])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openAddDialog(user)
 
     await user.type(dialog.getByLabelText('Name'), 'Aeliana')
@@ -349,7 +390,7 @@ describe('OfficerRoster', () => {
       },
     ])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
 
     const dialog = await openEditDialog(user, 'Ragnok')
 
@@ -363,7 +404,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     serveRoster([])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openAddDialog(user)
 
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Primary profession 1' }), 'Mining')
@@ -388,7 +429,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     const calls = serveRoster([{ ...ragnok, professions: [{ profession: 'Mining', skillLevel: 300 }] }])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openEditDialog(user, 'Ragnok')
 
     await user.clear(dialog.getByLabelText('Raid team'))
@@ -403,7 +444,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     const calls = serveRoster([{ ...ragnok, professions: [{ profession: 'Mining', skillLevel: 300 }] }])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     const dialog = await openEditDialog(user, 'Ragnok')
 
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Primary profession 1' }), 'Blacksmithing')
@@ -417,7 +458,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     const calls = serveRoster([ragnok, selene])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     await user.click(await screen.findByRole('button', { name: 'Delete Ragnok' }))
 
     await user.click(
@@ -434,7 +475,7 @@ describe('OfficerRoster', () => {
     signInAs(officer)
     const calls = serveRoster([ragnok])
     const user = userEvent.setup()
-    renderWithProviders(<OfficerRoster />, '/officer/roster')
+    renderWithProviders(<Roster />)
     await user.click(await screen.findByRole('button', { name: 'Delete Ragnok' }))
 
     await user.click(

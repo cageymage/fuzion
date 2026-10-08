@@ -11,7 +11,6 @@ import { Legal } from '../pages/Legal/Legal'
 import { News } from '../pages/News/News'
 import { OfficerNews } from '../pages/OfficerNews/OfficerNews'
 import { OfficerRaidProgress } from '../pages/OfficerRaidProgress/OfficerRaidProgress'
-import { OfficerRoster } from '../pages/OfficerRoster/OfficerRoster'
 import { Professions } from '../pages/Professions/Professions'
 import { RaidProgress } from '../pages/RaidProgress/RaidProgress'
 import { Roster } from '../pages/Roster/Roster'
@@ -50,7 +49,6 @@ export function App() {
             <Route path="/roster" element={<Roster />} />
             <Route path="/raid-progress" element={<RaidProgress />} />
             <Route path="/officer/raid-progress" element={<OfficerRaidProgress />} />
-            <Route path="/officer/roster" element={<OfficerRoster />} />
             <Route path="/officer/news" element={<OfficerNews />} />
             <Route
               path="/officer/news/:id"
