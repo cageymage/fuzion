@@ -27,6 +27,13 @@ async function fillEveryField(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('Applications', () => {
+  it('should show a notice linking to the legal page when the form is shown', () => {
+    renderWithProviders(<Applications />)
+
+    expect(screen.getByRole('link', { name: 'Legal page' })).toHaveAttribute('href', '/legal')
+    expect(screen.getByText(/by applying you agree/i)).toBeInTheDocument()
+  })
+
   it('should show a thank-you message when the application is submitted successfully', async () => {
     const user = userEvent.setup()
     renderWithProviders(<Applications />)

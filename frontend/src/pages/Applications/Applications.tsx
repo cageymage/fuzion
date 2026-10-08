@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile'
 import { useRef, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { submitApplication } from '../../api/applications'
 import { ApiError } from '../../api/client'
 import { wowClasses } from '../../lib/wowClasses'
@@ -158,6 +159,9 @@ export function Applications() {
             {form.notes.length} / {maxNotesLength}
           </span>
         </label>
+        <p className={styles.notice}>
+          By applying you agree to how we handle your details, see the <Link to="/legal">Legal page</Link>.
+        </p>
         <Turnstile
           ref={turnstile}
           siteKey={turnstileSiteKey}

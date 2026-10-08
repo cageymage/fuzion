@@ -69,6 +69,17 @@ Pattern: **`<feature/endpoint> should <expected behavior> when <discriminating c
 - Don't add auth/session logic ad hoc in handlers — route it through `internal/auth`.
 - Don't hand-roll `.env` parsing per package — one config load in `cmd/api/main.go`, passed down via structs.
 
+## Legal page
+
+`frontend/src/pages/Legal/Legal.tsx` is the privacy policy, content notice and attributions. Update it in the same PR whenever a change affects what it says:
+
+- New personal data collected or stored (new form fields, linked accounts such as Battle.net OAuth, new cookies)
+- A new third party that receives data or is embedded (APIs, embeds, analytics, hosting)
+- New user-uploaded content types
+- New third-party assets that need attribution
+
+Add or adjust a Legal test for the new wording, and say in the PR description what changed on the page.
+
 ## Git workflow
 
 - Never `git commit` unless explicitly told to in that message. Finishing a task, passing tests, or a plan that ends in "then commit" is not permission — leave the work staged/unstaged and say it's ready.
