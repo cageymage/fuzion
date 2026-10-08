@@ -24,7 +24,7 @@ describe('StreamCard', () => {
     expect(screen.getByText('World of Warcraft: Forever')).toBeInTheDocument()
   })
 
-  it('should show the stream title', () => {
+  it('should show the stream title when the channel is live',() => {
     render(<StreamCard stream={liveStream} />)
 
     expect(screen.getByText('Mythic Queen Ansurek progress')).toBeInTheDocument()
