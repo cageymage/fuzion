@@ -28,6 +28,9 @@ type characterJSON struct {
 	Role2         *string `json:"role2"`
 	IsMain        bool    `json:"isMain"`
 	RaidTeam      *string `json:"raidTeam"`
+	Race          *string `json:"race"`
+	Level         *int    `json:"level"`
+	Faction       *string `json:"faction"`
 	CreatedAt     string  `json:"createdAt"`
 }
 
@@ -1205,4 +1208,174 @@ func TestUpdateCharacter_ClearsProfessions_WhenProfessionsIsEmpty(t *testing.T) 
 	if diff := cmp.Diff([]professionJSON{}, updated.Professions); diff != "" {
 		t.Errorf("unexpected professions (-want +got):\n%s", diff)
 	}
+}
+
+const wantRaceError = "race: must be one of Dwarf, Gnome, Human, Night Elf, Orc, Skyborne (High Order), Skyborne (Windshaper), Tauren, Troll, Undead"
+
+func TestListRoster_ReturnsFactionDerivedFromRace_WhenCharacterHasRace(t *testing.T) {
+	// given an Orc, a Dwarf and one Skyborne of each faction
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main, race, created_at)
+		VALUES
+			('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Warrior', 'tank', true, 'Orc', '2026-09-01T12:00:00Z'),
+			('22222222-2222-2222-2222-222222222222', 'Bronzebeard', 'Ironhide', 'Emberreach', 'Warrior', 'tank', true, 'Dwarf', '2026-09-01T12:00:00Z'),
+			('33333333-3333-3333-3333-333333333333', 'Cirrus', 'Highwind', 'Emberreach', 'Mage', 'dps', true, 'Skyborne (High Order)', '2026-09-01T12:00:00Z'),
+			('44444444-4444-4444-4444-444444444444', 'Dusk', 'Galeborn', 'Emberreach', 'Shaman', 'healer', true, 'Skyborne (Windshaper)', '2026-09-01T12:00:00Z')`)
+
+	// when I ask for the roster
+	resp := srv.Get(t, "/api/roster")
+
+	// then I expect each character's faction to follow from its race
+	resp.RequireStatus(t, http.StatusOK)
+	var characters []characterJSON
+	resp.DecodeJSON(t, &characters)
+
+	got := map[string][2]string{}
+	for _, c := range characters {
+		got[c.Name] = [2]string{*c.Race, *c.Faction}
+	}
+	want := map[string][2]string{
+		"Aeliana":     {"Orc", "Horde"},
+		"Bronzebeard": {"Dwarf", "Alliance"},
+		"Cirrus":      {"Skyborne (High Order)", "Alliance"},
+		"Dusk":        {"Skyborne (Windshaper)", "Horde"},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected races and factions (-want +got):\n%s", diff)
+	}
+}
+
+func TestListRoster_ReturnsNullRaceLevelAndFaction_WhenCharacterHasNone(t *testing.T) {
+	// given a character that predates race and level
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main, created_at)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'healer', true, '2026-09-01T12:00:00Z')`)
+
+	// when I ask for the roster
+	resp := srv.Get(t, "/api/roster")
+
+	// then I expect race, level and faction to be null
+	resp.RequireStatus(t, http.StatusOK)
+	var characters []characterJSON
+	resp.DecodeJSON(t, &characters)
+	if len(characters) != 1 {
+		t.Fatalf("expected one character, got %d", len(characters))
+	}
+	if got := characters[0]; got.Race != nil || got.Level != nil || got.Faction != nil {
+		t.Errorf("expected null race, level and faction, got race=%v level=%v faction=%v", got.Race, got.Level, got.Faction)
+	}
+}
+
+func TestCreateCharacter_StoresRaceLevelAndFaction_WhenValuesAreValid(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a Troll at level 60
+	body := createBody([]string{})
+	body["race"] = "Troll"
+	body["level"] = 60
+	resp := srv.Post(t, "/api/roster", body)
+
+	// then I expect a 201 carrying the race, level and derived faction
+	resp.RequireStatus(t, http.StatusCreated)
+	var created characterJSON
+	resp.DecodeJSON(t, &created)
+	if created.Race == nil || *created.Race != "Troll" || created.Level == nil || *created.Level != 60 || created.Faction == nil || *created.Faction != "Horde" {
+		t.Errorf("expected Troll, 60, Horde, got race=%v level=%v faction=%v", created.Race, created.Level, created.Faction)
+	}
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenRaceIsNotPlayable(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a character with a race that is not playable
+	body := createBody([]string{})
+	body["race"] = "Murloc"
+	resp := srv.Post(t, "/api/roster", body)
+
+	// then I expect a 400 naming the race field and nothing stored
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, wantRaceError)
+	if got := countCharacters(t, db); got != 0 {
+		t.Errorf("expected no character to be stored, found %d", got)
+	}
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenLevelIsBelowOne(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a character at level 0
+	body := createBody([]string{})
+	body["level"] = 0
+	resp := srv.Post(t, "/api/roster", body)
+
+	// then I expect a 400 naming the level field
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "level: must be between 1 and 60")
+}
+
+func TestCreateCharacter_ReturnsBadRequest_WhenLevelIsAboveTheCap(t *testing.T) {
+	// given I am logged in as an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I create a character at level 61
+	body := createBody([]string{})
+	body["level"] = 61
+	resp := srv.Post(t, "/api/roster", body)
+
+	// then I expect a 400 naming the level field
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, "level: must be between 1 and 60")
+}
+
+func TestUpdateCharacter_SetsRaceAndLevel_WhenValuesAreValid(t *testing.T) {
+	// given a character with no race or level
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main, created_at)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'healer', true, '2026-09-01T12:00:00Z')`)
+
+	// when I set a Night Elf at level 58
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{"race": "Night Elf", "level": 58})
+
+	// then I expect a 200 carrying the race, level and derived faction
+	resp.RequireStatus(t, http.StatusOK)
+	var updated characterJSON
+	resp.DecodeJSON(t, &updated)
+	if updated.Race == nil || *updated.Race != "Night Elf" || updated.Level == nil || *updated.Level != 58 || updated.Faction == nil || *updated.Faction != "Alliance" {
+		t.Errorf("expected Night Elf, 58, Alliance, got race=%v level=%v faction=%v", updated.Race, updated.Level, updated.Faction)
+	}
+}
+
+func TestUpdateCharacter_ReturnsBadRequest_WhenRaceIsNotPlayable(t *testing.T) {
+	// given an existing character
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main, created_at)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'healer', true, '2026-09-01T12:00:00Z')`)
+
+	// when I set a race that is not playable
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{"race": "Worgen"})
+
+	// then I expect a 400 naming the race field
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireErrorBody(t, resp, wantRaceError)
 }
