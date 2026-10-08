@@ -187,7 +187,25 @@
 }
 
 .smallButton {
-  padding: 6px 10px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.smallButton.dangerButton {
+  border-color: var(--live);
+  color: var(--live);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .button:hover:not(:disabled),

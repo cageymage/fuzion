@@ -19,9 +19,7 @@ const roleFilters: { value: RoleFilter; label: string }[] = [
 ]
 
 type DialogState =
-  | { kind: 'add' }
-  | { kind: 'edit'; character: Character }
-  | { kind: 'delete'; character: Character }
+  { kind: 'add' } | { kind: 'edit'; character: Character } | { kind: 'delete'; character: Character }
 
 interface SortHeaderProps {
   label: string
@@ -40,6 +38,43 @@ function SortHeader({ label, sortKey, sort, onSort }: SortHeaderProps) {
         {direction && <span aria-hidden="true">{direction === 'asc' ? ' ▲' : ' ▼'}</span>}
       </button>
     </th>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2.5 13.5 3 10l7.5-7.5 3 3L6 13z" />
+      <path d="M9 4l3 3" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4M6.5 6.5v4M9.5 6.5v4" />
+    </svg>
   )
 }
 
@@ -169,7 +204,11 @@ export function Roster() {
                     <SortHeader label="Raid Team" sortKey="raidTeam" sort={sort} onSort={toggleSort} />
                     <th scope="col">Main/Alt</th>
                     <th scope="col">Professions</th>
-                    {canManage && <th scope="col">Actions</th>}
+                    {canManage && (
+                      <th scope="col">
+                        <span className={styles.visuallyHidden}>Actions</span>
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -207,18 +246,20 @@ export function Roster() {
                             <button
                               type="button"
                               className={styles.smallButton}
+                              title={`Edit ${character.name}`}
                               aria-label={`Edit ${character.name}`}
                               onClick={() => setDialog({ kind: 'edit', character })}
                             >
-                              Edit
+                              <PencilIcon />
                             </button>
                             <button
                               type="button"
-                              className={styles.smallButton}
+                              className={`${styles.smallButton} ${styles.dangerButton}`}
+                              title={`Delete ${character.name}`}
                               aria-label={`Delete ${character.name}`}
                               onClick={() => setDialog({ kind: 'delete', character })}
                             >
-                              Delete
+                              <TrashIcon />
                             </button>
                           </div>
                         </td>
@@ -234,7 +275,9 @@ export function Roster() {
 
       {dialog?.kind === 'add' && <CharacterDialog onClose={closeDialog} />}
       {dialog?.kind === 'edit' && <CharacterDialog character={dialog.character} onClose={closeDialog} />}
-      {dialog?.kind === 'delete' && <DeleteCharacterDialog character={dialog.character} onClose={closeDialog} />}
+      {dialog?.kind === 'delete' && (
+        <DeleteCharacterDialog character={dialog.character} onClose={closeDialog} />
+      )}
     </section>
   )
 }
