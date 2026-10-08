@@ -382,3 +382,50 @@ describe('Roster sorting and search', () => {
     expect(screen.getByText('No characters match.')).toBeInTheDocument()
   })
 })
+
+describe('Roster composition summary', () => {
+  it('should show role, main and alt counts and the average level for the visible characters', async () => {
+    const dps: Character = { ...selene, id: 'dps', name: 'Dpsguy', role: 'dps', level: 58 }
+    server.use(
+      http.get('/api/roster', () =>
+        HttpResponse.json([{ ...ragnok, level: 60 }, { ...selene, level: 60 }, dps, { ...zaldrix, level: 50 }]),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    await screen.findByText('Ragnok')
+
+    const summary = screen.getByRole('region', { name: 'Roster summary' })
+    expect(within(summary).getByText('3 characters')).toBeInTheDocument()
+    expect(within(summary).getByText(/1 Tank \| 1 Healer \| 1 DPS/)).toBeInTheDocument()
+    expect(within(summary).getByText(/Main 3 \| 0 Alts/)).toBeInTheDocument()
+    expect(within(summary).getByText(/Avg level 59/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('checkbox', { name: 'Show alts' }))
+
+    expect(within(summary).getByText('4 characters')).toBeInTheDocument()
+    expect(within(summary).getByText(/Main 3 \| 1 Alt/)).toBeInTheDocument()
+  })
+
+  it('should follow the role filter when a role is selected', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([ragnok, selene])))
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    await screen.findByText('Ragnok')
+
+    await user.click(screen.getByRole('button', { name: 'Healer' }))
+
+    const summary = screen.getByRole('region', { name: 'Roster summary' })
+    expect(within(summary).getByText('1 character')).toBeInTheDocument()
+    expect(within(summary).getByText(/0 Tanks \| 1 Healer/)).toBeInTheDocument()
+  })
+
+  it('should leave out the average level when no visible character has a level', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
+    renderWithProviders(<Roster />)
+
+    await screen.findByText('Ragnok')
+
+    expect(screen.getByRole('region', { name: 'Roster summary' })).not.toHaveTextContent('Avg level')
+  })
+})

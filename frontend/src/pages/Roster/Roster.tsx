@@ -9,6 +9,8 @@ import { filterRoster, sortRoster, type RoleFilter, type RosterSort, type SortKe
 import type { Character } from '../../types/roster'
 import styles from './Roster.module.css'
 import { roleLabel, specLabel } from './rosterLabels'
+import { RosterSummary } from './RosterSummary'
+import { summarizeRoster } from './summarizeRoster'
 import { useRosterData } from './useRosterData'
 
 const roleFilters: { value: RoleFilter; label: string }[] = [
@@ -148,6 +150,8 @@ export function Roster() {
         </div>
       )}
 
+      {roster.isSuccess && <RosterSummary summary={summarizeRoster(visibleCharacters)} />}
+
       <div className={styles.filters}>
         <div className={styles.roleFilters}>
           {roleFilters.map(({ value, label }) => (
@@ -209,7 +213,6 @@ export function Roster() {
 
       {roster.isSuccess && (
         <>
-          <p className={styles.count}>{visibleCharacters.length} characters</p>
           {visibleCharacters.length === 0 ? (
             <p className={styles.noticeText}>No characters match.</p>
           ) : (
