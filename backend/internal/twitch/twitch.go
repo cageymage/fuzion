@@ -14,8 +14,8 @@ const (
 	APIBaseURL  = "https://api.twitch.tv"
 	AuthBaseURL = "https://id.twitch.tv"
 
-	// Retail World of Warcraft, looked up once via Get Games. Filtering on it
-	// keeps a member streaming another game from showing as "live" in the guild.
+	// Retail World of Warcraft, looked up once via Get Games. A stream in any
+	// other game is not shown as "live" in the guild, only as live elsewhere.
 	WorldOfWarcraftGameID = "18122"
 
 	maxLoginsPerRequest = 100
@@ -32,6 +32,7 @@ type Config struct {
 
 type LiveStream struct {
 	Login        string
+	GameID       string
 	GameName     string
 	Title        string
 	ViewerCount  int
@@ -53,7 +54,7 @@ func NewClient(cfg Config, httpClient *http.Client) *Client {
 	return &Client{cfg: cfg, httpClient: httpClient}
 }
 
-// LiveStreams returns only the channels that are live in the WoW category;
+// LiveStreams returns the channels that are live in any game;
 // channels Twitch does not report are simply absent.
 func (c *Client) LiveStreams(ctx context.Context, logins []string) ([]LiveStream, error) {
 	token, err := c.appToken(ctx)
@@ -150,6 +151,7 @@ func (c *Client) appToken(ctx context.Context) (string, error) {
 
 type helixStream struct {
 	UserLogin    string `json:"user_login"`
+	GameID       string `json:"game_id"`
 	GameName     string `json:"game_name"`
 	Title        string `json:"title"`
 	ViewerCount  int    `json:"viewer_count"`
@@ -161,7 +163,6 @@ func (c *Client) fetchStreams(ctx context.Context, token string, logins []string
 	for _, login := range logins {
 		q.Add("user_login", login)
 	}
-	q.Set("game_id", WorldOfWarcraftGameID)
 	q.Set("first", fmt.Sprint(maxLoginsPerRequest))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.cfg.BaseURL+"/helix/streams?"+q.Encode(), nil)
@@ -182,6 +183,7 @@ func (c *Client) fetchStreams(ctx context.Context, token string, logins []string
 	for _, s := range body.Data {
 		live = append(live, LiveStream{
 			Login:        strings.ToLower(s.UserLogin),
+			GameID:       s.GameID,
 			GameName:     s.GameName,
 			Title:        s.Title,
 			ViewerCount:  s.ViewerCount,

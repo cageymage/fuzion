@@ -94,6 +94,7 @@ func TestLiveStreams_ReturnsLiveChannels_WhenTwitchResponds(t *testing.T) {
 	fake := newFakeTwitch(t)
 	fake.live = []map[string]any{{
 		"user_login":    "Thundermane",
+		"game_id":       twitch.WorldOfWarcraftGameID,
 		"game_name":     "World of Warcraft",
 		"title":         "Mythic Queen Ansurek progress",
 		"viewer_count":  1240,
@@ -109,6 +110,7 @@ func TestLiveStreams_ReturnsLiveChannels_WhenTwitchResponds(t *testing.T) {
 	}
 	want := []twitch.LiveStream{{
 		Login:        "thundermane",
+		GameID:       twitch.WorldOfWarcraftGameID,
 		GameName:     "World of Warcraft",
 		Title:        "Mythic Queen Ansurek progress",
 		ViewerCount:  1240,
@@ -160,6 +162,27 @@ func TestLiveStreams_ReturnsTitle_WhenTwitchResponds(t *testing.T) {
 	}
 }
 
+func TestLiveStreams_DecodesGameId_WhenHelixReturnsStream(t *testing.T) {
+	// given Twitch reports a channel live in a game other than WoW
+	fake := newFakeTwitch(t)
+	fake.live = []map[string]any{{
+		"user_login": "Thundermane",
+		"game_id":    "512710",
+		"game_name":  "Call of Duty: Warzone",
+	}}
+
+	// when I ask which channels are live
+	got, err := fake.client().LiveStreams(context.Background(), []string{"thundermane"})
+
+	// then I expect the game id and name to come back
+	if err != nil {
+		t.Fatalf("LiveStreams: %v", err)
+	}
+	if len(got) != 1 || got[0].GameID != "512710" || got[0].GameName != "Call of Duty: Warzone" {
+		t.Errorf("got %+v, want game id 512710 and name Call of Duty: Warzone", got)
+	}
+}
+
 func TestLiveStreams_FetchesAppToken_BeforeFirstCall(t *testing.T) {
 	// given a fake Twitch that has not yet handed out a token
 	fake := newFakeTwitch(t)
@@ -181,7 +204,7 @@ func TestLiveStreams_FetchesAppToken_BeforeFirstCall(t *testing.T) {
 	}
 }
 
-func TestLiveStreams_FiltersToWorldOfWarcraftCategory_WhenAskingTwitch(t *testing.T) {
+func TestLiveStreams_DoesNotFilterByGame_WhenAskingTwitch(t *testing.T) {
 	// given a fake Twitch
 	fake := newFakeTwitch(t)
 
@@ -190,15 +213,18 @@ func TestLiveStreams_FiltersToWorldOfWarcraftCategory_WhenAskingTwitch(t *testin
 		t.Fatalf("LiveStreams: %v", err)
 	}
 
-	// then I expect the query to name both logins and the WoW category
+	// then I expect the query to name both logins and no game filter
 	if len(fake.streamsURL) != 1 {
 		t.Fatalf("expected one streams call, got %d", len(fake.streamsURL))
 	}
 	query := fake.streamsURL[0]
-	for _, part := range []string{"user_login=thundermane", "user_login=moonveil", "game_id=" + twitch.WorldOfWarcraftGameID, "first=100"} {
+	for _, part := range []string{"user_login=thundermane", "user_login=moonveil", "first=100"} {
 		if !strings.Contains(query, part) {
 			t.Errorf("expected query %q to contain %q", query, part)
 		}
+	}
+	if strings.Contains(query, "game_id") {
+		t.Errorf("expected query %q to leave out game_id", query)
 	}
 }
 
