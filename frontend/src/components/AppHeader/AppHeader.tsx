@@ -2,6 +2,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, NavLink } from 'react-router-dom'
 import { loginUrl, logout } from '../../api/auth'
 import { navItems } from '../../app/navigation'
+import logo144 from '../../assets/logo-144.webp'
+import logo48 from '../../assets/logo-48.webp'
+import logo96 from '../../assets/logo-96.webp'
 import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
 import styles from './AppHeader.module.css'
 
@@ -9,23 +12,14 @@ export function AppHeader() {
   return (
     <header className={styles.header}>
       <Link to="/" className={styles.brand}>
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-          <defs>
-            <clipPath id="fuzion-left-diamond">
-              <path d="M14 3 L25 20 L14 37 L3 20 Z" />
-            </clipPath>
-          </defs>
-          <path d="M14 3 L25 20 L14 37 L3 20 Z" fill="var(--gold)" fillOpacity="0.1" />
-          <path d="M26 3 L37 20 L26 37 L15 20 Z" fill="var(--gold)" fillOpacity="0.1" />
-          <path
-            d="M26 3 L37 20 L26 37 L15 20 Z"
-            fill="var(--gold)"
-            fillOpacity="0.85"
-            clipPath="url(#fuzion-left-diamond)"
-          />
-          <path d="M14 3 L25 20 L14 37 L3 20 Z" stroke="var(--gold)" strokeWidth="1.5" strokeLinejoin="round" />
-          <path d="M26 3 L37 20 L26 37 L15 20 Z" stroke="var(--gold-hover)" strokeWidth="1.5" strokeLinejoin="round" />
-        </svg>
+        <img
+          className={styles.logo}
+          src={logo48}
+          srcSet={`${logo48} 1x, ${logo96} 2x, ${logo144} 3x`}
+          width={48}
+          height={48}
+          alt=""
+        />
         <span className={styles.wordmark}>FUZION</span>
       </Link>
       <nav className={styles.nav} aria-label="Main">

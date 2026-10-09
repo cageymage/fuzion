@@ -32,6 +32,14 @@ describe('Legal', () => {
     )
   })
 
+  it('should credit Midjourney for the home page artwork when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Attributions' })).toHaveTextContent(
+      'Home page artwork: generated with Midjourney.',
+    )
+  })
+
   it('should state the Blizzard disclaimer when the page renders', () => {
     renderWithProviders(<Legal />)
 

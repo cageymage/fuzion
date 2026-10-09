@@ -71,6 +71,7 @@ export function Legal() {
           <li>Embedded videos: YouTube, a Google LLC service.</li>
           <li>Bot protection: Cloudflare, Inc.</li>
           <li>Hosting: Render Services, Inc.</li>
+          <li>Home page artwork: generated with Midjourney.</li>
         </ul>
       </section>
     </article>

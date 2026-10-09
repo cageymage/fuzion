@@ -19,6 +19,14 @@ function loggedInAs(user: AuthUser) {
 }
 
 describe('AppHeader', () => {
+  it('should link the FUZION wordmark to the home page without announcing the logo image', () => {
+    renderWithProviders(<AppHeader />)
+
+    const brand = screen.getByRole('link', { name: 'FUZION' })
+    expect(brand).toHaveAttribute('href', '/')
+    expect(brand.querySelector('img')).toHaveAttribute('alt', '')
+  })
+
   it('should render a link for every navigation item', () => {
     renderWithProviders(<AppHeader />)
 
@@ -64,7 +72,8 @@ describe('AppHeader', () => {
     renderWithProviders(<AppHeader />)
 
     await screen.findByText('thundermane')
-    expect(screen.getByRole('presentation')).toHaveAttribute('src', thundermane.avatarUrl)
+    const sources = screen.getAllByRole('presentation').map((image) => image.getAttribute('src'))
+    expect(sources).toContain(thundermane.avatarUrl)
   })
 
   it('should call the logout endpoint when Log out is clicked', async () => {
