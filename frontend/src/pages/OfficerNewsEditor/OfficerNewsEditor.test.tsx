@@ -656,6 +656,7 @@ describe('OfficerNewsEditor', () => {
       </>,
       '/news',
     )
+    await user.click(await screen.findByRole('button', { name: /Drafts/ }))
     await user.click(await screen.findByRole('link', { name: 'Patch 11.0 notes' }))
     await user.click(await screen.findByRole('button', { name: 'Publish' }))
     await user.click(screen.getByRole('button', { name: 'Confirm publish' }))
@@ -664,7 +665,7 @@ describe('OfficerNewsEditor', () => {
     await user.click(screen.getByRole('link', { name: 'News list' }))
 
     await screen.findByRole('link', { name: 'Patch 11.0 notes' })
-    expect(screen.queryByRole('heading', { name: 'Drafts' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /^Drafts/ })).not.toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Patch 11.0 notes' })).toHaveLength(1)
   })
 

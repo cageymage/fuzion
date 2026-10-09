@@ -331,17 +331,24 @@ describe('News', () => {
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
   })
 
-  it('should list drafts with links to the editor when the visitor is an officer', async () => {
+  it('should keep the drafts collapsed until an officer expands them', async () => {
     signInAs(officer)
-
+    const user = userEvent.setup()
     renderNews()
 
-    expect(await screen.findByRole('heading', { name: 'Drafts' })).toBeInTheDocument()
-    expect(await screen.findByRole('link', { name: 'Patch 11.0 notes' })).toHaveAttribute(
+    const toggle = await screen.findByRole('button', { name: /^▸ Drafts \(1\)$|^Drafts \(1\)$/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: 'Patch 11.0 notes' })).not.toBeInTheDocument()
+
+    await user.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'Patch 11.0 notes' })).toHaveAttribute(
       'href',
       '/officer/news/draft-1',
     )
   })
+
 
   it('should not show the drafts section when an officer has no drafts', async () => {
     signInAs(officer)
@@ -351,7 +358,7 @@ describe('News', () => {
 
     await screen.findByRole('button', { name: 'New post' })
     await screen.findByText('Welcome our newest officers')
-    expect(screen.queryByRole('heading', { name: 'Drafts' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /^Drafts/ })).not.toBeInTheDocument()
   })
 
   it('should show an error message when an officer\'s drafts cannot be loaded', async () => {
@@ -405,7 +412,7 @@ describe('News', () => {
 
     await screen.findByText('Welcome our newest officers')
     expect(screen.queryByRole('button', { name: 'New post' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Drafts' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /^Drafts/ })).not.toBeInTheDocument()
   })
 
   it('should show an error message when the news request fails', async () => {

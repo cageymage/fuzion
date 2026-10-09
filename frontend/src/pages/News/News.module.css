@@ -126,3 +126,16 @@
   font-size: 1.625rem;
   margin: 20px 0 12px;
 }
+
+.draftsToggle {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.draftsToggle:hover {
+  color: var(--gold-hover);
+}

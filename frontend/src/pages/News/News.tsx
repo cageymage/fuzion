@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { createDraft, fetchDrafts, fetchNewsPage } from '../../api/news'
 import { NewsCard } from '../../components/NewsCard/NewsCard'
@@ -31,6 +32,7 @@ function OfficerTools() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const drafts = useQuery({ queryKey: ['officer-news', 'drafts'], queryFn: fetchDrafts })
+  const [draftsOpen, setDraftsOpen] = useState(false)
   const newPost = useMutation({
     mutationFn: createDraft,
     onSuccess: async (post) => {
@@ -56,13 +58,25 @@ function OfficerTools() {
       )}
       {drafts.isError && <p className={styles.noticeText}>Drafts could not be loaded.</p>}
       {drafts.isSuccess && drafts.data.length > 0 && (
-        <section aria-labelledby="news-drafts-heading">
-          <h2 id="news-drafts-heading" className={styles.draftsTitle}>
-            Drafts
+        <section>
+          <h2 className={styles.draftsTitle}>
+            <button
+              type="button"
+              className={styles.draftsToggle}
+              aria-expanded={draftsOpen}
+              aria-controls="news-drafts-list"
+              onClick={() => setDraftsOpen((open) => !open)}
+            >
+              <span aria-hidden="true">{draftsOpen ? '▾' : '▸'}</span> Drafts ({drafts.data.length})
+            </button>
           </h2>
-          {drafts.data.map((draft) => (
-            <NewsCard key={draft.id} post={draft} />
-          ))}
+          {draftsOpen && (
+            <div id="news-drafts-list">
+              {drafts.data.map((draft) => (
+                <NewsCard key={draft.id} post={draft} />
+              ))}
+            </div>
+          )}
         </section>
       )}
     </div>
