@@ -44,10 +44,12 @@ type Reviewable struct {
 	ReviewedBy    uuid.NullUUID `db:"reviewed_by"    json:"reviewedBy"`
 	ReviewedAt    *time.Time    `db:"reviewed_at"    json:"reviewedAt"`
 	ReviewNote    string        `db:"review_note"    json:"reviewNote"`
+
+	DiscordMessageID *string `db:"discord_message_id" json:"-"`
 }
 
 const reviewableColumns = `id, applicant_name, character_name, class, role, availability, discord_handle, notes,
-	status, submitted_at, reviewed_by, reviewed_at, review_note`
+	status, submitted_at, reviewed_by, reviewed_at, review_note, discord_message_id`
 
 type Repo struct {
 	db *sqlx.DB
@@ -132,4 +134,13 @@ func (a *Reviewable) normalizeTimes() {
 		utc := a.ReviewedAt.UTC()
 		a.ReviewedAt = &utc
 	}
+}
+
+func (r *Repo) SetDiscordMessageID(ctx context.Context, id uuid.UUID, messageID string) error {
+	const query = `UPDATE applications SET discord_message_id = $2 WHERE id = $1`
+
+	if _, err := r.db.ExecContext(ctx, query, id, messageID); err != nil {
+		return fmt.Errorf("update application %s discord message id: %w", id, err)
+	}
+	return nil
 }

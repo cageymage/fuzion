@@ -101,7 +101,7 @@ func run() error {
 	}
 
 	router := server.New(server.Deps{
-		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{}, recruiting, botCheck)),
+		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{}, recruiting, botCheck, cfg.siteBaseURL)),
 		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db))),
 		Images:         images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.System{}, announcements, cfg.siteBaseURL)),

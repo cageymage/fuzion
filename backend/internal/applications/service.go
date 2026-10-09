@@ -49,7 +49,8 @@ func (e *ValidationError) Error() string {
 
 // Notifier is the recruiting channel; a nil Notifier means notifications are disabled.
 type Notifier interface {
-	Send(ctx context.Context, msg discord.Message) error
+	Post(ctx context.Context, msg discord.Message) (messageID string, err error)
+	Edit(ctx context.Context, messageID string, msg discord.Message) error
 }
 
 // Verifier is the bot check on public submissions; a nil Verifier means the check is disabled.
@@ -62,10 +63,12 @@ type Service struct {
 	clock    clock.Clock
 	notifier Notifier
 	verifier Verifier
+
+	siteBaseURL string
 }
 
-func NewService(repo *Repo, clock clock.Clock, notifier Notifier, verifier Verifier) *Service {
-	return &Service{repo: repo, clock: clock, notifier: notifier, verifier: verifier}
+func NewService(repo *Repo, clock clock.Clock, notifier Notifier, verifier Verifier, siteBaseURL string) *Service {
+	return &Service{repo: repo, clock: clock, notifier: notifier, verifier: verifier, siteBaseURL: strings.TrimRight(siteBaseURL, "/")}
 }
 
 // VerifyHuman returns a ValidationError when the token is missing or rejected,
@@ -117,23 +120,73 @@ func (s *Service) notifyRecruiting(ctx context.Context, app Application) {
 	if s.notifier == nil {
 		return
 	}
-	if err := s.notifier.Send(ctx, newApplicationMessage(app)); err != nil {
+	messageID, err := s.notifier.Post(ctx, newApplicationMessage(app, s.siteBaseURL))
+	if err != nil {
 		slog.ErrorContext(ctx, "notify recruiting channel of new application", "applicationID", app.ID, "error", err)
+		return
+	}
+	if err := s.repo.SetDiscordMessageID(ctx, app.ID, messageID); err != nil {
+		slog.ErrorContext(ctx, "remember recruiting channel message for application", "applicationID", app.ID, "error", err)
 	}
 }
 
-func newApplicationMessage(app Application) discord.Message {
+// The review is already saved, so a failed edit must not fail it.
+func (s *Service) markAnnouncementReviewed(ctx context.Context, app Reviewable) {
+	if s.notifier == nil || app.DiscordMessageID == nil {
+		return
+	}
+	if err := s.notifier.Edit(ctx, *app.DiscordMessageID, reviewedApplicationMessage(app, s.siteBaseURL)); err != nil {
+		slog.ErrorContext(ctx, "edit recruiting channel message for reviewed application", "applicationID", app.ID, "error", err)
+	}
+}
+
+const (
+	colorAccepted = 0x57F287
+	colorDeclined = 0xED4245
+)
+
+func newApplicationMessage(app Application, siteBaseURL string) discord.Message {
 	return discord.Message{Embeds: []discord.Embed{{
 		Title:       "New application: " + app.CharacterName,
+		URL:         siteBaseURL + "/officer/applications",
 		Description: "An officer needs to review this on the site.",
-		Fields: []discord.EmbedField{
-			{Name: "Applicant", Value: app.ApplicantName},
-			{Name: "Character", Value: app.CharacterName},
-			{Name: "Class / Role", Value: app.Class + " / " + app.Role},
-			{Name: "Availability", Value: app.Availability},
-			{Name: "Discord", Value: app.DiscordHandle},
-		},
+		Fields:      applicationFields(app),
 	}}}
+}
+
+func reviewedApplicationMessage(app Reviewable, siteBaseURL string) discord.Message {
+	embed := discord.Embed{
+		URL: siteBaseURL + "/officer/applications",
+		Fields: applicationFields(Application{
+			ApplicantName: app.ApplicantName,
+			CharacterName: app.CharacterName,
+			Class:         app.Class,
+			Role:          app.Role,
+			Availability:  app.Availability,
+			DiscordHandle: app.DiscordHandle,
+		}),
+	}
+	if app.Status == "accepted" {
+		embed.Title = "✅ Accepted: " + app.CharacterName
+		embed.Color = colorAccepted
+	} else {
+		embed.Title = "❌ Declined: " + app.CharacterName
+		embed.Color = colorDeclined
+	}
+	if app.ReviewNote != "" {
+		embed.Fields = append(embed.Fields, discord.EmbedField{Name: "Review note", Value: app.ReviewNote})
+	}
+	return discord.Message{Embeds: []discord.Embed{embed}}
+}
+
+func applicationFields(app Application) []discord.EmbedField {
+	return []discord.EmbedField{
+		{Name: "Applicant", Value: app.ApplicantName},
+		{Name: "Character", Value: app.CharacterName},
+		{Name: "Class / Role", Value: app.Class + " / " + app.Role},
+		{Name: "Availability", Value: app.Availability},
+		{Name: "Discord", Value: app.DiscordHandle},
+	}
 }
 
 func (s *Service) List(ctx context.Context, status string) ([]Reviewable, error) {
@@ -182,6 +235,7 @@ func (s *Service) Review(ctx context.Context, id string, reviewer uuid.UUID, req
 	if err != nil {
 		return Reviewable{}, fmt.Errorf("review application: %w", err)
 	}
+	s.markAnnouncementReviewed(ctx, app)
 	return app, nil
 }
 

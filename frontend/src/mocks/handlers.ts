@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw'
+import type { Application, ApplicationStatus } from '../types/applications'
 import type { EditablePost, NewsPage, NewsPost } from '../types/news'
 import type { RaidProgress, RaidTier } from '../types/raidProgress'
 import type { Raid } from '../types/raids'
@@ -308,8 +309,49 @@ const professionEntries: ProfessionEntry[] = [
   },
 ]
 
+export const pendingApplication: Application = {
+  id: '11111111-1111-4111-8111-111111111111',
+  applicantName: 'Mira',
+  characterName: 'Thornleaf',
+  class: 'Druid',
+  role: 'healer',
+  availability: 'Tue/Thu 8-11pm ET',
+  discordHandle: 'mira.heals',
+  notes: 'Raided Karazhan on my old realm.\nHappy to reroll if needed.',
+  status: 'pending',
+  submittedAt: '2026-10-06T18:30:00Z',
+  reviewedBy: null,
+  reviewedAt: null,
+  reviewNote: '',
+}
+
+export const acceptedApplication: Application = {
+  ...pendingApplication,
+  id: '22222222-2222-4222-8222-222222222222',
+  applicantName: 'Brek',
+  characterName: 'Ironhide',
+  class: 'Warrior',
+  role: 'tank',
+  status: 'accepted',
+  submittedAt: '2026-10-04T12:00:00Z',
+  reviewedBy: '33333333-3333-4333-8333-333333333333',
+  reviewedAt: '2026-10-05T09:00:00Z',
+  reviewNote: 'Great fit for tank spot',
+}
+
+const applications = [pendingApplication, acceptedApplication]
+
 export const handlers = [
   http.post('/api/applications', () => HttpResponse.json({ id: 'app-1' }, { status: 201 })),
+  http.get('/api/applications', ({ request }) => {
+    const status = new URL(request.url).searchParams.get('status')
+    return HttpResponse.json(status ? applications.filter((application) => application.status === status) : applications)
+  }),
+  http.patch('/api/applications/:id', async ({ params, request }) => {
+    const body = (await request.json()) as { status: ApplicationStatus; reviewNote?: string }
+    const application = applications.find((candidate) => candidate.id === params.id)
+    return HttpResponse.json({ ...application, status: body.status, reviewNote: body.reviewNote ?? '' })
+  }),
   http.get('/api/auth/me', () => HttpResponse.json({ error: 'login required' }, { status: 401 })),
   http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
   newsHandler(newsPosts),

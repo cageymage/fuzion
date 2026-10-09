@@ -70,8 +70,10 @@ func loadConfig() (config, error) {
 		return config{}, err
 	}
 
-	if os.Getenv("DISCORD_ANNOUNCEMENTS_WEBHOOK_URL") != "" && os.Getenv("SITE_BASE_URL") == "" {
-		return config{}, errors.New("SITE_BASE_URL is required when DISCORD_ANNOUNCEMENTS_WEBHOOK_URL is set")
+	for _, webhook := range []string{"DISCORD_ANNOUNCEMENTS_WEBHOOK_URL", "DISCORD_RECRUITING_WEBHOOK_URL"} {
+		if os.Getenv(webhook) != "" && os.Getenv("SITE_BASE_URL") == "" {
+			return config{}, fmt.Errorf("SITE_BASE_URL is required when %s is set", webhook)
+		}
 	}
 
 	return config{

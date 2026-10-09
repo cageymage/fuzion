@@ -27,6 +27,34 @@ async function fillEveryField(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('Applications', () => {
+  it('should link to the officer review page when the visitor is an officer', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ id: 'user-1', username: 'Officer', avatarUrl: null, isOfficer: true }),
+      ),
+    )
+
+    renderWithProviders(<Applications />)
+
+    expect(await screen.findByRole('link', { name: 'Manage applications' })).toHaveAttribute(
+      'href',
+      '/officer/applications',
+    )
+  })
+
+  it('should not link to the officer review page when the visitor is not an officer', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ id: 'user-2', username: 'Member', avatarUrl: null, isOfficer: false }),
+      ),
+    )
+
+    renderWithProviders(<Applications />)
+
+    await screen.findByRole('button', { name: /submit/i })
+    expect(screen.queryByRole('link', { name: 'Manage applications' })).not.toBeInTheDocument()
+  })
+
   it('should show a notice linking to the legal page when the form is shown', () => {
     renderWithProviders(<Applications />)
 

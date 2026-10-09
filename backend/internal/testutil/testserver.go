@@ -38,7 +38,7 @@ import (
 // FixedNow is the instant every server built by NewServer reports as "now".
 var FixedNow = time.Date(2026, 3, 14, 20, 0, 0, 0, time.UTC)
 
-// SiteBaseURL is the public site address that news announcements link to.
+// SiteBaseURL is the public site address that Discord announcements and notifications link to.
 const SiteBaseURL = "https://fuzion.example"
 
 type Server struct {
@@ -126,7 +126,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	}, discord.Client())
 
 	router := server.New(server.Deps{
-		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting, verifier)),
+		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting, verifier, SiteBaseURL)),
 		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db))),
 		Images:         images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL)),

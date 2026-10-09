@@ -7,6 +7,16 @@
   font-size: 38px;
 }
 
+.manageLink {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: var(--gold);
+  font-size: var(--text-ui);
+  text-decoration: underline;
+  text-decoration-color: rgba(211, 162, 77, 0.5);
+  text-underline-offset: 4px;
+}
+
 .form {
   display: flex;
   flex-direction: column;
