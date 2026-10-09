@@ -11,6 +11,5 @@ export const navItems: NavItem[] = [
   { label: 'Calendar & Events', path: '/calendar' },
   { label: 'Applications', path: '/applications' },
   { label: 'Professions', path: '/professions' },
-  { label: 'PvP', path: '/pvp' },
   { label: 'Streams', path: '/streams' },
 ]

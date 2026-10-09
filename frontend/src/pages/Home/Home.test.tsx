@@ -29,8 +29,18 @@ describe('Home', () => {
     renderWithProviders(<Home />)
 
     expect(await screen.findByRole('heading', { name: 'Fuzion', level: 1 })).toBeInTheDocument()
-    expect(screen.getByText('Emberreach · US')).toBeInTheDocument()
+    expect(screen.getByText('PvE · US')).toBeInTheDocument()
     expect(screen.getByText('Raiding · Dungeons · Community')).toBeInTheDocument()
+  })
+
+  it('should show the hero image as decorative with an empty alt text', async () => {
+    const { container } = renderWithProviders(<Home />)
+
+    await screen.findByRole('heading', { name: 'Fuzion', level: 1 })
+    const hero = container.querySelector('picture img')
+    expect(hero).toHaveAttribute('alt', '')
+    expect(hero).toHaveAttribute('width', '2400')
+    expect(hero).toHaveAttribute('height', '900')
   })
 
   it('should use the first image in the newest post body as the featured thumbnail', async () => {

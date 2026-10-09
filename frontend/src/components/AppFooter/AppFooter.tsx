@@ -4,7 +4,7 @@ import styles from './AppFooter.module.css'
 export function AppFooter() {
   return (
     <footer className={styles.footer}>
-      <span>Fuzion · Emberreach · World of Warcraft: Forever</span>
+      <span>Fuzion · PvE · World of Warcraft: Forever</span>
       <nav aria-label="Footer">
         <Link className={styles.link} to="/legal">
           Legal

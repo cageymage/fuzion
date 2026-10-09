@@ -8,7 +8,7 @@ describe('AppFooter', () => {
     renderWithProviders(<AppFooter />)
 
     expect(
-      screen.getByText('Fuzion · Emberreach · World of Warcraft: Forever'),
+      screen.getByText('Fuzion · PvE · World of Warcraft: Forever'),
     ).toBeInTheDocument()
   })
 

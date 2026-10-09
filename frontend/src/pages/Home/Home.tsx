@@ -1,5 +1,11 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import heroDesktopAvif from '../../assets/hero-desktop.avif'
+import heroDesktopJpg from '../../assets/hero-desktop.jpg'
+import heroDesktopWebp from '../../assets/hero-desktop.webp'
+import heroMobileAvif from '../../assets/hero-mobile.avif'
+import heroMobileJpg from '../../assets/hero-mobile.jpg'
+import heroMobileWebp from '../../assets/hero-mobile.webp'
 import { FeaturedNewsCard } from '../../components/FeaturedNewsCard/FeaturedNewsCard'
 import { LiveStreamEmbed } from '../../components/LiveStreamEmbed/LiveStreamEmbed'
 import { NewsCard } from '../../components/NewsCard/NewsCard'
@@ -21,8 +27,16 @@ export function Home() {
   return (
     <>
       <section className={styles.hero}>
-        <div>
-          <div className="eyebrow">Emberreach · US</div>
+        <picture className={styles.heroImage}>
+          <source media="(max-width: 720px)" type="image/avif" srcSet={heroMobileAvif} />
+          <source media="(max-width: 720px)" type="image/webp" srcSet={heroMobileWebp} />
+          <source media="(max-width: 720px)" type="image/jpeg" srcSet={heroMobileJpg} />
+          <source type="image/avif" srcSet={heroDesktopAvif} />
+          <source type="image/webp" srcSet={heroDesktopWebp} />
+          <img src={heroDesktopJpg} width={2400} height={900} alt="" fetchPriority="high" />
+        </picture>
+        <div className={styles.heroText}>
+          <div className="eyebrow">PvE · US</div>
           <h1 className={styles.title}>Fuzion</h1>
           <div className={styles.tagline}>Raiding · Dungeons · Community</div>
         </div>
