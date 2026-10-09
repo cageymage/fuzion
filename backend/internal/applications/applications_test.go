@@ -836,3 +836,145 @@ func TestReviewApplication_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.
 	// then I expect a 401
 	resp.RequireStatus(t, 401)
 }
+
+type editedEmbed struct {
+	Title       string `json:"title"`
+	URL         string `json:"url"`
+	Description string `json:"description"`
+	Color       int    `json:"color"`
+	Fields      []struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	} `json:"fields"`
+}
+
+func decodeEditedEmbed(t *testing.T, edit testutil.WebhookEdit) editedEmbed {
+	t.Helper()
+	var got struct {
+		Embeds []editedEmbed `json:"embeds"`
+	}
+	if err := json.Unmarshal(edit.Body, &got); err != nil {
+		t.Fatalf("decode edit body %q: %v", edit.Body, err)
+	}
+	if len(got.Embeds) != 1 {
+		t.Fatalf("expected 1 embed, got %d in %s", len(got.Embeds), edit.Body)
+	}
+	return got.Embeds[0]
+}
+
+func submitAnnouncedApplication(t *testing.T, srv *testutil.Server) string {
+	t.Helper()
+	resp := srv.Post(t, "/api/applications", validApplication())
+	resp.RequireStatus(t, 201)
+	var submitted struct {
+		ID string `json:"id"`
+	}
+	resp.DecodeJSON(t, &submitted)
+	return submitted.ID
+}
+
+func TestReviewApplication_EditsDiscordMessageToAccepted_WhenApplicationWasAnnounced(t *testing.T) {
+	// given an application whose submission was announced in the recruiting channel
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	id := submitAnnouncedApplication(t, srv)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I accept it with a note
+	resp := srv.Patch(t, "/api/applications/"+id, map[string]string{"status": "accepted", "reviewNote": "Invite for Tuesday."})
+
+	// then I expect a 200
+	resp.RequireStatus(t, 200)
+
+	// and the announcement was edited to show it accepted, in green, with the note
+	edits := srv.Webhook.Edits()
+	if len(edits) != 1 {
+		t.Fatalf("expected exactly 1 webhook edit, got %d", len(edits))
+	}
+	if edits[0].MessageID != testutil.MessageID(1) {
+		t.Errorf("expected the edit to target message %q, got %q", testutil.MessageID(1), edits[0].MessageID)
+	}
+	embed := decodeEditedEmbed(t, edits[0])
+	if embed.Title != "✅ Accepted: Thornleaf" {
+		t.Errorf("expected title %q, got %q", "✅ Accepted: Thornleaf", embed.Title)
+	}
+	if embed.Color != 0x57F287 {
+		t.Errorf("expected green color %d, got %d", 0x57F287, embed.Color)
+	}
+	if embed.URL != testutil.SiteBaseURL+"/officer/applications" {
+		t.Errorf("expected the embed to keep linking to the review page, got %q", embed.URL)
+	}
+	last := embed.Fields[len(embed.Fields)-1]
+	if last.Name != "Review note" || last.Value != "Invite for Tuesday." {
+		t.Errorf("expected a trailing Review note field, got %q = %q", last.Name, last.Value)
+	}
+}
+
+func TestReviewApplication_EditsDiscordMessageToDeclined_WhenApplicationWasAnnounced(t *testing.T) {
+	// given an application whose submission was announced in the recruiting channel
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	id := submitAnnouncedApplication(t, srv)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I decline it without a note
+	resp := srv.Patch(t, "/api/applications/"+id, map[string]string{"status": "declined"})
+
+	// then I expect a 200
+	resp.RequireStatus(t, 200)
+
+	// and the announcement was edited to show it declined, in red, with no note field
+	edits := srv.Webhook.Edits()
+	if len(edits) != 1 {
+		t.Fatalf("expected exactly 1 webhook edit, got %d", len(edits))
+	}
+	embed := decodeEditedEmbed(t, edits[0])
+	if embed.Title != "❌ Declined: Thornleaf" {
+		t.Errorf("expected title %q, got %q", "❌ Declined: Thornleaf", embed.Title)
+	}
+	if embed.Color != 0xED4245 {
+		t.Errorf("expected red color %d, got %d", 0xED4245, embed.Color)
+	}
+	for _, f := range embed.Fields {
+		if f.Name == "Review note" {
+			t.Errorf("expected no Review note field when the note is empty, got %q", f.Value)
+		}
+	}
+}
+
+func TestReviewApplication_StillReturnsOK_WhenDiscordEditFails(t *testing.T) {
+	// given an announced application and a recruiting webhook that rejects edits
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	id := submitAnnouncedApplication(t, srv)
+	srv.Webhook.EditStatus = 500
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I accept it
+	resp := srv.Patch(t, "/api/applications/"+id, map[string]string{"status": "accepted"})
+
+	// then I expect a 200 with the accepted status
+	resp.RequireStatus(t, 200)
+	var got reviewedApplicationJSON
+	resp.DecodeJSON(t, &got)
+	if got.Status != "accepted" {
+		t.Errorf("expected status %q, got %q", "accepted", got.Status)
+	}
+}
+
+func TestReviewApplication_DoesNotEditDiscord_WhenApplicationWasNeverAnnounced(t *testing.T) {
+	// given a pending application that was stored without a Discord announcement
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	id := insertApplication(t, db, "Thornleaf", "pending", time.Now())
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I accept it
+	resp := srv.Patch(t, "/api/applications/"+id, map[string]string{"status": "accepted"})
+
+	// then I expect a 200 and no edit sent to Discord
+	resp.RequireStatus(t, 200)
+	if got := len(srv.Webhook.Edits()); got != 0 {
+		t.Errorf("expected no webhook edits, got %d", got)
+	}
+}
