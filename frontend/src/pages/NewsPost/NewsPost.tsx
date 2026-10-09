@@ -1,16 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
 import Markdown from 'react-markdown'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { fetchNewsPost } from '../../api/news'
 import { ApiError } from '../../api/client'
 import { Chip } from '../../components/Chip/Chip'
+import { DeleteNewsPost } from '../../components/DeleteNewsPost/DeleteNewsPost'
 import { LightboxImage } from '../../components/LightboxImage/LightboxImage'
+import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { formatRelativeDate } from '../../lib/format'
 import { newsCategoryMeta } from '../../lib/newsCategory'
 import styles from './NewsPost.module.css'
 
 export function NewsPostPage() {
   const { id = '' } = useParams()
+  const navigate = useNavigate()
+  const currentUser = useCurrentUser()
   const post = useQuery({ queryKey: ['news', 'post', id], queryFn: () => fetchNewsPost(id) })
 
   return (
@@ -38,6 +42,14 @@ export function NewsPostPage() {
           <div className={styles.meta}>
             Posted by {post.data.authorName} · {formatRelativeDate(post.data.publishedAt)}
           </div>
+          {currentUser.data?.isOfficer && (
+            <div className={styles.officerActions}>
+              <Link to={`/officer/news/${post.data.id}`} className={styles.editLink}>
+                Edit
+              </Link>
+              <DeleteNewsPost postId={post.data.id} onDeleted={() => navigate('/news')} />
+            </div>
+          )}
           <div className={styles.body}>
             <Markdown components={{ img: LightboxImage }}>{post.data.body}</Markdown>
           </div>
