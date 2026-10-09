@@ -10,7 +10,6 @@ import { Home } from '../pages/Home/Home'
 import { Legal } from '../pages/Legal/Legal'
 import { News } from '../pages/News/News'
 import { OfficerApplications } from '../pages/OfficerApplications/OfficerApplications'
-import { OfficerNews } from '../pages/OfficerNews/OfficerNews'
 import { OfficerRaidProgress } from '../pages/OfficerRaidProgress/OfficerRaidProgress'
 import { Professions } from '../pages/Professions/Professions'
 import { RaidProgress } from '../pages/RaidProgress/RaidProgress'
@@ -51,7 +50,6 @@ export function App() {
             <Route path="/raid-progress" element={<RaidProgress />} />
             <Route path="/officer/raid-progress" element={<OfficerRaidProgress />} />
             <Route path="/officer/applications" element={<OfficerApplications />} />
-            <Route path="/officer/news" element={<OfficerNews />} />
             <Route
               path="/officer/news/:id"
               element={

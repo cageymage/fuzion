@@ -97,12 +97,32 @@
   margin: 8px 0 0;
 }
 
-.manageLink {
-  display: inline-block;
+.officerTools {
   margin-bottom: 20px;
+}
+
+.newPostButton {
+  padding: 8px 16px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-chip);
+  background: var(--gold-soft);
   color: var(--gold);
-  font-size: var(--text-ui);
-  text-decoration: underline;
-  text-decoration-color: rgba(211, 162, 77, 0.5);
-  text-underline-offset: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.newPostButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.errorText {
+  color: var(--live);
+  font-size: var(--text-meta);
+  margin: 8px 0 0;
+}
+
+.draftsTitle {
+  font-size: 1.625rem;
+  margin: 20px 0 12px;
 }

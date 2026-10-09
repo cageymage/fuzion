@@ -5,7 +5,6 @@ import { Link, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { draftPost, newsPage } from '../../mocks/handlers'
 import { News } from '../News/News'
-import { OfficerNews } from '../OfficerNews/OfficerNews'
 import { ToastProvider } from '../../components/Toast/Toast'
 import type { NewsPost } from '../../types/news'
 import { server } from '../../mocks/server'
@@ -592,13 +591,16 @@ describe('OfficerNewsEditor', () => {
     const published = [
       { ...draftPost, id: 'post-old', title: 'Older post', publishedAt: '2026-01-01T00:00:00Z' },
     ]
+    let drafts = [draftPost]
     server.use(
+      http.get('/api/news/drafts', () => HttpResponse.json(drafts)),
       http.get('/api/news', () =>
         HttpResponse.json(newsPage(published as unknown as NewsPost[])),
       ),
       http.post('/api/news/:id/publish', () => {
         const nowPublished = { ...draftPost, publishedAt: '2026-09-01T00:00:00Z' }
         published.unshift(nowPublished)
+        drafts = []
         return HttpResponse.json(nowPublished)
       }),
     )
@@ -626,7 +628,7 @@ describe('OfficerNewsEditor', () => {
     expect(await screen.findByText('Patch 11.0 notes')).toBeInTheDocument()
   })
 
-  it('should move the post from drafts to published on the officer list when it is published', async () => {
+  it('should move the post from drafts to published on the news page when it is published', async () => {
     signInAs(officer)
     const published = [
       { ...draftPost, id: 'post-old', title: 'Older post', publishedAt: '2026-01-01T00:00:00Z' },
@@ -645,23 +647,24 @@ describe('OfficerNewsEditor', () => {
     const user = userEvent.setup()
     renderWithProviders(
       <>
-        <Link to="/officer/news">Officer list</Link>
+        <Link to="/news">News list</Link>
         <Routes>
-          <Route path="/officer/news" element={<OfficerNews />} />
+          <Route path="/news" element={<News />} />
           <Route path="/officer/news/:id" element={<OfficerNewsEditor />} />
           <Route path="/news/:id" element={<p>Post page</p>} />
         </Routes>
       </>,
-      '/officer/news',
+      '/news',
     )
     await user.click(await screen.findByRole('link', { name: 'Patch 11.0 notes' }))
     await user.click(await screen.findByRole('button', { name: 'Publish' }))
     await user.click(screen.getByRole('button', { name: 'Confirm publish' }))
     await screen.findByText('Post page')
 
-    await user.click(screen.getByRole('link', { name: 'Officer list' }))
+    await user.click(screen.getByRole('link', { name: 'News list' }))
 
-    expect(await screen.findByText('No drafts.')).toBeInTheDocument()
+    await screen.findByRole('link', { name: 'Patch 11.0 notes' })
+    expect(screen.queryByRole('heading', { name: 'Drafts' })).not.toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Patch 11.0 notes' })).toHaveLength(1)
   })
 
