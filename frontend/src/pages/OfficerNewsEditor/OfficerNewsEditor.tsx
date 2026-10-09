@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { uploadImage } from '../../api/images'
 import { editablePostKey, fetchEditablePost, publishNewsPost } from '../../api/news'
+import { DeleteNewsPost } from '../../components/DeleteNewsPost/DeleteNewsPost'
 import { LightboxImage } from '../../components/LightboxImage/LightboxImage'
 import { OfficerOnly } from '../../components/OfficerOnly/OfficerOnly'
 import { useToast } from '../../components/Toast/Toast'
@@ -105,7 +106,10 @@ function PostEditor({ post }: PostEditorProps) {
     },
   })
 
-  const blocker = useBlocker(dirty)
+  const deleted = useRef(false)
+
+  // The deleted post's unsaved edits are moot, so deleting must not trigger the leave warning.
+  const blocker = useBlocker(() => dirty && !deleted.current)
 
   const [imageError, setImageError] = useState<string | null>(null)
   const [draggingImage, setDraggingImage] = useState(false)
@@ -187,8 +191,8 @@ function PostEditor({ post }: PostEditorProps) {
   return (
     <section className={styles.page}>
       <h1 className={styles.title}>Edit post</h1>
-      <Link to="/officer/news" className={styles.backLink}>
-        Back to all posts
+      <Link to="/news" className={styles.backLink}>
+        Back to all news
       </Link>
 
       <div className={styles.form}>
@@ -292,6 +296,13 @@ function PostEditor({ post }: PostEditorProps) {
               </button>
             </span>
           )}
+          <DeleteNewsPost
+            postId={post.id}
+            onDeleted={() => {
+              deleted.current = true
+              navigate('/news')
+            }}
+          />
         </div>
         {blocker.state === 'blocked' && (
           <div className={styles.backdrop}>

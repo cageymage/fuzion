@@ -32,6 +32,18 @@ function renderEditor(route = '/officer/news/draft-1') {
   )
 }
 
+function renderEditorWithNewsPage() {
+  return renderWithProviders(
+    <ToastProvider>
+      <Routes>
+        <Route path="/officer/news/:id" element={<OfficerNewsEditor />} />
+        <Route path="/news" element={<p>News page</p>} />
+      </Routes>
+    </ToastProvider>,
+    '/officer/news/draft-1',
+  )
+}
+
 function renderEditorWithHomeLink() {
   return renderWithProviders(
     <>
@@ -250,6 +262,94 @@ describe('OfficerNewsEditor', () => {
 
     expect(await screen.findByText('Post page')).toBeInTheDocument()
     expect(patches).toHaveLength(1)
+  })
+
+  it('should call the delete endpoint and return to the news list when Delete is confirmed', async () => {
+    signInAs(officer)
+    const deletedIds: string[] = []
+    server.use(
+      http.delete('/api/news/:id', ({ params }) => {
+        deletedIds.push(String(params.id))
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderEditorWithNewsPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByText('News page')).toBeInTheDocument()
+    expect(deletedIds).toEqual(['draft-1'])
+  })
+
+  it('should not warn about unsaved changes when a post with unsaved edits is deleted', async () => {
+    signInAs(officer)
+    const user = userEvent.setup()
+    renderEditorWithNewsPage()
+    await user.type(await screen.findByRole('textbox', { name: 'Title' }), '!')
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByText('News page')).toBeInTheDocument()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('should show a success toast when Delete is confirmed', async () => {
+    signInAs(officer)
+    const user = userEvent.setup()
+    renderEditorWithNewsPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Post deleted')
+  })
+
+  it('should not call the delete endpoint when the delete confirmation is cancelled', async () => {
+    signInAs(officer)
+    const deletedIds: string[] = []
+    server.use(
+      http.delete('/api/news/:id', ({ params }) => {
+        deletedIds.push(String(params.id))
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderEditorWithNewsPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel delete' }))
+
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    expect(deletedIds).toEqual([])
+  })
+
+  it('should stay on the editor with an error when deleting fails', async () => {
+    signInAs(officer)
+    server.use(
+      http.delete('/api/news/:id', () =>
+        HttpResponse.json({ error: 'news post not found' }, { status: 404 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderEditorWithNewsPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('news post not found')
+    expect(screen.getByRole('textbox', { name: 'Title' })).toBeInTheDocument()
+    expect(screen.queryByText('Post deleted')).not.toBeInTheDocument()
+  })
+
+  it('should offer Delete when the post is already published', async () => {
+    signInAs(officer)
+
+    renderEditor('/officer/news/post-1')
+
+    expect(await screen.findByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
   it('should show the post fields when the post is already published', async () => {

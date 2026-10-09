@@ -7,7 +7,7 @@ import type {
   PostFields,
 } from '../types/news'
 import { firstMarkdownImageUrl } from '../lib/markdown'
-import { apiGet, apiSend } from './client'
+import { apiDelete, apiGet, apiSend } from './client'
 
 interface NewsPageQuery {
   category?: NewsCategory
@@ -66,6 +66,10 @@ export function saveNewsPost(id: string, fields: PostFields): Promise<EditablePo
 
 export function publishNewsPost(id: string): Promise<EditablePost> {
   return apiSend<EditablePost>('POST', `/news/${id}/publish`, {})
+}
+
+export function deleteNewsPost(id: string): Promise<void> {
+  return apiDelete(`/news/${id}`)
 }
 
 export const editablePostKey = (id: string) => ['officer-news', 'post', id] as const
