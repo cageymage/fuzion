@@ -336,7 +336,7 @@ describe('News', () => {
     const user = userEvent.setup()
     renderNews()
 
-    const toggle = await screen.findByRole('button', { name: /^▸ Drafts \(1\)$|^Drafts \(1\)$/ })
+    const toggle = await screen.findByRole('button', { name: 'Drafts (1)' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('link', { name: 'Patch 11.0 notes' })).not.toBeInTheDocument()
 
