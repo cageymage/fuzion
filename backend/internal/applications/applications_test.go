@@ -184,6 +184,38 @@ func TestSubmitApplication_PostsSummaryToDiscordWebhook(t *testing.T) {
 	}
 }
 
+func TestSubmitApplication_PostsEmbedLinkingToReviewPage_WhenRecruitingWebhookIsConfigured(t *testing.T) {
+	// given a server whose recruiting webhook is a fake Discord channel
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when I submit the application
+	resp := srv.Post(t, "/api/applications", validApplication())
+
+	// then I expect a 201
+	resp.RequireStatus(t, 201)
+
+	// and the posted embed links to the officer review page on the site
+	bodies := srv.Webhook.Bodies()
+	if len(bodies) != 1 {
+		t.Fatalf("expected exactly 1 webhook post, got %d", len(bodies))
+	}
+	var got struct {
+		Embeds []struct {
+			URL string `json:"url"`
+		} `json:"embeds"`
+	}
+	if err := json.Unmarshal(bodies[0], &got); err != nil {
+		t.Fatalf("decode webhook body %q: %v", bodies[0], err)
+	}
+	if len(got.Embeds) != 1 {
+		t.Fatalf("expected 1 embed, got %d in %s", len(got.Embeds), bodies[0])
+	}
+	if want := testutil.SiteBaseURL + "/officer/applications"; got.Embeds[0].URL != want {
+		t.Errorf("expected embed url %q, got %q", want, got.Embeds[0].URL)
+	}
+}
+
 func TestSubmitApplication_StillReturnsCreated_WhenDiscordWebhookFails(t *testing.T) {
 	// given a recruiting webhook that answers 500
 	db := testutil.DB(t)

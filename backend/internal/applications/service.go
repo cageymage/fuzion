@@ -62,10 +62,12 @@ type Service struct {
 	clock    clock.Clock
 	notifier Notifier
 	verifier Verifier
+
+	siteBaseURL string
 }
 
-func NewService(repo *Repo, clock clock.Clock, notifier Notifier, verifier Verifier) *Service {
-	return &Service{repo: repo, clock: clock, notifier: notifier, verifier: verifier}
+func NewService(repo *Repo, clock clock.Clock, notifier Notifier, verifier Verifier, siteBaseURL string) *Service {
+	return &Service{repo: repo, clock: clock, notifier: notifier, verifier: verifier, siteBaseURL: strings.TrimRight(siteBaseURL, "/")}
 }
 
 // VerifyHuman returns a ValidationError when the token is missing or rejected,
@@ -117,14 +119,15 @@ func (s *Service) notifyRecruiting(ctx context.Context, app Application) {
 	if s.notifier == nil {
 		return
 	}
-	if err := s.notifier.Send(ctx, newApplicationMessage(app)); err != nil {
+	if err := s.notifier.Send(ctx, newApplicationMessage(app, s.siteBaseURL)); err != nil {
 		slog.ErrorContext(ctx, "notify recruiting channel of new application", "applicationID", app.ID, "error", err)
 	}
 }
 
-func newApplicationMessage(app Application) discord.Message {
+func newApplicationMessage(app Application, siteBaseURL string) discord.Message {
 	return discord.Message{Embeds: []discord.Embed{{
 		Title:       "New application: " + app.CharacterName,
+		URL:         siteBaseURL + "/officer/applications",
 		Description: "An officer needs to review this on the site.",
 		Fields: []discord.EmbedField{
 			{Name: "Applicant", Value: app.ApplicantName},

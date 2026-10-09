@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { submitApplication } from '../../api/applications'
 import { ApiError } from '../../api/client'
+import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { wowClasses } from '../../lib/wowClasses'
 import type { ApplicationRole, SubmitApplicationRequest } from '../../types/applications'
 import styles from './Applications.module.css'
@@ -43,6 +44,7 @@ export function Applications() {
   const [validationError, setValidationError] = useState<string | null>(null)
   const turnstile = useRef<TurnstileInstance>(null)
   const submission = useMutation({ mutationFn: submitApplication })
+  const currentUser = useCurrentUser()
 
   const update = (key: keyof SubmitApplicationRequest, value: string) =>
     setForm((current) => ({ ...current, [key]: value }))
@@ -86,6 +88,11 @@ export function Applications() {
   return (
     <section className={styles.page}>
       <h1 className={styles.title}>Applications</h1>
+      {currentUser.data?.isOfficer && (
+        <Link to="/officer/applications" className={styles.manageLink}>
+          Manage applications
+        </Link>
+      )}
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
         {errorMessage && (
           <p role="alert" className={styles.error}>
