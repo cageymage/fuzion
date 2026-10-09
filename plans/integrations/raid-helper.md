@@ -181,7 +181,7 @@ Open questions:
 
 ### 3.1 Endpoint
 - **Request:** `GET https://raid-helper.xyz/api/v4/events/{eventId}`, e.g. `.../api/v4/events/1556072183254622279`. The event page on the Raid-Helper website has a direct link to this JSON.
-- **Response:** `200`, `Content-Type: application/json;charset=utf-8`, and it is valid JSON. The sample originally pasted looked like JS-object notation because of how it was displayed, not because of the wire format. Display names with quotes arrive correctly escaped (e.g. `Zarik\"OhioAssWarlock\"Envy`).
+- **Response:** `200`, `Content-Type: application/json;charset=utf-8`, and it is valid JSON. The sample originally pasted looked like JS-object notation because of how it was displayed, not because of the wire format. Display names with quotes arrive correctly escaped (e.g. `Sample\"Nick\"Name`).
 - **Auth:** none needed for this event. The docs' Authorization section says only "sensitive" requests need the per-server API key (`Authorization` header, key from `/apikey`), which matches an event read being public. Exactly which endpoints count as sensitive: `TODO`. It was fetched with no cookies, API key or Authorization header, so it is a public GET by event ID. Whether this holds for all events (e.g. servers that restrict visibility), `TODO`.
 - **Host and version:** the link uses `raid-helper.xyz` and `v4`. The docs site is `raid-helper.dev`, and third-party code was seen using `.dev/api/v2/...`. Whether `.xyz`/`.dev` and v2/v4 are interchangeable or versioned differently: `TODO`.
 - **Response headers** (captured with `curl -i`, anonymous request):
