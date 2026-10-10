@@ -8,6 +8,11 @@
   margin-bottom: 0;
 }
 
+.content {
+  position: relative;
+  z-index: 1;
+}
+
 .title {
   margin: 12px 0 4px;
   font-family: var(--font-body);

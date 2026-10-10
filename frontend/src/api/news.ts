@@ -27,20 +27,25 @@ export async function fetchNewsPage({
   if (category) query.set('category', category)
 
   const result = await apiGet<NewsPage>(`/news?${query}`)
-  return { posts: result._embedded.news, total: result.total }
+  return { posts: result._embedded.news.map(withFirstImage), total: result.total }
 }
 
 // The API returns each post's Markdown body in the list; the first image in it becomes the card thumbnail.
-export async function fetchLatestNews(limit: number): Promise<NewsPost[]> {
-  const result = await apiGet<NewsPage>(`/news?limit=${limit}`)
-  return result._embedded.news.map((post) => ({
+function withFirstImage<T extends { imageUrl?: string | null; body?: string }>(post: T): T {
+  return {
     ...post,
     imageUrl: post.imageUrl ?? (post.body ? firstMarkdownImageUrl(post.body) : null),
-  }))
+  }
 }
 
-export function fetchDrafts(): Promise<EditablePost[]> {
-  return apiGet<EditablePost[]>('/news/drafts')
+export async function fetchLatestNews(limit: number): Promise<NewsPost[]> {
+  const result = await apiGet<NewsPage>(`/news?limit=${limit}`)
+  return result._embedded.news.map(withFirstImage)
+}
+
+export async function fetchDrafts(): Promise<EditablePost[]> {
+  const drafts = await apiGet<EditablePost[]>('/news/drafts')
+  return drafts.map(withFirstImage)
 }
 
 // Drafts are not served by GET /news/{id}, so look there first.

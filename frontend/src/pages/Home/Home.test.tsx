@@ -73,11 +73,9 @@ describe('Home', () => {
     const { container } = renderWithProviders(<Home />)
 
     await screen.findByRole('heading', { name: 'Fuzion defeated Queen Ansurek on Mythic' })
-    const featuredCard = screen
-      .getByRole('heading', { name: 'Fuzion defeated Queen Ansurek on Mythic' })
-      .closest('article')
-    expect(featuredCard?.querySelector('img')).toBeNull()
-    expect(container.querySelector('svg[viewBox="0 0 210 130"]')).not.toBeNull()
+    const placeholderGraph = container.querySelector('svg[viewBox="0 0 210 130"]')
+    expect(placeholderGraph).not.toBeNull()
+    expect(placeholderGraph?.parentElement?.querySelector('img')).toBeNull()
   })
 
   it('should show the countdown to the next raid when one is scheduled', async () => {

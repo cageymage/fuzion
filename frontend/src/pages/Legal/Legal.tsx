@@ -77,6 +77,7 @@ export function Legal() {
           <li>Bot protection: Cloudflare, Inc.</li>
           <li>Hosting: Render Services, Inc.</li>
           <li>Home page artwork: generated with Midjourney.</li>
+          <li>News card background artwork: generated with Midjourney.</li>
         </ul>
       </section>
     </article>
