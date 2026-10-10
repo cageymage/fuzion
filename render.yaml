@@ -49,6 +49,17 @@ services:
         sync: false
       - key: DISCORD_REDIRECT_URL
         sync: false
+      # Optional: without BATTLENET_REDIRECT_URL, members cannot link a Battle.net
+      # account. When it is set, BLIZZARD_CLIENT_ID and BLIZZARD_CLIENT_SECRET are
+      # required too (the same Blizzard client as the roster sync). The redirect URL
+      # must be registered on that client and use the host people actually browse,
+      # e.g. https://fuziongaming.gg/api/auth/battlenet/callback
+      - key: BATTLENET_REDIRECT_URL
+        sync: false
+      - key: BLIZZARD_CLIENT_ID
+        sync: false
+      - key: BLIZZARD_CLIENT_SECRET
+        sync: false
       # Optional: without it, new applications are not announced in Discord. It is
       # a channel webhook URL (Edit Channel > Integrations > Webhooks); treat it
       # as a secret.

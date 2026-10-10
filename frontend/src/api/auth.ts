@@ -1,7 +1,9 @@
 import type { AuthUser } from '../types/auth'
-import { apiPost, baseUrl } from './client'
+import { apiDelete, apiPost, baseUrl } from './client'
 
 export const loginUrl = `${baseUrl}/auth/login`
+// A plain anchor target, like loginUrl: the server has to answer it so it can redirect to Battle.net.
+export const battlenetLinkUrl = `${baseUrl}/auth/battlenet/link`
 
 // A 401 here just means "nobody is logged in", which is a normal state, not an error.
 export async function fetchCurrentUser(): Promise<AuthUser | null> {
@@ -17,4 +19,8 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
 
 export function logout(): Promise<void> {
   return apiPost('/auth/logout')
+}
+
+export function unlinkBattlenet(): Promise<void> {
+  return apiDelete('/auth/battlenet')
 }

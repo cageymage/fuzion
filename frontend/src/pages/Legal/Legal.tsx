@@ -22,12 +22,17 @@ export function Legal() {
             Discord identity: when you log in with Discord, your Discord ID and username, plus a
             session cookie that keeps you logged in.
           </li>
+          <li>
+            Battle.net link: if you choose to link Battle.net on your dashboard, your Battle.net ID
+            and BattleTag. Unlinking deletes both.
+          </li>
           <li>Images uploaded by officers, such as news post images.</li>
         </ul>
         <p>Other services are involved in running the site:</p>
         <ul>
           <li>Cloudflare Turnstile checks that application submissions come from a person.</li>
           <li>Twitch and YouTube provide live status, thumbnails and embedded streams and videos.</li>
+          <li>Blizzard Battle.net signs you in when you link your account.</li>
           <li>Render hosts the site and its database.</li>
         </ul>
         <p>

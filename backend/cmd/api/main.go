@@ -64,6 +64,19 @@ func run() error {
 		BaseURL:      auth.DiscordAPIBaseURL,
 	}, &http.Client{Timeout: 10 * time.Second})
 
+	// Assign only when configured: a typed-nil *BattleNet in the option would read as enabled.
+	var authOptions []auth.ServiceOption
+	if cfg.battleNet.enabled() {
+		authOptions = append(authOptions, auth.WithBattleNet(auth.NewBattleNet(auth.BattleNetConfig{
+			ClientID:     cfg.battleNet.clientID,
+			ClientSecret: cfg.battleNet.clientSecret,
+			RedirectURL:  cfg.battleNet.redirectURL,
+			BaseURL:      auth.BattleNetAPIBaseURL,
+		}, &http.Client{Timeout: 10 * time.Second})))
+	} else {
+		slog.Info("battle.net linking disabled: BATTLENET_REDIRECT_URL is not set")
+	}
+
 	playlistID := cfg.youtube.playlistID
 	if !cfg.youtube.enabled() {
 		slog.Info("suggested videos disabled: YOUTUBE_API_KEY and YOUTUBE_PLAYLIST_ID are not both set")
@@ -102,7 +115,7 @@ func run() error {
 
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{}, recruiting, botCheck, cfg.siteBaseURL)),
-		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db))),
+		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db), authOptions...)),
 		Images:         images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.System{}, announcements, cfg.siteBaseURL)),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),

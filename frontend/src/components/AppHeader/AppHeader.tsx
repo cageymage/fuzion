@@ -74,7 +74,9 @@ function AccountMenu() {
           {user.username.slice(0, 1).toUpperCase()}
         </span>
       )}
-      <span className={styles.username}>{user.username}</span>
+      <Link to="/dashboard" className={styles.username}>
+        {user.username}
+      </Link>
       <button
         type="button"
         className={styles.logoutButton}

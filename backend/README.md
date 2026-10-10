@@ -36,6 +36,7 @@ Environment:
 | `BLIZZARD_NAMESPACE`    | `profile-<region>` | the game version's profile namespace, e.g. `profile-classic1x-us`; Forever's value is not known yet |
 | `GUILD_REALM_SLUG`      | when enabled | the guild's realm in Blizzard's slug form, e.g. `area-52` |
 | `GUILD_NAME_SLUG`       | when enabled | the guild name as a slug (lowercase, spaces to hyphens), e.g. `my-guild` |
+| `BATTLENET_REDIRECT_URL` | optional | enables Battle.net account linking on `/dashboard`; must be registered on the Blizzard client, `http://localhost:5173/api/auth/battlenet/callback` in dev. Needs `BLIZZARD_CLIENT_ID` and `BLIZZARD_CLIENT_SECRET` on the API too |
 
 Background jobs run from `cmd/sync`, one job per invocation, once and exit
 (Render runs `/sync twitch` every minute). Locally, with the API already run

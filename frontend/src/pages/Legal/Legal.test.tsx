@@ -24,6 +24,14 @@ describe('Legal', () => {
     }
   })
 
+  it('should describe the data stored when a member links Battle.net when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    const privacy = screen.getByRole('region', { name: 'Privacy policy' })
+    expect(privacy).toHaveTextContent('Battle.net ID and BattleTag')
+    expect(privacy).toHaveTextContent('Unlinking deletes both')
+  })
+
   it('should say removal is requested through an officer on Discord when the page renders', () => {
     renderWithProviders(<Legal />)
 

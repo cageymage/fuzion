@@ -6,6 +6,7 @@ import { ToastProvider } from '../components/Toast/Toast'
 import { Applications } from '../pages/Applications/Applications'
 import { Calendar } from '../pages/Calendar/Calendar'
 import { ComingSoon } from '../pages/ComingSoon/ComingSoon'
+import { Dashboard } from '../pages/Dashboard/Dashboard'
 import { Home } from '../pages/Home/Home'
 import { Legal } from '../pages/Legal/Legal'
 import { News } from '../pages/News/News'
@@ -62,6 +63,7 @@ export function App() {
             <Route path="/streams" element={<Streams />} />
             <Route path="/applications" element={<Applications />} />
             <Route path="/professions" element={<Professions />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/legal" element={<Legal />} />
             {navItems
               .filter(
