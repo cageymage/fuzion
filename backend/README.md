@@ -29,6 +29,13 @@ Environment:
 | `DISCORD_REDIRECT_URL`  | required | must be registered on the Discord app; `http://localhost:5173/api/auth/callback` in dev |
 | `TWITCH_CLIENT_ID`      | optional | `cmd/sync` only; from a dev.twitch.tv app. The Twitch job skips itself unless both are set |
 | `TWITCH_CLIENT_SECRET`  | optional | same place; never commit it        |
+| `SYNC_BLIZZARD_ROSTER_ENABLED` | `false` | `cmd/sync` only; the Blizzard roster job does nothing unless this is `true` |
+| `BLIZZARD_CLIENT_ID`    | when enabled | from a develop.battle.net client |
+| `BLIZZARD_CLIENT_SECRET` | when enabled | same place; never commit it |
+| `BLIZZARD_REGION`       | `us` | API host region |
+| `BLIZZARD_NAMESPACE`    | `profile-<region>` | the game version's profile namespace, e.g. `profile-classic1x-us`; Forever's value is not known yet |
+| `GUILD_REALM_SLUG`      | when enabled | the guild's realm in Blizzard's slug form, e.g. `area-52` |
+| `GUILD_NAME_SLUG`       | when enabled | the guild name as a slug (lowercase, spaces to hyphens), e.g. `my-guild` |
 
 Background jobs run from `cmd/sync`, one job per invocation, once and exit
 (Render runs `/sync twitch` every minute). Locally, with the API already run
@@ -44,6 +51,19 @@ game: a guildie live in retail WoW (game id 18122) is `isLive`, one live in
 another game is `isLiveOtherGame` (never shown on the home page), and anyone
 else has both flags false. It also stores each live stream's title and a
 thumbnail URL with a fixed 440x248 size.
+
+`sync blizzard-roster` pulls the guild roster from Blizzard once an hour and
+is off until `SYNC_BLIZZARD_ROSTER_ENABLED=true`. For each member it adds the
+character if the roster lacks it, or refreshes class, level and guild rank if
+it exists (matched on name and realm, ignoring case). New characters get the
+secondary name `Unset` and role `dps` because Blizzard supplies neither; the
+sync never touches role, spec, main/alt, raid team or owner after that. A
+character the sync saw before and no longer sees gets `left_guild_at` and
+drops off `GET /api/roster`; characters entered by hand that Blizzard never
+listed are left alone. Members with a class the site lacks (Death Knight,
+Monk, Demon Hunter, Evoker exist on retail only) are skipped and counted in
+the `sync_log` message, and an empty or failed Blizzard response changes
+nothing.
 
 Migrations under `migrations/` are embedded and applied on startup, so there
 is no separate migrate step.

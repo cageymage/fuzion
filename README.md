@@ -202,10 +202,11 @@ clean database: `docker compose down -v` then `npm run dev` again.
 
 ## Deploying
 
-Production is four Render services declared in [render.yaml](render.yaml):
+Production is five Render services declared in [render.yaml](render.yaml):
 a static site for the frontend, a Docker web service for the API, a cron
 job that syncs Twitch live status every minute (the API's image, run as
-`/sync twitch`), and a managed Postgres. Render deploys `main` on push; GitHub Actions
+`/sync twitch`), a cron job that syncs the guild roster from Blizzard hourly
+(`/sync blizzard-roster`, off by default), and a managed Postgres. Render deploys `main` on push; GitHub Actions
 ([test.yml](.github/workflows/test.yml)) runs the test suites on PRs.
 
 The static site rewrites `/api/*` to the API service, so the browser only
@@ -215,7 +216,7 @@ config or `VITE_API_BASE_URL` is needed in prod.
 First-time setup:
 
 1. Render dashboard → **New → Blueprint**, pick this repo. Render creates
-   all four services from `render.yaml` and wires `DATABASE_URL`. Later
+   all five services from `render.yaml` and wires `DATABASE_URL`. Later
    additions to `render.yaml` are picked up when the Blueprint syncs, which
    happens on push to `main` if the Blueprint's auto-sync is on.
 2. Check the API's hostname in the dashboard. If it isn't
@@ -230,6 +231,11 @@ First-time setup:
    (from a Confidential app at dev.twitch.tv/console). Until both are set,
    each run logs that it skipped and exits 0. Once they are, every run
    writes a row to `sync_log`.
+6. `fuzion-sync-blizzard-roster` ships switched off (`SYNC_BLIZZARD_ROSTER_ENABLED`
+   is `false`). To turn it on, set the Blizzard credentials, `BLIZZARD_NAMESPACE`,
+   `GUILD_REALM_SLUG` and `GUILD_NAME_SLUG`, then flip the flag to `true`. Check
+   the first run's `sync_log` row before trusting it; see
+   [backend/README.md](backend/README.md) for what the job writes.
 
 Postgres runs on the paid Basic plan (`0.1c-256mb`, $6/mo), not the free
 tier. That is deliberate: a free database expires after 30 days, and losing
