@@ -1,0 +1,71 @@
+{
+  "_links": { "self": { "href": "https://us.api.blizzard.com/data/wow/guild/defias-pillager/test-guild/roster?namespace=profile-classic1x-us" } },
+  "guild": {
+    "name": "Test Guild",
+    "id": 1,
+    "realm": { "name": "Defias Pillager", "id": 5126, "slug": "defias-pillager" },
+    "faction": { "type": "ALLIANCE", "name": "Alliance" }
+  },
+  "members": [
+    {
+      "character": {
+        "name": "Testwarr",
+        "id": 1001,
+        "realm": { "id": 5126, "slug": "defias-pillager" },
+        "level": 60,
+        "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/1" }, "id": 1 },
+        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/1" }, "id": 1 },
+        "faction": { "type": "ALLIANCE" }
+      },
+      "rank": 0
+    },
+    {
+      "character": {
+        "name": "Testmage",
+        "id": 1002,
+        "realm": { "id": 5126, "slug": "defias-pillager" },
+        "level": 45,
+        "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/8" }, "id": 8 },
+        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/7" }, "id": 7 },
+        "faction": { "type": "ALLIANCE" }
+      },
+      "rank": 5
+    },
+    {
+      "character": {
+        "name": "Testdruid",
+        "id": 1003,
+        "realm": { "id": 5126, "slug": "defias-pillager" },
+        "level": 60,
+        "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/11" }, "id": 11 },
+        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/4" }, "id": 4 },
+        "faction": { "type": "ALLIANCE" }
+      },
+      "rank": 6
+    },
+    {
+      "character": {
+        "name": "Thráin",
+        "id": 1004,
+        "realm": { "id": 1566, "slug": "area-52" },
+        "level": 58,
+        "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/2" }, "id": 2 },
+        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/3" }, "id": 3 },
+        "faction": { "type": "ALLIANCE" }
+      },
+      "rank": 3
+    },
+    {
+      "character": {
+        "name": "Testdk",
+        "id": 1005,
+        "realm": { "id": 1566, "slug": "area-52" },
+        "level": 90,
+        "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/6" }, "id": 6 },
+        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/1" }, "id": 1 },
+        "faction": { "type": "ALLIANCE" }
+      },
+      "rank": 5
+    }
+  ]
+}
