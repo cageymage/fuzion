@@ -13,6 +13,7 @@ type config struct {
 	allowedOrigins []string
 	discord        discordConfig
 	youtube        youTubeConfig
+	battleNet      battleNetConfig
 
 	// Optional: empty disables the Discord ping for new applications, so local
 	// dev and CI need no real channel.
@@ -37,6 +38,18 @@ type youTubeConfig struct {
 
 func (c youTubeConfig) enabled() bool {
 	return c.apiKey != "" && c.playlistID != ""
+}
+
+// Optional: without BATTLENET_REDIRECT_URL, members cannot link a Battle.net
+// account. The client credentials are the same Blizzard app the roster sync uses.
+type battleNetConfig struct {
+	clientID     string
+	clientSecret string
+	redirectURL  string
+}
+
+func (c battleNetConfig) enabled() bool {
+	return c.redirectURL != ""
 }
 
 type discordConfig struct {
@@ -70,6 +83,22 @@ func loadConfig() (config, error) {
 		return config{}, err
 	}
 
+	battleNet := battleNetConfig{
+		clientID:     os.Getenv("BLIZZARD_CLIENT_ID"),
+		clientSecret: os.Getenv("BLIZZARD_CLIENT_SECRET"),
+		redirectURL:  os.Getenv("BATTLENET_REDIRECT_URL"),
+	}
+	if battleNet.enabled() {
+		for _, v := range []struct{ name, value string }{
+			{"BLIZZARD_CLIENT_ID", battleNet.clientID},
+			{"BLIZZARD_CLIENT_SECRET", battleNet.clientSecret},
+		} {
+			if v.value == "" {
+				return config{}, fmt.Errorf("%s is required when BATTLENET_REDIRECT_URL is set", v.name)
+			}
+		}
+	}
+
 	for _, webhook := range []string{"DISCORD_ANNOUNCEMENTS_WEBHOOK_URL", "DISCORD_RECRUITING_WEBHOOK_URL"} {
 		if os.Getenv(webhook) != "" && os.Getenv("SITE_BASE_URL") == "" {
 			return config{}, fmt.Errorf("SITE_BASE_URL is required when %s is set", webhook)
@@ -81,7 +110,8 @@ func loadConfig() (config, error) {
 		databaseURL:    databaseURL,
 		allowedOrigins: allowedOrigins,
 		discord:        discord,
-		youtube: youTubeConfig{
+		battleNet:      battleNet,
+		youtube:youTubeConfig{
 			apiKey:     os.Getenv("YOUTUBE_API_KEY"),
 			playlistID: os.Getenv("YOUTUBE_PLAYLIST_ID"),
 		},

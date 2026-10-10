@@ -43,8 +43,9 @@ const SiteBaseURL = "https://fuzion.example"
 
 type Server struct {
 	*httptest.Server
-	Discord *FakeDiscord
-	Webhook *FakeWebhook
+	Discord   *FakeDiscord
+	BattleNet *FakeBattleNet
+	Webhook   *FakeWebhook
 	// Announcements is the news announcements channel, separate from Webhook (recruiting).
 	Announcements *FakeWebhook
 	YouTube       *FakeYouTube
@@ -125,10 +126,18 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 		BaseURL:      discord.URL,
 	}, discord.Client())
 
+	fakeBattleNet := NewFakeBattleNet(t)
+	battleNet := auth.NewBattleNet(auth.BattleNetConfig{
+		ClientID:     BattleNetClientID,
+		ClientSecret: BattleNetClientSecret,
+		RedirectURL:  BattleNetRedirectURL,
+		BaseURL:      fakeBattleNet.URL,
+	}, fakeBattleNet.Client())
+
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting, verifier, SiteBaseURL)),
-		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db))),
-		Images:         images.NewHandler(images.NewService(images.NewRepo(db))),
+		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), auth.WithBattleNet(battleNet))),
+		Images:        images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL)),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.Fixed(FixedNow))),
@@ -151,7 +160,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	client.Jar = jar
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
-	return &Server{Server: httpServer, Discord: discord, Webhook: webhook, Announcements: announcementsWebhook, YouTube: youTube, Turnstile: fakeTurnstile, db: db, client: client}
+	return &Server{Server: httpServer, Discord: discord, BattleNet: fakeBattleNet, Webhook: webhook, Announcements: announcementsWebhook, YouTube: youTube, Turnstile: fakeTurnstile, db: db, client: client}
 }
 
 type LoginOption func(*loginOptions)

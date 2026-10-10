@@ -14,13 +14,59 @@ const sessionTTL = 30 * 24 * time.Hour
 
 var ErrCannotRemoveOwnAdmin = errors.New("cannot remove your own admin access")
 
+var ErrBattleNetNotConfigured = errors.New("battle.net linking is not configured")
+
 type Service struct {
-	provider Provider
-	repo     *Repo
+	provider  Provider
+	battleNet Provider
+	repo      *Repo
 }
 
-func NewService(provider Provider, repo *Repo) *Service {
-	return &Service{provider: provider, repo: repo}
+type ServiceOption func(*Service)
+
+// WithBattleNet enables account linking. Assign only a non-nil provider: a
+// typed-nil in the interface would read as configured.
+func WithBattleNet(provider Provider) ServiceOption {
+	return func(s *Service) { s.battleNet = provider }
+}
+
+func NewService(provider Provider, repo *Repo, opts ...ServiceOption) *Service {
+	s := &Service{provider: provider, repo: repo}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+func (s *Service) BattleNetEnabled() bool {
+	return s.battleNet != nil
+}
+
+func (s *Service) BattleNetAuthURL(state string) string {
+	return s.battleNet.AuthURL(state)
+}
+
+// LinkBattleNet attaches the Battle.net account behind a callback code to an
+// already logged-in user. It is linking, not a second login: no session is created.
+func (s *Service) LinkBattleNet(ctx context.Context, userID uuid.UUID, code string) error {
+	if s.battleNet == nil {
+		return ErrBattleNetNotConfigured
+	}
+	identity, err := s.battleNet.Exchange(ctx, code)
+	if err != nil {
+		return fmt.Errorf("link battle.net: %w", err)
+	}
+	if err := s.repo.LinkBattleNet(ctx, userID, identity); err != nil {
+		return fmt.Errorf("link battle.net: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) UnlinkBattleNet(ctx context.Context, userID uuid.UUID) error {
+	if err := s.repo.UnlinkBattleNet(ctx, userID); err != nil {
+		return fmt.Errorf("unlink battle.net: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) AuthURL(state string) string {

@@ -8,23 +8,29 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 )
 
 var (
-	ErrSessionNotFound = errors.New("session not found")
-	ErrUserNotFound    = errors.New("user not found")
+	ErrSessionNotFound        = errors.New("session not found")
+	ErrUserNotFound           = errors.New("user not found")
+	ErrBattleNetAlreadyLinked = errors.New("battle.net account is already linked to another user")
 )
 
+const uniqueViolationCode = "23505"
+
 type User struct {
-	ID         uuid.UUID `db:"id"`
-	DiscordID  string    `db:"discord_id"`
-	Username   string    `db:"username"`
-	AvatarURL  *string   `db:"avatar_url"`
-	IsAdmin    bool      `db:"is_admin"`
-	IsOfficer  bool      `db:"is_officer"`
-	CreatedAt  time.Time `db:"created_at"`
-	LastSeenAt time.Time `db:"last_seen_at"`
+	ID           uuid.UUID `db:"id"`
+	DiscordID    string    `db:"discord_id"`
+	Username     string    `db:"username"`
+	AvatarURL    *string   `db:"avatar_url"`
+	BattleNetID  *string   `db:"battlenet_id"`
+	BattleNetTag *string   `db:"battlenet_tag"`
+	IsAdmin      bool      `db:"is_admin"`
+	IsOfficer    bool      `db:"is_officer"`
+	CreatedAt    time.Time `db:"created_at"`
+	LastSeenAt   time.Time `db:"last_seen_at"`
 }
 
 // HasOfficerAccess is the effective officer permission: admins get
@@ -56,7 +62,7 @@ func (r *Repo) UpsertUserByDiscordID(ctx context.Context, identity Identity) (Us
 			SET username = EXCLUDED.username,
 			    avatar_url = EXCLUDED.avatar_url,
 			    last_seen_at = now()
-		RETURNING id, discord_id, username, avatar_url, is_admin, is_officer, created_at, last_seen_at,
+		RETURNING id, discord_id, username, avatar_url, battlenet_id, battlenet_tag, is_admin, is_officer, created_at, last_seen_at,
 		          (xmax = 0 AND is_admin) AS granted_first_admin`
 
 	var avatarURL *string
@@ -76,7 +82,7 @@ func (r *Repo) UpsertUserByDiscordID(ctx context.Context, identity Identity) (Us
 
 func (r *Repo) ListUsers(ctx context.Context) ([]User, error) {
 	const query = `
-		SELECT id, discord_id, username, avatar_url, is_admin, is_officer, created_at, last_seen_at
+		SELECT id, discord_id, username, avatar_url, battlenet_id, battlenet_tag, is_admin, is_officer, created_at, last_seen_at
 		FROM users
 		ORDER BY username`
 
@@ -95,7 +101,7 @@ func (r *Repo) UpdateUserRoles(ctx context.Context, id uuid.UUID, isOfficer, isA
 		UPDATE users
 		SET is_officer = $2, is_admin = $3
 		WHERE id = $1
-		RETURNING id, discord_id, username, avatar_url, is_admin, is_officer, created_at, last_seen_at`
+		RETURNING id, discord_id, username, avatar_url, battlenet_id, battlenet_tag, is_admin, is_officer, created_at, last_seen_at`
 
 	var user User
 	err := r.db.GetContext(ctx, &user, query, id, isOfficer, isAdmin)
@@ -108,6 +114,35 @@ func (r *Repo) UpdateUserRoles(ctx context.Context, id uuid.UUID, isOfficer, isA
 	return user.utc(), nil
 }
 
+func (r *Repo) LinkBattleNet(ctx context.Context, userID uuid.UUID, identity Identity) error {
+	const query = `
+		UPDATE users
+		SET battlenet_id = $2, battlenet_tag = $3
+		WHERE id = $1`
+
+	_, err := r.db.ExecContext(ctx, query, userID, identity.ProviderUserID, identity.Username)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
+		return ErrBattleNetAlreadyLinked
+	}
+	if err != nil {
+		return fmt.Errorf("link battle.net: %w", err)
+	}
+	return nil
+}
+
+func (r *Repo) UnlinkBattleNet(ctx context.Context, userID uuid.UUID) error {
+	const query = `
+		UPDATE users
+		SET battlenet_id = NULL, battlenet_tag = NULL
+		WHERE id = $1`
+
+	if _, err := r.db.ExecContext(ctx, query, userID); err != nil {
+		return fmt.Errorf("unlink battle.net: %w", err)
+	}
+	return nil
+}
+
 func (r *Repo) CreateSession(ctx context.Context, token string, userID uuid.UUID, expiresAt time.Time) error {
 	const query = `INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, $3)`
 	if _, err := r.db.ExecContext(ctx, query, token, userID, expiresAt); err != nil {
@@ -118,7 +153,7 @@ func (r *Repo) CreateSession(ctx context.Context, token string, userID uuid.UUID
 
 func (r *Repo) FindSession(ctx context.Context, token string) (User, error) {
 	const query = `
-		SELECT u.id, u.discord_id, u.username, u.avatar_url, u.is_admin, u.is_officer, u.created_at, u.last_seen_at
+		SELECT u.id, u.discord_id, u.username, u.avatar_url, u.battlenet_id, u.battlenet_tag, u.is_admin, u.is_officer, u.created_at, u.last_seen_at
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		WHERE s.token = $1 AND s.expires_at > now()`

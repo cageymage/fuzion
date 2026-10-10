@@ -25,6 +25,12 @@ func (h *Handler) Register(r chi.Router) {
 	r.Post("/auth/logout", h.logout)
 	r.Get("/auth/me", h.me)
 
+	if h.service.BattleNetEnabled() {
+		r.With(RequireUser).Get("/auth/battlenet/link", h.battleNetLink)
+		r.With(RequireUser).Get("/auth/battlenet/callback", h.battleNetCallback)
+		r.With(RequireUser).Delete("/auth/battlenet", h.battleNetUnlink)
+	}
+
 	r.Route("/admin/users", func(admin chi.Router) {
 		admin.Use(RequireAdmin)
 		admin.Get("/", h.listUsers)
@@ -33,11 +39,13 @@ func (h *Handler) Register(r chi.Router) {
 }
 
 type meResponse struct {
-	ID        uuid.UUID `json:"id"`
-	Username  string    `json:"username"`
-	AvatarURL *string   `json:"avatarUrl"`
-	IsOfficer bool      `json:"isOfficer"`
-	IsAdmin   bool      `json:"isAdmin"`
+	ID              uuid.UUID `json:"id"`
+	Username        string    `json:"username"`
+	AvatarURL       *string   `json:"avatarUrl"`
+	IsOfficer       bool      `json:"isOfficer"`
+	IsAdmin         bool      `json:"isAdmin"`
+	BattleNetLinked bool      `json:"battlenetLinked"`
+	BattleTag       *string   `json:"battletag"`
 }
 
 type userResponse struct {
@@ -119,7 +127,61 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		AvatarURL: user.AvatarURL,
 		IsOfficer: user.HasOfficerAccess(),
 		IsAdmin:   user.IsAdmin,
+
+		BattleNetLinked: user.BattleNetID != nil,
+		BattleTag:       user.BattleNetTag,
 	})
+}
+
+func (h *Handler) battleNetLink(w http.ResponseWriter, r *http.Request) {
+	state, err := newState()
+	if err != nil {
+		slog.ErrorContext(r.Context(), "generate oauth state", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "linking could not be started"})
+		return
+	}
+	http.SetCookie(w, stateCookie(r, state))
+	http.Redirect(w, r, h.service.BattleNetAuthURL(state), http.StatusFound)
+}
+
+func (h *Handler) battleNetCallback(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, expiredCookie(r, stateCookieName))
+
+	cookie, err := r.Cookie(stateCookieName)
+	if err != nil || subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(r.URL.Query().Get("state"))) != 1 {
+		slog.WarnContext(r.Context(), "battle.net callback state missing or differs from cookie", "host", r.Host)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "link state mismatch"})
+		return
+	}
+
+	// The user pressed Cancel on the consent screen.
+	if r.URL.Query().Get("error") != "" {
+		http.Redirect(w, r, "/dashboard", http.StatusFound)
+		return
+	}
+
+	user, _ := UserFrom(r.Context())
+	err = h.service.LinkBattleNet(r.Context(), user.ID, r.URL.Query().Get("code"))
+	switch {
+	case errors.Is(err, ErrBattleNetAlreadyLinked):
+		http.Redirect(w, r, "/dashboard?battlenet=already-linked", http.StatusFound)
+		return
+	case err != nil:
+		slog.ErrorContext(r.Context(), "link battle.net", "error", err, "user_id", user.ID)
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "battle.net could not be linked"})
+		return
+	}
+	http.Redirect(w, r, "/dashboard", http.StatusFound)
+}
+
+func (h *Handler) battleNetUnlink(w http.ResponseWriter, r *http.Request) {
+	user, _ := UserFrom(r.Context())
+	if err := h.service.UnlinkBattleNet(r.Context(), user.ID); err != nil {
+		slog.ErrorContext(r.Context(), "unlink battle.net", "error", err, "user_id", user.ID)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "battle.net could not be unlinked"})
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
