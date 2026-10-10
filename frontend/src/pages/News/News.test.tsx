@@ -321,6 +321,19 @@ describe('News', () => {
     expect(await screen.findByText('No posts in this category yet.')).toBeInTheDocument()
   })
 
+  it('should use the first image in the post body as the card background when the post has no image URL', async () => {
+    server.use(
+      newsHandler([
+        { ...recruitmentPost, body: 'Intro\n\n![Raid night](https://cdn.example/raid-night.jpg)' },
+      ]),
+    )
+
+    renderNews()
+
+    const card = (await screen.findByText('Now recruiting: Holy Priest')).closest('article')
+    expect(card?.querySelector('img')).toHaveAttribute('src', 'https://cdn.example/raid-night.jpg')
+  })
+
   it('should hide the paging controls when there are no posts', async () => {
     server.use(newsHandler([]))
 

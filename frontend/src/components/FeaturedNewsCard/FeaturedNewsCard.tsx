@@ -3,6 +3,7 @@ import { formatRelativeDate } from '../../lib/format'
 import { newsCategoryMeta } from '../../lib/newsCategory'
 import type { NewsPost } from '../../types/news'
 import { Chip } from '../Chip/Chip'
+import { NewsBackdrop } from '../NewsBackdrop/NewsBackdrop'
 import styles from './FeaturedNewsCard.module.css'
 
 interface FeaturedNewsCardProps {
@@ -14,6 +15,7 @@ export function FeaturedNewsCard({ post }: FeaturedNewsCardProps) {
 
   return (
     <article className={`card ${styles.card}`}>
+      <NewsBackdrop category={post.category} imageUrl={post.imageUrl} />
       <div className={styles.thumbnail}>
         {post.imageUrl ? (
           <img className={styles.thumbnailImage} src={post.imageUrl} alt="" />

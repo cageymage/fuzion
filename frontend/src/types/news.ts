@@ -28,6 +28,7 @@ export interface EditablePost {
   category: NewsCategory
   body: string
   pinned: boolean
+  imageUrl?: string | null
   authorName: string
   publishedAt: string | null
   updatedAt: string
