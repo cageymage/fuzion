@@ -48,6 +48,7 @@ func (r *Repo) List(ctx context.Context) ([]Character, error) {
 	const query = `
 		SELECT id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, created_at
 		FROM characters
+		WHERE left_guild_at IS NULL
 		ORDER BY is_main DESC, name ASC, secondary_name ASC`
 
 	characters := []Character{}
