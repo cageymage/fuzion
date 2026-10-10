@@ -39,11 +39,14 @@ type UpsertResult struct {
 	// UnsupportedClasses counts skipped members by Blizzard class id, so a run shows
 	// which classes the site is missing.
 	UnsupportedClasses map[int]int
+	// UnmappedRaces counts imported members whose race id the sync cannot name, so their
+	// race is left as it was.
+	UnmappedRaces map[int]int
 }
 
 // UpsertFromBlizzard makes the guild's members match Blizzard's list. Characters are
 // matched on name and realm, ignoring case. For existing characters only class, level,
-// guild rank and left_guild_at are written; role, spec, main/alt, raid team and owner
+// race, guild rank and left_guild_at are written; role, spec, main/alt, raid team and owner
 // belong to officers and members. A character that was seen in an earlier sync and is
 // now absent is marked as having left; one the sync has never seen is left alone.
 func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.RosterMember) (UpsertResult, error) {
@@ -51,13 +54,14 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 		UPDATE characters SET
 			class         = $3,
 			level         = COALESCE($4, level),
+			race          = COALESCE($6, race),
 			guild_rank    = $5,
 			left_guild_at = NULL
 		WHERE lower(name) = lower($1) AND ` + realmSlugSQL + ` = $2`
 
 	const insert = `
-		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main, level, guild_rank)
-		VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8)
+		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main, level, guild_rank, race)
+		VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8, $9)
 		ON CONFLICT (name, secondary_name) DO NOTHING`
 
 	const markLeft = `
@@ -72,7 +76,7 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 	}
 	defer func() { _ = tx.Rollback() }() // no-op once committed
 
-	result := UpsertResult{UnsupportedClasses: map[int]int{}}
+	result := UpsertResult{UnsupportedClasses: map[int]int{}, UnmappedRaces: map[int]int{}}
 	seenNames := make([]string, 0, len(members))
 	seenRealms := make([]string, 0, len(members))
 	for _, m := range members {
@@ -87,7 +91,11 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 		}
 
 		level := validLevel(m.Level)
-		updated, err := tx.ExecContext(ctx, update, m.Name, slug, m.Class, level, m.Rank)
+		race := raceOrNil(m)
+		if race == nil {
+			result.UnmappedRaces[m.RaceID]++
+		}
+		updated, err := tx.ExecContext(ctx, update, m.Name, slug, m.Class, level, m.Rank, race)
 		if err != nil {
 			return UpsertResult{}, fmt.Errorf("update character %s: %w", m.Name, err)
 		}
@@ -98,7 +106,7 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 			continue
 		}
 
-		inserted, err := tx.ExecContext(ctx, insert, uuid.New(), m.Name, placeholderSecondaryName, realmDisplayName(slug), m.Class, placeholderRole, level, m.Rank)
+		inserted, err := tx.ExecContext(ctx, insert, uuid.New(), m.Name, placeholderSecondaryName, realmDisplayName(slug), m.Class, placeholderRole, level, m.Rank, race)
 		if err != nil {
 			return UpsertResult{}, fmt.Errorf("insert character %s: %w", m.Name, err)
 		}
@@ -189,12 +197,20 @@ func (j *SyncBlizzardRoster) sync(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("store guild roster: %w", err)
 	}
-	return fmt.Sprintf("%d members: %d added, %d updated, %d left, %d skipped%s",
-		len(members), result.Inserted, result.Updated, result.Left, result.Skipped, describeUnsupportedClasses(result.UnsupportedClasses)), nil
+	return fmt.Sprintf("%d members: %d added, %d updated, %d left, %d skipped%s%s",
+		len(members), result.Inserted, result.Updated, result.Left, result.Skipped,
+		describeCounts("class", result.UnsupportedClasses), describeCounts("unmapped race", result.UnmappedRaces)), nil
 }
 
-// " (class 6 x20, 10 x12)", most common first, or "" when nothing was skipped for its class.
-func describeUnsupportedClasses(counts map[int]int) string {
+func raceOrNil(m blizzard.RosterMember) *string {
+	if m.Race == "" {
+		return nil
+	}
+	return &m.Race
+}
+
+// " (class 6 x20, 10 x12)", most common id first, or "" when there is nothing to count.
+func describeCounts(label string, counts map[int]int) string {
 	if len(counts) == 0 {
 		return ""
 	}
@@ -208,7 +224,7 @@ func describeUnsupportedClasses(counts map[int]int) string {
 	parts := make([]string, 0, len(ids))
 	for i, id := range ids {
 		if i == 0 {
-			parts = append(parts, fmt.Sprintf("class %d x%d", id, counts[id]))
+			parts = append(parts, fmt.Sprintf("%s %d x%d", label, id, counts[id]))
 		} else {
 			parts = append(parts, fmt.Sprintf("%d x%d", id, counts[id]))
 		}

@@ -20,6 +20,7 @@ type fakeMember struct {
 	name  string
 	realm string
 	class int
+	race  int
 	level int
 	rank  int
 }
@@ -52,6 +53,7 @@ func newFakeBlizzardRoster(t *testing.T, members ...fakeMember) *fakeBlizzardRos
 					"level":          m.level,
 					"realm":          map[string]any{"slug": m.realm},
 					"playable_class": map[string]any{"id": m.class},
+					"playable_race":  map[string]any{"id": m.race},
 				},
 				"rank": m.rank,
 			})
@@ -79,6 +81,7 @@ type syncedCharacter struct {
 	Spec          *string `db:"spec"`
 	IsMain        bool    `db:"is_main"`
 	RaidTeam      *string `db:"raid_team"`
+	Race          *string `db:"race"`
 	Level         *int    `db:"level"`
 	GuildRank     *int    `db:"guild_rank"`
 	Left          bool    `db:"left"`
@@ -88,7 +91,7 @@ func syncedCharacters(t *testing.T, db *sqlx.DB) []syncedCharacter {
 	t.Helper()
 	var rows []syncedCharacter
 	err := db.Select(&rows, `
-		SELECT name, secondary_name, realm, class, role, spec, is_main, raid_team, level, guild_rank,
+		SELECT name, secondary_name, realm, class, role, spec, is_main, raid_team, race, level, guild_rank,
 		       left_guild_at IS NOT NULL AS "left"
 		FROM characters ORDER BY name`)
 	if err != nil {
@@ -114,6 +117,8 @@ func syncLogEntries(t *testing.T, db *sqlx.DB) []syncLogEntry {
 
 func intPtr(n int) *int { return &n }
 
+func strPtr(s string) *string { return &s }
+
 const (
 	warrior = 1
 	paladin = 2
@@ -127,8 +132,8 @@ func TestSyncBlizzardRoster_InsertsNewCharacters_WhenBlizzardListsMembersTheTabl
 	// given an empty roster and a Blizzard guild with a warrior and a multi-word realm paladin
 	db := testutil.DB(t)
 	fake := newFakeBlizzardRoster(t,
-		fakeMember{name: "Tankard", realm: "emberreach", class: warrior, level: 60, rank: 0},
-		fakeMember{name: "Lightbringer", realm: "area-52", class: paladin, level: 55, rank: 4},
+		fakeMember{name: "Tankard", realm: "emberreach", class: warrior, race: 1, level: 60, rank: 0},
+		fakeMember{name: "Lightbringer", realm: "area-52", class: paladin, race: 3, level: 55, rank: 4},
 	)
 
 	// when the roster sync runs
@@ -139,8 +144,8 @@ func TestSyncBlizzardRoster_InsertsNewCharacters_WhenBlizzardListsMembersTheTabl
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Lightbringer", SecondaryName: "Unset", Realm: "Area 52", Class: "Paladin", Role: "dps", Level: intPtr(55), GuildRank: intPtr(4)},
-		{Name: "Tankard", SecondaryName: "Unset", Realm: "Emberreach", Class: "Warrior", Role: "dps", Level: intPtr(60), GuildRank: intPtr(0)},
+		{Name: "Lightbringer", SecondaryName: "Unset", Realm: "Area 52", Class: "Paladin", Role: "dps", Race: strPtr("Dwarf"), Level: intPtr(55), GuildRank: intPtr(4)},
+		{Name: "Tankard", SecondaryName: "Unset", Realm: "Emberreach", Class: "Warrior", Role: "dps", Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(0)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -153,7 +158,7 @@ func TestSyncBlizzardRoster_PreservesOfficerOwnedFields_WhenUpdatingExistingChar
 	db.MustExec(`
 		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, is_main, raid_team, level)
 		VALUES ('11111111-1111-1111-1111-111111111111', 'Tankard', 'Ironhide', 'Emberreach', 'Warrior', 'Protection', 'tank', true, 'Team 1', 58)`)
-	fake := newFakeBlizzardRoster(t, fakeMember{name: "TANKARD", realm: "emberreach", class: warrior, level: 60, rank: 2})
+	fake := newFakeBlizzardRoster(t, fakeMember{name: "TANKARD", realm: "emberreach", class: warrior, race: 1, level: 60, rank: 2})
 
 	// when the roster sync runs with a different case and a higher level
 	err := fake.runSync(db)
@@ -165,7 +170,7 @@ func TestSyncBlizzardRoster_PreservesOfficerOwnedFields_WhenUpdatingExistingChar
 	protection := "Protection"
 	team1 := "Team 1"
 	want := []syncedCharacter{
-		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "tank", Spec: &protection, IsMain: true, RaidTeam: &team1, Level: intPtr(60), GuildRank: intPtr(2)},
+		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "tank", Spec: &protection, IsMain: true, RaidTeam: &team1, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(2)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -176,15 +181,15 @@ func TestSyncBlizzardRoster_MarksMissingCharactersAsLeft_WhenAnEarlierSyncSawThe
 	// given two characters imported by a first sync
 	db := testutil.DB(t)
 	first := newFakeBlizzardRoster(t,
-		fakeMember{name: "Stayer", realm: "emberreach", class: mage, level: 60, rank: 1},
-		fakeMember{name: "Quitter", realm: "emberreach", class: druid, level: 60, rank: 5},
+		fakeMember{name: "Stayer", realm: "emberreach", class: mage, race: 1, level: 60, rank: 1},
+		fakeMember{name: "Quitter", realm: "emberreach", class: druid, race: 1, level: 60, rank: 5},
 	)
 	if err := first.runSync(db); err != nil {
 		t.Fatalf("first sync: %v", err)
 	}
 
 	// when a later sync no longer lists one of them
-	second := newFakeBlizzardRoster(t, fakeMember{name: "Stayer", realm: "emberreach", class: mage, level: 60, rank: 1})
+	second := newFakeBlizzardRoster(t, fakeMember{name: "Stayer", realm: "emberreach", class: mage, race: 1, level: 60, rank: 1})
 	err := second.runSync(db)
 
 	// then I expect only the missing character to be marked as having left
@@ -206,19 +211,19 @@ func TestSyncBlizzardRoster_ClearsLeftMarker_WhenCharacterIsListedAgain(t *testi
 	// given a character a previous sync marked as having left
 	db := testutil.DB(t)
 	if err := newFakeBlizzardRoster(t,
-		fakeMember{name: "Stayer", realm: "emberreach", class: mage, level: 60, rank: 1},
-		fakeMember{name: "Boomerang", realm: "emberreach", class: druid, level: 60, rank: 5},
+		fakeMember{name: "Stayer", realm: "emberreach", class: mage, race: 1, level: 60, rank: 1},
+		fakeMember{name: "Boomerang", realm: "emberreach", class: druid, race: 1, level: 60, rank: 5},
 	).runSync(db); err != nil {
 		t.Fatalf("first sync: %v", err)
 	}
-	if err := newFakeBlizzardRoster(t, fakeMember{name: "Stayer", realm: "emberreach", class: mage, level: 60, rank: 1}).runSync(db); err != nil {
+	if err := newFakeBlizzardRoster(t, fakeMember{name: "Stayer", realm: "emberreach", class: mage, race: 1, level: 60, rank: 1}).runSync(db); err != nil {
 		t.Fatalf("second sync: %v", err)
 	}
 
 	// when a sync lists the character again
 	err := newFakeBlizzardRoster(t,
-		fakeMember{name: "Stayer", realm: "emberreach", class: mage, level: 60, rank: 1},
-		fakeMember{name: "Boomerang", realm: "emberreach", class: druid, level: 60, rank: 5},
+		fakeMember{name: "Stayer", realm: "emberreach", class: mage, race: 1, level: 60, rank: 1},
+		fakeMember{name: "Boomerang", realm: "emberreach", class: druid, race: 1, level: 60, rank: 5},
 	).runSync(db)
 
 	// then I expect nobody to be marked as having left
@@ -238,7 +243,7 @@ func TestSyncBlizzardRoster_LeavesHandEnteredCharactersVisible_WhenBlizzardNever
 	db.MustExec(`
 		INSERT INTO characters (id, name, secondary_name, realm, class, role)
 		VALUES ('11111111-1111-1111-1111-111111111111', 'Recruit', 'Trialist', 'Emberreach', 'Rogue', 'dps')`)
-	fake := newFakeBlizzardRoster(t, fakeMember{name: "Stayer", realm: "emberreach", class: mage, level: 60, rank: 1})
+	fake := newFakeBlizzardRoster(t, fakeMember{name: "Stayer", realm: "emberreach", class: mage, race: 1, level: 60, rank: 1})
 
 	// when the roster sync runs
 	err := fake.runSync(db)
@@ -258,8 +263,8 @@ func TestSyncBlizzardRoster_SkipsMembersAndRecordsIt_WhenClassIsNotSupported(t *
 	// given a guild with a retail-only Death Knight and a level beyond the site's cap
 	db := testutil.DB(t)
 	fake := newFakeBlizzardRoster(t,
-		fakeMember{name: "Grimblade", realm: "emberreach", class: deathKnight, level: 90, rank: 3},
-		fakeMember{name: "Overleveled", realm: "emberreach", class: mage, level: 90, rank: 3},
+		fakeMember{name: "Grimblade", realm: "emberreach", class: deathKnight, race: 1, level: 90, rank: 3},
+		fakeMember{name: "Overleveled", realm: "emberreach", class: mage, race: 1, level: 90, rank: 3},
 	)
 
 	// when the roster sync runs
@@ -270,7 +275,7 @@ func TestSyncBlizzardRoster_SkipsMembersAndRecordsIt_WhenClassIsNotSupported(t *
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Overleveled", SecondaryName: "Unset", Realm: "Emberreach", Class: "Mage", Role: "dps", GuildRank: intPtr(3)},
+		{Name: "Overleveled", SecondaryName: "Unset", Realm: "Emberreach", Class: "Mage", Role: "dps", Race: strPtr("Human"), GuildRank: intPtr(3)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -285,12 +290,12 @@ func TestSyncBlizzardRoster_ListsSkippedClassesMostCommonFirst_WhenSeveralClasse
 	// given a guild with three Monks, one Death Knight and two Evokers
 	db := testutil.DB(t)
 	fake := newFakeBlizzardRoster(t,
-		fakeMember{name: "Monka", realm: "emberreach", class: 10, level: 60, rank: 3},
-		fakeMember{name: "Monkb", realm: "emberreach", class: 10, level: 60, rank: 3},
-		fakeMember{name: "Monkc", realm: "emberreach", class: 10, level: 60, rank: 3},
-		fakeMember{name: "Deathk", realm: "emberreach", class: deathKnight, level: 60, rank: 3},
-		fakeMember{name: "Evokera", realm: "emberreach", class: 13, level: 60, rank: 3},
-		fakeMember{name: "Evokerb", realm: "emberreach", class: 13, level: 60, rank: 3},
+		fakeMember{name: "Monka", realm: "emberreach", class: 10, race: 1, level: 60, rank: 3},
+		fakeMember{name: "Monkb", realm: "emberreach", class: 10, race: 1, level: 60, rank: 3},
+		fakeMember{name: "Monkc", realm: "emberreach", class: 10, race: 1, level: 60, rank: 3},
+		fakeMember{name: "Deathk", realm: "emberreach", class: deathKnight, race: 1, level: 60, rank: 3},
+		fakeMember{name: "Evokera", realm: "emberreach", class: 13, race: 1, level: 60, rank: 3},
+		fakeMember{name: "Evokerb", realm: "emberreach", class: 13, race: 1, level: 60, rank: 3},
 	)
 
 	// when the roster sync runs
@@ -309,7 +314,7 @@ func TestSyncBlizzardRoster_ListsSkippedClassesMostCommonFirst_WhenSeveralClasse
 func TestSyncBlizzardRoster_LeavesTableUntouchedAndLogsError_WhenBlizzardFails(t *testing.T) {
 	// given an imported character and a Blizzard that now returns a server error
 	db := testutil.DB(t)
-	if err := newFakeBlizzardRoster(t, fakeMember{name: "Stayer", realm: "emberreach", class: mage, level: 60, rank: 1}).runSync(db); err != nil {
+	if err := newFakeBlizzardRoster(t, fakeMember{name: "Stayer", realm: "emberreach", class: mage, race: 1, level: 60, rank: 1}).runSync(db); err != nil {
 		t.Fatalf("first sync: %v", err)
 	}
 	down := newFakeBlizzardRoster(t)
@@ -336,7 +341,7 @@ func TestSyncBlizzardRoster_LeavesTableUntouchedAndLogsError_WhenBlizzardFails(t
 func TestSyncBlizzardRoster_ReturnsErrorWithoutMarkingAnyoneAsLeft_WhenBlizzardReturnsNoMembers(t *testing.T) {
 	// given an imported character and a Blizzard that returns an empty roster
 	db := testutil.DB(t)
-	if err := newFakeBlizzardRoster(t, fakeMember{name: "Stayer", realm: "emberreach", class: mage, level: 60, rank: 1}).runSync(db); err != nil {
+	if err := newFakeBlizzardRoster(t, fakeMember{name: "Stayer", realm: "emberreach", class: mage, race: 1, level: 60, rank: 1}).runSync(db); err != nil {
 		t.Fatalf("first sync: %v", err)
 	}
 
@@ -373,5 +378,37 @@ func TestListRoster_HidesCharactersWhoLeftTheGuild(t *testing.T) {
 	resp.DecodeJSON(t, &characters)
 	if len(characters) != 1 || characters[0].Name != "Stayer" {
 		t.Errorf("roster = %+v, want only Stayer", characters)
+	}
+}
+
+func TestSyncBlizzardRoster_KeepsExistingRaceAndLogsIt_WhenRaceIdIsNotMapped(t *testing.T) {
+	// given an officer-set Skyborne character and a new member, both with race ids the sync cannot name
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, role, race)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Skywing', 'Unset', 'Emberreach', 'Mage', 'dps', 'Skyborne (High Order)')`)
+	fake := newFakeBlizzardRoster(t,
+		fakeMember{name: "Skywing", realm: "emberreach", class: mage, race: 99, level: 60, rank: 1},
+		fakeMember{name: "Newcomer", realm: "emberreach", class: mage, race: 99, level: 60, rank: 1},
+	)
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect the officer's race kept, the new member without a race, and the ids in the log
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	wantRaces := map[string]*string{"Skywing": strPtr("Skyborne (High Order)"), "Newcomer": nil}
+	gotRaces := map[string]*string{}
+	for _, c := range syncedCharacters(t, db) {
+		gotRaces[c.Name] = c.Race
+	}
+	if diff := cmp.Diff(wantRaces, gotRaces); diff != "" {
+		t.Errorf("unexpected races (-want +got):\n%s", diff)
+	}
+	wantLog := []syncLogEntry{{Source: "blizzard-roster", Status: "ok", Message: "2 members: 1 added, 1 updated, 0 left, 0 skipped (unmapped race 99 x2)"}}
+	if diff := cmp.Diff(wantLog, syncLogEntries(t, db)); diff != "" {
+		t.Errorf("unexpected sync log (-want +got):\n%s", diff)
 	}
 }

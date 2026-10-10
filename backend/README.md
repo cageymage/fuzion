@@ -54,8 +54,11 @@ thumbnail URL with a fixed 440x248 size.
 
 `sync blizzard-roster` pulls the guild roster from Blizzard once an hour and
 is off until `SYNC_BLIZZARD_ROSTER_ENABLED=true`. For each member it adds the
-character if the roster lacks it, or refreshes class, level and guild rank if
-it exists (matched on name and realm, ignoring case). New characters get the
+character if the roster lacks it, or refreshes class, level, race and guild rank if
+it exists (matched on name and realm, ignoring case). Race is set from the
+roster when its id is known (Classic races only; Skyborne ids are not mapped yet, so
+those members keep whatever race an officer set and show up as `unmapped race N` in
+the `sync_log` message). New characters get the
 secondary name `Unset` and role `dps` because Blizzard supplies neither; the
 sync never touches role, spec, main/alt, raid team or owner after that. A
 character the sync saw before and no longer sees gets `left_guild_at` and

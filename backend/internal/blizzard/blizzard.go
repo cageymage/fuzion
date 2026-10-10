@@ -29,6 +29,13 @@ var classNames = map[int]string{
 	7: "Shaman", 8: "Mage", 9: "Warlock", 11: "Druid",
 }
 
+// Classic race ids. Forever's Skyborne races are not here because their ids are not
+// known yet; a member with an unmapped race keeps RaceID and an empty Race.
+var raceNames = map[int]string{
+	1: "Human", 2: "Orc", 3: "Dwarf", 4: "Night Elf",
+	5: "Undead", 6: "Tauren", 7: "Gnome", 8: "Troll",
+}
+
 type Config struct {
 	ClientID     string
 	ClientSecret string
@@ -49,6 +56,8 @@ type RosterMember struct {
 	Rank      int
 	ClassID   int
 	Class     string
+	RaceID    int
+	Race      string
 }
 
 // A Client is meant to live for one job run: it keeps the app token it fetched and is
@@ -101,6 +110,9 @@ func (c *Client) GuildRoster(ctx context.Context, realmSlug, guildSlug string) (
 				PlayableClass struct {
 					ID int `json:"id"`
 				} `json:"playable_class"`
+				PlayableRace struct {
+					ID int `json:"id"`
+				} `json:"playable_race"`
 			} `json:"character"`
 			Rank int `json:"rank"`
 		} `json:"members"`
@@ -118,6 +130,8 @@ func (c *Client) GuildRoster(ctx context.Context, realmSlug, guildSlug string) (
 			Rank:      m.Rank,
 			ClassID:   m.Character.PlayableClass.ID,
 			Class:     classNames[m.Character.PlayableClass.ID],
+			RaceID:    m.Character.PlayableRace.ID,
+			Race:      raceNames[m.Character.PlayableRace.ID],
 		})
 	}
 	return members, nil

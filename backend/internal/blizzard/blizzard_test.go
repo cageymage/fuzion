@@ -87,11 +87,11 @@ func TestGuildRoster_ParsesMembers_WhenBlizzardResponds(t *testing.T) {
 		t.Fatalf("GuildRoster: %v", err)
 	}
 	want := []blizzard.RosterMember{
-		{Name: "Testwarr", RealmSlug: "defias-pillager", Level: 60, Rank: 0, ClassID: 1, Class: "Warrior"},
-		{Name: "Testmage", RealmSlug: "defias-pillager", Level: 45, Rank: 5, ClassID: 8, Class: "Mage"},
-		{Name: "Testdruid", RealmSlug: "defias-pillager", Level: 60, Rank: 6, ClassID: 11, Class: "Druid"},
-		{Name: "Thráin", RealmSlug: "area-52", Level: 58, Rank: 3, ClassID: 2, Class: "Paladin"},
-		{Name: "Testdk", RealmSlug: "area-52", Level: 90, Rank: 5, ClassID: 6, Class: ""},
+		{Name: "Testwarr", RealmSlug: "defias-pillager", Level: 60, Rank: 0, ClassID: 1, Class: "Warrior", RaceID: 1, Race: "Human"},
+		{Name: "Testmage", RealmSlug: "defias-pillager", Level: 45, Rank: 5, ClassID: 8, Class: "Mage", RaceID: 7, Race: "Gnome"},
+		{Name: "Testdruid", RealmSlug: "defias-pillager", Level: 60, Rank: 6, ClassID: 11, Class: "Druid", RaceID: 4, Race: "Night Elf"},
+		{Name: "Thráin", RealmSlug: "area-52", Level: 58, Rank: 3, ClassID: 2, Class: "Paladin", RaceID: 3, Race: "Dwarf"},
+		{Name: "Testdk", RealmSlug: "area-52", Level: 90, Rank: 5, ClassID: 6, Class: "", RaceID: 1, Race: "Human"},
 	}
 	if diff := cmp.Diff(want, members); diff != "" {
 		t.Errorf("unexpected members (-want +got):\n%s", diff)
