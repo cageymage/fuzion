@@ -1,0 +1,62 @@
+.page {
+  padding: 28px var(--gutter) 40px;
+  max-width: 760px;
+  font-size: var(--text-ui);
+}
+
+.title {
+  margin: 0 0 12px;
+  font-size: 38px;
+}
+
+.section {
+  margin-top: 28px;
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 1.625rem;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-chip);
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.linkButton:hover {
+  background: var(--gold-soft);
+  color: var(--gold-hover);
+}
+
+.button {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: var(--text-meta);
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold-hover);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  color: var(--live);
+}

@@ -12,6 +12,8 @@ const thundermane: AuthUser = {
   username: 'thundermane',
   avatarUrl: 'https://cdn.discordapp.com/avatars/80351110224678912/abc.png',
   isOfficer: false,
+  battlenetLinked: false,
+  battletag: null,
 }
 
 function loggedInAs(user: AuthUser) {
@@ -64,6 +66,17 @@ describe('AppHeader', () => {
     expect(await screen.findByText('thundermane')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Log in with Discord' })).not.toBeInTheDocument()
+  })
+
+  it('should link the username to the dashboard when a member is logged in', async () => {
+    loggedInAs(thundermane)
+
+    renderWithProviders(<AppHeader />)
+
+    expect(await screen.findByRole('link', { name: 'thundermane' })).toHaveAttribute(
+      'href',
+      '/dashboard',
+    )
   })
 
   it('should show the avatar as decorative when the logged-in member has one', async () => {
