@@ -35,6 +35,26 @@
   margin-bottom: 24px;
 }
 
+.officerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.editLink {
+  padding: 8px 16px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-chip);
+  color: var(--gold);
+}
+
+.editLink:hover {
+  background: var(--gold-soft);
+  color: var(--gold-hover);
+}
+
 .body {
   line-height: 1.65;
 }

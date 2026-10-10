@@ -45,6 +45,15 @@ describe('NewsCard', () => {
     expect(screen.queryByText('Two raid spots open for the Mythic roster.')).not.toBeInTheDocument()
   })
 
+  it('should link a draft to the editor and label it as a draft when the post is not published', () => {
+    renderWithProviders(<NewsCard post={{ ...post, publishedAt: null }} />)
+
+    expect(
+      screen.getByRole('link', { name: 'Now recruiting: Restoration Druid & Fire Mage' }),
+    ).toHaveAttribute('href', '/officer/news/post-2')
+    expect(screen.getByText('Draft by Officer')).toBeInTheDocument()
+  })
+
   it('should link the title to the post page', () => {
     renderWithProviders(<NewsCard post={post} />)
 

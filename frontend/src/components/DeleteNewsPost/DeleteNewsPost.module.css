@@ -1,0 +1,39 @@
+.button {
+  padding: 8px 16px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--gold);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--gold-soft);
+  color: var(--gold-hover);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.danger {
+  border-color: var(--live);
+  color: var(--live);
+}
+
+.confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-meta);
+}
+
+.error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--live);
+  font-size: var(--text-meta);
+}

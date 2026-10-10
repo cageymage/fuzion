@@ -23,10 +23,18 @@ function servePost(detail: NewsPostDetail) {
   server.use(http.get('/api/news/:id', () => HttpResponse.json(detail)))
 }
 
+const officer = { id: 'user-1', username: 'Officer', avatarUrl: null, isOfficer: true }
+const member = { id: 'user-2', username: 'Member', avatarUrl: null, isOfficer: false }
+
+function signInAs(user: typeof officer) {
+  server.use(http.get('/api/auth/me', () => HttpResponse.json(user)))
+}
+
 function renderPostPage() {
   return renderWithProviders(
     <Routes>
       <Route path="/news/:id" element={<NewsPostPage />} />
+      <Route path="/news" element={<p>News page</p>} />
     </Routes>,
     '/news/post-1',
   )
@@ -93,6 +101,49 @@ describe('NewsPostPage', () => {
     await user.keyboard('{Escape}')
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('should link to the editor when the visitor is an officer', async () => {
+    servePost(post)
+    signInAs(officer)
+
+    renderPostPage()
+
+    expect(await screen.findByRole('link', { name: 'Edit' })).toHaveAttribute(
+      'href',
+      '/officer/news/post-1',
+    )
+  })
+
+  it('should not offer Edit or Delete when the visitor is not an officer', async () => {
+    servePost(post)
+    signInAs(member)
+
+    renderPostPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+  })
+
+  it('should delete the post and return to the news page when an officer confirms deletion', async () => {
+    servePost(post)
+    signInAs(officer)
+    const deletedIds: string[] = []
+    server.use(
+      http.delete('/api/news/:id', ({ params }) => {
+        deletedIds.push(String(params.id))
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPostPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByText('News page')).toBeInTheDocument()
+    expect(deletedIds).toEqual(['post-1'])
   })
 
   it('should show a loading message when the request is still in flight', () => {

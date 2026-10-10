@@ -5,7 +5,6 @@ import { Link, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { draftPost, newsPage } from '../../mocks/handlers'
 import { News } from '../News/News'
-import { OfficerNews } from '../OfficerNews/OfficerNews'
 import { ToastProvider } from '../../components/Toast/Toast'
 import type { NewsPost } from '../../types/news'
 import { server } from '../../mocks/server'
@@ -29,6 +28,18 @@ function renderEditor(route = '/officer/news/draft-1') {
       </Routes>
     </ToastProvider>,
     route,
+  )
+}
+
+function renderEditorWithNewsPage() {
+  return renderWithProviders(
+    <ToastProvider>
+      <Routes>
+        <Route path="/officer/news/:id" element={<OfficerNewsEditor />} />
+        <Route path="/news" element={<p>News page</p>} />
+      </Routes>
+    </ToastProvider>,
+    '/officer/news/draft-1',
   )
 }
 
@@ -250,6 +261,94 @@ describe('OfficerNewsEditor', () => {
 
     expect(await screen.findByText('Post page')).toBeInTheDocument()
     expect(patches).toHaveLength(1)
+  })
+
+  it('should call the delete endpoint and return to the news list when Delete is confirmed', async () => {
+    signInAs(officer)
+    const deletedIds: string[] = []
+    server.use(
+      http.delete('/api/news/:id', ({ params }) => {
+        deletedIds.push(String(params.id))
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderEditorWithNewsPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByText('News page')).toBeInTheDocument()
+    expect(deletedIds).toEqual(['draft-1'])
+  })
+
+  it('should not warn about unsaved changes when a post with unsaved edits is deleted', async () => {
+    signInAs(officer)
+    const user = userEvent.setup()
+    renderEditorWithNewsPage()
+    await user.type(await screen.findByRole('textbox', { name: 'Title' }), '!')
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByText('News page')).toBeInTheDocument()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('should show a success toast when Delete is confirmed', async () => {
+    signInAs(officer)
+    const user = userEvent.setup()
+    renderEditorWithNewsPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Post deleted')
+  })
+
+  it('should not call the delete endpoint when the delete confirmation is cancelled', async () => {
+    signInAs(officer)
+    const deletedIds: string[] = []
+    server.use(
+      http.delete('/api/news/:id', ({ params }) => {
+        deletedIds.push(String(params.id))
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderEditorWithNewsPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel delete' }))
+
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    expect(deletedIds).toEqual([])
+  })
+
+  it('should stay on the editor with an error when deleting fails', async () => {
+    signInAs(officer)
+    server.use(
+      http.delete('/api/news/:id', () =>
+        HttpResponse.json({ error: 'news post not found' }, { status: 404 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderEditorWithNewsPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('news post not found')
+    expect(screen.getByRole('textbox', { name: 'Title' })).toBeInTheDocument()
+    expect(screen.queryByText('Post deleted')).not.toBeInTheDocument()
+  })
+
+  it('should offer Delete when the post is already published', async () => {
+    signInAs(officer)
+
+    renderEditor('/officer/news/post-1')
+
+    expect(await screen.findByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
   it('should show the post fields when the post is already published', async () => {
@@ -492,13 +591,16 @@ describe('OfficerNewsEditor', () => {
     const published = [
       { ...draftPost, id: 'post-old', title: 'Older post', publishedAt: '2026-01-01T00:00:00Z' },
     ]
+    let drafts = [draftPost]
     server.use(
+      http.get('/api/news/drafts', () => HttpResponse.json(drafts)),
       http.get('/api/news', () =>
         HttpResponse.json(newsPage(published as unknown as NewsPost[])),
       ),
       http.post('/api/news/:id/publish', () => {
         const nowPublished = { ...draftPost, publishedAt: '2026-09-01T00:00:00Z' }
         published.unshift(nowPublished)
+        drafts = []
         return HttpResponse.json(nowPublished)
       }),
     )
@@ -526,7 +628,7 @@ describe('OfficerNewsEditor', () => {
     expect(await screen.findByText('Patch 11.0 notes')).toBeInTheDocument()
   })
 
-  it('should move the post from drafts to published on the officer list when it is published', async () => {
+  it('should move the post from drafts to published on the news page when it is published', async () => {
     signInAs(officer)
     const published = [
       { ...draftPost, id: 'post-old', title: 'Older post', publishedAt: '2026-01-01T00:00:00Z' },
@@ -545,23 +647,25 @@ describe('OfficerNewsEditor', () => {
     const user = userEvent.setup()
     renderWithProviders(
       <>
-        <Link to="/officer/news">Officer list</Link>
+        <Link to="/news">News list</Link>
         <Routes>
-          <Route path="/officer/news" element={<OfficerNews />} />
+          <Route path="/news" element={<News />} />
           <Route path="/officer/news/:id" element={<OfficerNewsEditor />} />
           <Route path="/news/:id" element={<p>Post page</p>} />
         </Routes>
       </>,
-      '/officer/news',
+      '/news',
     )
+    await user.click(await screen.findByRole('button', { name: /Drafts/ }))
     await user.click(await screen.findByRole('link', { name: 'Patch 11.0 notes' }))
     await user.click(await screen.findByRole('button', { name: 'Publish' }))
     await user.click(screen.getByRole('button', { name: 'Confirm publish' }))
     await screen.findByText('Post page')
 
-    await user.click(screen.getByRole('link', { name: 'Officer list' }))
+    await user.click(screen.getByRole('link', { name: 'News list' }))
 
-    expect(await screen.findByText('No drafts.')).toBeInTheDocument()
+    await screen.findByRole('link', { name: 'Patch 11.0 notes' })
+    expect(screen.queryByRole('heading', { name: /^Drafts/ })).not.toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Patch 11.0 notes' })).toHaveLength(1)
   })
 

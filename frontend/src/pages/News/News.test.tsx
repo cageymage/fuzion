@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
-import { newsHandler } from '../../mocks/handlers'
+import { draftPost, newsHandler } from '../../mocks/handlers'
 import { server } from '../../mocks/server'
 import type { NewsCategory, NewsPost } from '../../types/news'
 import { renderWithProviders } from '../../testUtils'
@@ -31,6 +31,17 @@ function makePosts(count: number, category: NewsCategory): NewsPost[] {
   }))
 }
 
+const officer = { id: 'user-1', username: 'Officer', avatarUrl: null, isOfficer: true }
+const member = { id: 'user-2', username: 'Member', avatarUrl: null, isOfficer: false }
+
+function signInAs(user: typeof officer) {
+  server.use(http.get('/api/auth/me', () => HttpResponse.json(user)))
+}
+
+function LocationPath() {
+  return <p data-testid="location-path">{useLocation().pathname}</p>
+}
+
 function LocationSearch() {
   return <p data-testid="location-search">{useLocation().search}</p>
 }
@@ -40,6 +51,7 @@ function renderNews(route = '/news') {
     <>
       <News />
       <LocationSearch />
+      <LocationPath />
     </>,
     route,
   )
@@ -319,32 +331,88 @@ describe('News', () => {
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
   })
 
-  it('should link to the officer news page when the visitor is an officer', async () => {
-    server.use(
-      http.get('/api/auth/me', () =>
-        HttpResponse.json({ id: 'user-1', username: 'Officer', avatarUrl: null, isOfficer: true }),
-      ),
-    )
-
+  it('should keep the drafts collapsed until an officer expands them', async () => {
+    signInAs(officer)
+    const user = userEvent.setup()
     renderNews()
 
-    expect(await screen.findByRole('link', { name: 'Manage news' })).toHaveAttribute(
+    const toggle = await screen.findByRole('button', { name: 'Drafts (1)' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: 'Patch 11.0 notes' })).not.toBeInTheDocument()
+
+    await user.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'Patch 11.0 notes' })).toHaveAttribute(
       'href',
-      '/officer/news',
+      '/officer/news/draft-1',
     )
   })
 
-  it('should not link to the officer news page when the visitor is not an officer', async () => {
+
+  it('should not show the drafts section when an officer has no drafts', async () => {
+    signInAs(officer)
+    server.use(http.get('/api/news/drafts', () => HttpResponse.json([])))
+
+    renderNews()
+
+    await screen.findByRole('button', { name: 'New post' })
+    await screen.findByText('Welcome our newest officers')
+    expect(screen.queryByRole('heading', { name: /^Drafts/ })).not.toBeInTheDocument()
+  })
+
+  it('should show an error message when an officer\'s drafts cannot be loaded', async () => {
+    signInAs(officer)
+    server.use(http.get('/api/news/drafts', () => new HttpResponse(null, { status: 500 })))
+
+    renderNews()
+
+    expect(await screen.findByText('Drafts could not be loaded.')).toBeInTheDocument()
+  })
+
+  it('should open the editor for a new draft when an officer clicks New post', async () => {
+    signInAs(officer)
+    const user = userEvent.setup()
+    let created: unknown
     server.use(
-      http.get('/api/auth/me', () =>
-        HttpResponse.json({ id: 'user-2', username: 'Member', avatarUrl: null, isOfficer: false }),
-      ),
+      http.post('/api/news', async ({ request }) => {
+        created = await request.json()
+        return HttpResponse.json(draftPost, { status: 201 })
+      }),
     )
+    renderNews()
+
+    await user.click(await screen.findByRole('button', { name: 'New post' }))
+
+    expect(await screen.findByTestId('location-path')).toHaveTextContent('/officer/news/draft-1')
+    expect(created).toEqual({
+      title: 'Untitled post',
+      excerpt: '',
+      category: 'guild-news',
+      body: '',
+      pinned: false,
+    })
+  })
+
+  it('should show an error message when the new post cannot be created', async () => {
+    signInAs(officer)
+    const user = userEvent.setup()
+    server.use(http.post('/api/news', () => new HttpResponse(null, { status: 500 })))
+    renderNews()
+
+    await user.click(await screen.findByRole('button', { name: 'New post' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The new post could not be created.')
+  })
+
+  it('should not show New post or drafts when the visitor is not an officer', async () => {
+    signInAs(member)
 
     renderNews()
 
     await screen.findByText('Welcome our newest officers')
-    expect(screen.queryByRole('link', { name: 'Manage news' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'New post' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /^Drafts/ })).not.toBeInTheDocument()
   })
 
   it('should show an error message when the news request fails', async () => {

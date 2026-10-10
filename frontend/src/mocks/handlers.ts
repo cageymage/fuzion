@@ -367,6 +367,7 @@ export const handlers = [
   http.post('/api/news/:id/publish', () =>
     HttpResponse.json({ ...draftPost, publishedAt: new Date().toISOString() }),
   ),
+  http.delete('/api/news/:id', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/professions', () => HttpResponse.json(professionEntries)),
   http.get('/api/raid-progress', () => HttpResponse.json([raidProgress])),
   http.get('/api/raid-tiers', () => HttpResponse.json(raidTiers)),
