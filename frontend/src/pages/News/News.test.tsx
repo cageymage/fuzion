@@ -103,6 +103,13 @@ describe('News', () => {
     expect(screen.getByText('Loading news…')).toBeInTheDocument()
   })
 
+  it('should reserve space for a full page of posts when the request is still in flight', () => {
+    renderNews()
+
+    const placeholder = screen.getByText('Loading news…').closest('[role="status"]')
+    expect(placeholder?.querySelectorAll('[data-skeleton]')).toHaveLength(5)
+  })
+
   it('should only show recruitment posts when the Recruitment filter is selected', async () => {
     const user = userEvent.setup()
     renderNews()

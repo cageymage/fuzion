@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { createDraft, fetchDrafts, fetchNewsPage } from '../../api/news'
 import { NewsCard } from '../../components/NewsCard/NewsCard'
+import { LoadingPlaceholder, Skeleton } from '../../components/Skeleton/Skeleton'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { newsCategoryMeta } from '../../lib/newsCategory'
 import type { NewsCategory } from '../../types/news'
@@ -12,6 +13,7 @@ type CategoryFilter = NewsCategory | 'all'
 
 const pageSizes = [5, 10, 25, 50]
 const defaultPageSize = pageSizes[0]
+const NEWS_CARD_HEIGHT = 120
 
 const filters: { value: CategoryFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -144,7 +146,13 @@ export function News() {
           </select>
         </label>
       </div>
-      {news.isPending && <p className={styles.noticeText}>Loading news…</p>}
+      {news.isPending && (
+        <LoadingPlaceholder label="Loading news…">
+          {Array.from({ length: pageSize }, (_, index) => (
+            <Skeleton key={index} height={NEWS_CARD_HEIGHT} className={styles.cardSkeleton} />
+          ))}
+        </LoadingPlaceholder>
+      )}
       {news.isError && <p className={styles.noticeText}>News could not be loaded.</p>}
       {posts.map((post) => (
         <NewsCard key={post.id} post={post} />

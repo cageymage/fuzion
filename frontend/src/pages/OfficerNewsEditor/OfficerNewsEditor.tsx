@@ -6,7 +6,16 @@ import MDEditor, {
   type TextAreaTextApi,
 } from '@uiw/react-md-editor/nohighlight'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type DragEvent,
+  type SVGProps,
+} from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { uploadImage } from '../../api/images'
 import { editablePostKey, fetchEditablePost, publishNewsPost } from '../../api/news'
@@ -20,6 +29,17 @@ import styles from './OfficerNewsEditor.module.css'
 import { useAutosave, type SaveStatus } from './useAutosave'
 
 const categories: NewsCategory[] = ['guild-news', 'raid-progress', 'recruitment', 'patch-notes']
+
+// The library's toolbar svgs are role="img" with no name; every button already carries its own aria-label.
+function hideIconFromAssistiveTech(command: ICommand): ICommand {
+  const icon = isValidElement<SVGProps<SVGSVGElement>>(command.icon)
+    ? cloneElement(command.icon, { 'aria-hidden': true, role: undefined })
+    : command.icon
+  if (Array.isArray(command.children)) {
+    return { ...command, icon, children: command.children.map(hideIconFromAssistiveTech) }
+  }
+  return { ...command, icon }
+}
 
 interface ImageCommandOptions {
   uploading: boolean
@@ -172,6 +192,8 @@ function PostEditor({ post }: PostEditorProps) {
           })
         : command,
     )
+    .map(hideIconFromAssistiveTech)
+  const toolbarExtraCommands = commands.getExtraCommands().map(hideIconFromAssistiveTech)
 
   // beforeunload covers closing the tab; useBlocker covers in-app route changes.
   useEffect(() => {
@@ -242,6 +264,7 @@ function PostEditor({ post }: PostEditorProps) {
             value={fields.body}
             onChange={(value) => change({ body: value ?? '' })}
             commands={toolbarCommands}
+            extraCommands={toolbarExtraCommands}
             preview="live"
             previewOptions={{ components: { img: LightboxImage } }}
             height={420}

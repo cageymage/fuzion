@@ -1,5 +1,5 @@
 import { screen, waitFor } from '@testing-library/react'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { newsPage } from '../../mocks/handlers'
 import { server } from '../../mocks/server'
@@ -23,6 +23,45 @@ const centrifuze: Stream = {
 describe('Home', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  // React warns once per process, so this has to run before any other test renders the hero.
+  it('should load the hero image with high fetch priority without a React unknown-prop warning', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { container } = renderWithProviders(<Home />)
+
+    await screen.findByRole('heading', { name: 'Fuzion', level: 1 })
+
+    expect(container.querySelector('picture img')).toHaveAttribute('fetchpriority', 'high')
+    const warnings = consoleError.mock.calls.map(([message]) => String(message))
+    expect(warnings.filter((message) => message.includes('React does not recognize'))).toEqual([])
+  })
+
+  it('should reserve space for three news cards when the news request is pending', () => {
+    server.use(http.get('/api/news', () => delay('infinite')))
+
+    renderWithProviders(<Home />)
+
+    const placeholder = screen.getByText('Loading the latest news…').closest('[role="status"]')
+    expect(placeholder?.querySelectorAll('[data-skeleton]')).toHaveLength(3)
+  })
+
+  it('should reserve space for the next raid card when the raid request is pending', () => {
+    server.use(http.get('/api/raids/next', () => delay('infinite')))
+
+    renderWithProviders(<Home />)
+
+    const placeholder = screen.getByText('Checking the raid schedule…').closest('[role="status"]')
+    expect(placeholder?.querySelectorAll('[data-skeleton]')).toHaveLength(1)
+  })
+
+  it('should reserve a video-sized slot when the live streams request is pending', () => {
+    server.use(http.get('/api/streams/live', () => delay('infinite')))
+
+    renderWithProviders(<Home />)
+
+    const placeholder = screen.getByText('Checking who is live…').closest('[role="status"]')
+    expect(placeholder?.querySelectorAll('[data-skeleton]')).toHaveLength(1)
   })
 
   it('should show the guild name, realm and tagline', async () => {

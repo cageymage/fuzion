@@ -11,8 +11,15 @@ import { LiveStreamEmbed } from '../../components/LiveStreamEmbed/LiveStreamEmbe
 import { NewsCard } from '../../components/NewsCard/NewsCard'
 import { NextRaidCard } from '../../components/NextRaidCard/NextRaidCard'
 import { SuggestedVideoCard } from '../../components/SuggestedVideoCard/SuggestedVideoCard'
+import { LoadingPlaceholder, Skeleton } from '../../components/Skeleton/Skeleton'
 import styles from './Home.module.css'
 import { useHomeData } from './useHomeData'
+
+// React 18 warns on the camelCase fetchPriority prop; the lowercase attribute is the supported spelling until React 19.
+const heroFetchPriority = { fetchpriority: 'high' }
+
+const FEATURED_NEWS_HEIGHT = 260
+const NEWS_CARD_HEIGHT = 120
 
 export function Home() {
   const { news, nextRaid, liveStreams, suggestedVideo } = useHomeData()
@@ -33,7 +40,7 @@ export function Home() {
           <source media="(max-width: 720px)" type="image/jpeg" srcSet={heroMobileJpg} />
           <source type="image/avif" srcSet={heroDesktopAvif} />
           <source type="image/webp" srcSet={heroDesktopWebp} />
-          <img src={heroDesktopJpg} width={2400} height={900} alt="" fetchPriority="high" />
+          <img src={heroDesktopJpg} width={2400} height={900} alt="" {...heroFetchPriority} />
         </picture>
         <div className={styles.heroText}>
           <div className="eyebrow">PvE · US</div>
@@ -45,9 +52,13 @@ export function Home() {
         ) : (
           <div className={`card ${styles.notice}`}>
             <div className="eyebrow eyebrow-muted">Next Raid</div>
-            <p className={styles.noticeText}>
-              {nextRaid.isPending ? 'Checking the raid schedule…' : 'No raid scheduled yet.'}
-            </p>
+            {nextRaid.isPending ? (
+              <LoadingPlaceholder label="Checking the raid schedule…">
+                <Skeleton height={128} className={styles.noticeSkeleton} />
+              </LoadingPlaceholder>
+            ) : (
+              <p className={styles.noticeText}>No raid scheduled yet.</p>
+            )}
           </div>
         )}
       </section>
@@ -62,7 +73,13 @@ export function Home() {
               View all →
             </Link>
           </header>
-          {news.isPending && <p className={styles.noticeText}>Loading the latest news…</p>}
+          {news.isPending && (
+            <LoadingPlaceholder label="Loading the latest news…">
+              <Skeleton height={FEATURED_NEWS_HEIGHT} className={styles.newsSkeleton} />
+              <Skeleton height={NEWS_CARD_HEIGHT} className={styles.newsSkeleton} />
+              <Skeleton height={NEWS_CARD_HEIGHT} className={styles.newsSkeleton} />
+            </LoadingPlaceholder>
+          )}
           {news.isError && <p className={styles.noticeText}>Latest news could not be loaded.</p>}
           {featuredPost && <FeaturedNewsCard post={featuredPost} />}
           {remainingPosts.map((post) => (
@@ -77,7 +94,11 @@ export function Home() {
           <header className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>{vaultVideo ? 'From the Vault' : 'Live Now'}</h2>
           </header>
-          {liveStreams.isPending && <p className={styles.noticeText}>Checking who is live…</p>}
+          {liveStreams.isPending && (
+            <LoadingPlaceholder label="Checking who is live…">
+              <Skeleton height="auto" className={styles.videoSkeleton} />
+            </LoadingPlaceholder>
+          )}
           {liveStreams.isError && (
             <p className={styles.noticeText}>Live streams could not be loaded.</p>
           )}

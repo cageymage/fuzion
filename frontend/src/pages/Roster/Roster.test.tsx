@@ -49,6 +49,13 @@ const zaldrix: Character = {
 const roster = [ragnok, selene, zaldrix]
 
 describe('Roster', () => {
+  it('should reserve space for table rows when the request is still in flight', () => {
+    renderWithProviders(<Roster />)
+
+    const placeholder = screen.getByText('Loading the roster…').closest('[role="status"]')
+    expect(placeholder?.querySelectorAll('[data-skeleton]')).toHaveLength(10)
+  })
+
   it('should list only main characters by default', async () => {
     server.use(http.get('/api/roster', () => HttpResponse.json(roster)))
 

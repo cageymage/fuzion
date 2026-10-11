@@ -376,6 +376,29 @@ describe('OfficerNewsEditor', () => {
     await waitFor(() => expect(body).toHaveValue('![](https://cdn.example/boss.png)## Changes'))
   })
 
+  it('should hide every toolbar icon from assistive technology when the editor loads', async () => {
+    signInAs(officer)
+    const { container } = renderEditor()
+    await screen.findByRole('textbox', { name: 'Body' })
+
+    const icons = container.querySelectorAll('.w-md-editor-toolbar svg')
+    expect(icons.length).toBeGreaterThan(0)
+    icons.forEach((icon) => {
+      expect(icon).toHaveAttribute('aria-hidden', 'true')
+      expect(icon).not.toHaveAttribute('role', 'img')
+    })
+  })
+
+  it('should keep the accessible name on the toolbar buttons when their icons are hidden', async () => {
+    signInAs(officer)
+    renderEditor()
+    await screen.findByRole('textbox', { name: 'Body' })
+
+    expect(screen.getByRole('button', { name: 'Add bold text (ctrl + b)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add italic text (ctrl + i)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Insert image' })).toBeInTheDocument()
+  })
+
   it('should reject the image url when it does not start with https', async () => {
     signInAs(officer)
     vi.spyOn(window, 'prompt').mockReturnValue('javascript:alert(1)')

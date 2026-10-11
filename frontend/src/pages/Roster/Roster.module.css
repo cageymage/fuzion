@@ -299,3 +299,7 @@
   color: var(--muted);
   font-size: var(--text-meta);
 }
+
+.rowSkeleton {
+  margin-bottom: 4px;
+}
