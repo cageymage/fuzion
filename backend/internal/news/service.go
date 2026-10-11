@@ -182,13 +182,7 @@ func (s *Service) announce(ctx context.Context, post Post) {
 		Description: post.Excerpt,
 		Fields:      []discord.EmbedField{{Name: "Category", Value: post.Category, Inline: true}},
 	}
-	if src := firstImageURL(post.Body); src != "" {
-		if uploadedImagePath.MatchString(src) {
-			src += "/thumb"
-		}
-		if strings.HasPrefix(src, "/") && !strings.HasPrefix(src, "//") {
-			src = s.siteBaseURL + src
-		}
+	if src := s.firstImageAbsoluteURL(post.Body); src != "" {
 		embed.Image = &discord.EmbedImage{URL: src}
 	}
 	msg := discord.Message{Embeds: []discord.Embed{embed}}
@@ -207,6 +201,22 @@ func firstImageURL(body string) string {
 		return ""
 	}
 	return match[1]
+}
+
+// firstImageAbsoluteURL is the body's first image as a link a Discord embed or a link
+// preview can fetch: uploads use the thumbnail and site-relative paths gain the site origin.
+func (s *Service) firstImageAbsoluteURL(body string) string {
+	src := firstImageURL(body)
+	if src == "" {
+		return ""
+	}
+	if uploadedImagePath.MatchString(src) {
+		src += "/thumb"
+	}
+	if strings.HasPrefix(src, "/") && !strings.HasPrefix(src, "//") {
+		src = s.siteBaseURL + src
+	}
+	return src
 }
 
 func parseID(id string) (uuid.UUID, error) {

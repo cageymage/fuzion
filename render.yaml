@@ -21,6 +21,11 @@ services:
       - type: rewrite
         source: /api/*
         destination: https://fuzion-api.onrender.com/api/*
+      # Link previews (Discord, Bluesky) read the raw HTML, so a post page comes
+      # from the API, which wraps the built index.html with that post's tags.
+      - type: rewrite
+        source: /news/:id
+        destination: https://fuzion-api.onrender.com/api/news/:id/page
       - type: rewrite
         source: /*
         destination: /index.html

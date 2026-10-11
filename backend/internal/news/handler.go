@@ -3,6 +3,7 @@ package news
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -33,15 +34,17 @@ type listResponse struct {
 
 type Handler struct {
 	service *Service
+	shell   *ShellFetcher
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, shell *ShellFetcher) *Handler {
+	return &Handler{service: service, shell: shell}
 }
 
 func (h *Handler) Register(r chi.Router) {
 	r.Get("/news", h.listPosts)
 	r.Get("/news/{id}", h.getPost)
+	r.Get("/news/{id}/page", h.getPostPage)
 	r.Group(func(officer chi.Router) {
 		officer.Use(auth.RequireOfficer)
 		officer.Get("/news/drafts", h.listDrafts)
@@ -59,6 +62,43 @@ func (h *Handler) getPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, post)
+}
+
+// getPostPage serves the app shell for /news/{id} with the post's link-preview tags, because
+// Discord and Bluesky read the raw HTML without running the app. An unknown post still gets
+// the shell, so the app can show its own not-found view.
+func (h *Handler) getPostPage(w http.ResponseWriter, r *http.Request) {
+	shell, err := h.shell.Get(r.Context())
+	if err != nil {
+		slog.ErrorContext(r.Context(), "load app shell for news page", "error", err)
+		http.Error(w, "page unavailable", http.StatusBadGateway)
+		return
+	}
+
+	status, page := http.StatusOK, shell
+	post, err := h.service.GetPublished(r.Context(), chi.URLParam(r, "id"))
+	var validationErr *ValidationError
+	switch {
+	case errors.As(err, &validationErr), errors.Is(err, ErrNotFound):
+		status = http.StatusNotFound
+	case err != nil:
+		slog.ErrorContext(r.Context(), "get news post for page", "error", err)
+		http.Error(w, "page unavailable", http.StatusInternalServerError)
+		return
+	default:
+		rendered, err := h.service.RenderPage(shell, post)
+		if err != nil {
+			slog.ErrorContext(r.Context(), "render news page tags", "postID", post.ID, "error", err)
+		} else {
+			page = rendered
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	if _, err := io.WriteString(w, page); err != nil {
+		slog.ErrorContext(r.Context(), "write news page", "error", err)
+	}
 }
 
 func (h *Handler) listDrafts(w http.ResponseWriter, r *http.Request) {
