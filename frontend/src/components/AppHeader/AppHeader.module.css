@@ -35,6 +35,55 @@
   gap: 26px;
 }
 
+.menuButton {
+  display: inline-flex;
+  padding: 7px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.menuButton:hover,
+.menuButton[aria-expanded='true'] {
+  border-color: var(--gold);
+  color: var(--gold-hover);
+}
+
+@media (min-width: 901px) {
+  .menuButton {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .menuButton {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .account {
+    order: 3;
+  }
+
+  .nav {
+    display: none;
+    order: 4;
+    flex-basis: 100%;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .navOpen {
+    display: flex;
+  }
+}
+
 .navLink {
   font-size: var(--text-ui);
   letter-spacing: 0.03em;

@@ -47,6 +47,43 @@ describe('AppHeader', () => {
     expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
   })
 
+  it('should render the menu button collapsed when the header first loads', () => {
+    renderWithProviders(<AppHeader />)
+
+    const menuButton = screen.getByRole('button', { name: 'Menu' })
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false')
+    expect(menuButton).toHaveAttribute('aria-controls', screen.getByRole('navigation').id)
+  })
+
+  it('should expand the menu when the menu button is clicked', async () => {
+    renderWithProviders(<AppHeader />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+
+    expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('should collapse the menu and return focus to the menu button when Escape is pressed', async () => {
+    renderWithProviders(<AppHeader />)
+    const menuButton = screen.getByRole('button', { name: 'Menu' })
+    await userEvent.click(menuButton)
+    screen.getByRole('link', { name: 'Roster' }).focus()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false')
+    expect(menuButton).toHaveFocus()
+  })
+
+  it('should collapse the menu when a navigation link is clicked', async () => {
+    renderWithProviders(<AppHeader />)
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
+
+    await userEvent.click(screen.getByRole('link', { name: 'Roster' }))
+
+    expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('should show a Discord login link when nobody is logged in', async () => {
     renderWithProviders(<AppHeader />)
 

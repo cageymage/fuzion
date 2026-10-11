@@ -121,13 +121,14 @@
 }
 
 .button:disabled {
-  opacity: 0.4;
+  border-color: var(--border-strong);
+  color: var(--muted);
   cursor: not-allowed;
 }
 
 .error {
   margin: 0;
-  color: var(--live);
+  color: var(--danger);
   font-size: var(--text-meta);
 }
 

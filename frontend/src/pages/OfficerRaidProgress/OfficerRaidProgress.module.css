@@ -99,8 +99,8 @@
 }
 
 .smallButton.dangerButton {
-  border-color: var(--live);
-  color: var(--live);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .field {
@@ -193,7 +193,7 @@
 }
 
 .error {
-  color: var(--live);
+  color: var(--danger);
   font-size: var(--text-meta);
   margin: 12px 0 0;
 }
