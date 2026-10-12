@@ -226,7 +226,7 @@ func (h *Handler) updateUserRoles(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
 		return
 	case err != nil:
-		slog.ErrorContext(r.Context(), "update user roles", "error", err)
+		slog.ErrorContext(r.Context(), "update user roles", "error", err, "user_id", id)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "could not update user roles"})
 		return
 	}

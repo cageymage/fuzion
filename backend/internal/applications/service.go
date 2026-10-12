@@ -122,11 +122,11 @@ func (s *Service) notifyRecruiting(ctx context.Context, app Application) {
 	}
 	messageID, err := s.notifier.Post(ctx, newApplicationMessage(app, s.siteBaseURL))
 	if err != nil {
-		slog.ErrorContext(ctx, "notify recruiting channel of new application", "applicationID", app.ID, "error", err)
+		slog.ErrorContext(ctx, "notify recruiting channel of new application", "application_id", app.ID, "error", err)
 		return
 	}
 	if err := s.repo.SetDiscordMessageID(ctx, app.ID, messageID); err != nil {
-		slog.ErrorContext(ctx, "remember recruiting channel message for application", "applicationID", app.ID, "error", err)
+		slog.ErrorContext(ctx, "remember recruiting channel message for application", "application_id", app.ID, "error", err)
 	}
 }
 
@@ -136,7 +136,7 @@ func (s *Service) markAnnouncementReviewed(ctx context.Context, app Reviewable) 
 		return
 	}
 	if err := s.notifier.Edit(ctx, *app.DiscordMessageID, reviewedApplicationMessage(app, s.siteBaseURL)); err != nil {
-		slog.ErrorContext(ctx, "edit recruiting channel message for reviewed application", "applicationID", app.ID, "error", err)
+		slog.ErrorContext(ctx, "edit recruiting channel message for reviewed application", "application_id", app.ID, "error", err)
 	}
 }
 

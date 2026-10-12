@@ -24,6 +24,8 @@ import (
 const usage = "usage: sync twitch|blizzard-roster"
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	if len(os.Args) != 2 {
 		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(2)

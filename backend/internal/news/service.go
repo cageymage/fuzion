@@ -187,7 +187,7 @@ func (s *Service) announce(ctx context.Context, post Post) {
 	}
 	msg := discord.Message{Embeds: []discord.Embed{embed}}
 	if err := s.notifier.Send(ctx, msg); err != nil {
-		slog.ErrorContext(ctx, "announce published news post", "postID", post.ID, "error", err)
+		slog.ErrorContext(ctx, "announce published news post", "post_id", post.ID, "error", err)
 	}
 }
 

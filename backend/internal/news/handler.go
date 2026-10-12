@@ -88,7 +88,7 @@ func (h *Handler) getPostPage(w http.ResponseWriter, r *http.Request) {
 	default:
 		rendered, err := h.service.RenderPage(shell, post)
 		if err != nil {
-			slog.ErrorContext(r.Context(), "render news page tags", "postID", post.ID, "error", err)
+			slog.ErrorContext(r.Context(), "render news page tags", "post_id", post.ID, "error", err)
 		} else {
 			page = rendered
 		}

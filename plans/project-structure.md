@@ -44,6 +44,8 @@ CI/CD is just Render's native GitHub integration (build + deploy on push) — no
 
 Local dev still uses `docker-compose.yml` (Postgres + backend + Vite dev server) so nothing depends on Render being reachable while developing.
 
+**App logs (issue #132):** the API and sync jobs log JSON to stdout through `log/slog`, and those logs live only in Render's log explorer. On the Hobby workspace that means 7 days (14 on Pro, 30 on Scale). Structured fields (`level`, `error`, `user_id`, `application_id`, `post_id`, `job`) are filterable there, so attach IDs and errors as slog attributes in snake_case, never formatted into the message. We chose not to use a log stream (a third party would receive log contents, which would need a Legal page change) or a self-hosted receiver. If we hit a real "what happened two weeks ago" case, write those specific events to a small Postgres table, as `sync_log` already does for sync job runs, rather than adding logging infrastructure.
+
 ## Top-level layout
 
 ```
