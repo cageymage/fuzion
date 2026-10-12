@@ -117,7 +117,7 @@ func run() error {
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{}, recruiting, botCheck, cfg.siteBaseURL)),
 		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db), authOptions...)),
 		Images:         images.NewHandler(images.NewService(images.NewRepo(db))),
-		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.System{}, announcements, cfg.siteBaseURL)),
+		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.System{}, announcements, cfg.siteBaseURL), news.NewShellFetcher(cfg.siteBaseURL+"/index.html", &http.Client{Timeout: 5 * time.Second}, clock.System{})),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.System{})),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),

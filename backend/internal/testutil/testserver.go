@@ -50,6 +50,8 @@ type Server struct {
 	Announcements *FakeWebhook
 	YouTube       *FakeYouTube
 	Turnstile     *FakeTurnstile
+	// Shell is the static site's index.html that per-post news pages wrap tags around.
+	Shell *FakeShell
 
 	db    *sqlx.DB
 	client *http.Client
@@ -134,11 +136,14 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 		BaseURL:      fakeBattleNet.URL,
 	}, fakeBattleNet.Client())
 
+	fakeShell := NewFakeShell(t)
+	shell := news.NewShellFetcher(fakeShell.URL+"/index.html", fakeShell.Client(), clock.Fixed(FixedNow))
+
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting, verifier, SiteBaseURL)),
 		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), auth.WithBattleNet(battleNet))),
 		Images:        images.NewHandler(images.NewService(images.NewRepo(db))),
-		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL)),
+		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL), shell),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.Fixed(FixedNow))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
@@ -160,7 +165,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	client.Jar = jar
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
-	return &Server{Server: httpServer, Discord: discord, BattleNet: fakeBattleNet, Webhook: webhook, Announcements: announcementsWebhook, YouTube: youTube, Turnstile: fakeTurnstile, db: db, client: client}
+	return &Server{Server: httpServer, Discord: discord, BattleNet: fakeBattleNet, Webhook: webhook, Announcements: announcementsWebhook, YouTube: youTube, Turnstile: fakeTurnstile, Shell: fakeShell, db: db, client: client}
 }
 
 type LoginOption func(*loginOptions)
