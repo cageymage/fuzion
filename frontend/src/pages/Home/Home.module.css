@@ -124,3 +124,16 @@
   font-size: var(--text-meta);
   margin: 8px 0 0;
 }
+
+.noticeSkeleton {
+  margin-top: 8px;
+}
+
+.newsSkeleton {
+  margin-bottom: 10px;
+}
+
+.videoSkeleton {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { LoadingPlaceholder, Skeleton } from '../../components/Skeleton/Skeleton'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { classColor } from '../../lib/classColor'
 import { primaryProfessionIcons } from '../../lib/professionIcon'
@@ -13,7 +14,10 @@ import { RosterSummary } from './RosterSummary'
 import { summarizeRoster } from './summarizeRoster'
 import { useRosterData } from './useRosterData'
 
-const roleFilters: { value: RoleFilter; label: string }[] = [
+const PLACEHOLDER_ROWS = 10
+const ROW_HEIGHT = 48
+
+const roleFilters:{ value: RoleFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'tank', label: 'Tank' },
   { value: 'healer', label: 'Healer' },
@@ -208,7 +212,13 @@ export function Roster() {
         </label>
       </div>
 
-      {roster.isPending && <p className={styles.noticeText}>Loading the roster…</p>}
+      {roster.isPending && (
+        <LoadingPlaceholder label="Loading the roster…">
+          {Array.from({ length: PLACEHOLDER_ROWS }, (_, index) => (
+            <Skeleton key={index} height={ROW_HEIGHT} className={styles.rowSkeleton} />
+          ))}
+        </LoadingPlaceholder>
+      )}
       {roster.isError && <p className={styles.noticeText}>The roster could not be loaded.</p>}
 
       {roster.isSuccess && (

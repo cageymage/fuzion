@@ -73,3 +73,5 @@ The hero artwork is AI-generated (Midjourney). The Legal page carries the attrib
 ## Link previews
 
 Discord, Bluesky and similar services read raw HTML and do not run JavaScript. `index.html` carries site-wide `og:*`, `twitter:card`, `description` and `canonical` tags, between `<!--og:start-->` and `<!--og:end-->`, with `{{SITE_BASE_URL}}` filled in at build time (default `https://fuziongaming.gg`, override with the `SITE_BASE_URL` environment variable). For `/news/:id` the API swaps that block for the post's own title, excerpt and first image (see the Hosting section of [project-structure.md](project-structure.md)). Discord caches embeds, so test changes with a `?v=2` URL.
+
+`robots.txt` and `sitemap.xml` are generated at build time by the `crawler-files` plugin in `vite.config.ts` (builders in `src/lib/siteFiles.ts`, same `SITE_BASE_URL`). Add new public pages to the list there; officer pages stay out.

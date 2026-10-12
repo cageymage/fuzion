@@ -139,3 +139,7 @@
 .draftsToggle:hover {
   color: var(--gold-hover);
 }
+
+.cardSkeleton {
+  margin-bottom: 10px;
+}
