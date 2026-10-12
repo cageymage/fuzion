@@ -288,7 +288,7 @@ Discord IDs, names, the image URL (it carries signed query parameters) and the b
 The sample had 16 signups, and the fields below match a live fetch of the same event. Statuses seen: all `"primary"`. Classes seen in signups: Melee, Ranged, Healer, Tank, Late, Tentative.
 
 ### 3.3 Field notes
-- **Timestamps are Unix seconds** (integers), confirming the guess in #31. `startTime` 1791331200 is 2026-10-07 00:00:00 UTC. `endTime - startTime` = 10800 s = `advancedSettings.duration` (180 min). `lastUpdated` equals the newest signup's `entryTime`.
+- **Timestamps are Unix seconds** (integers), confirming the guess in #31. `startTime` 1791331200 is 2026-10-07 00:00:00 UTC. `endTime - startTime` = 10800 s = `advancedSettings.duration` (180 min). `lastUpdated` >= the newest signup's `entryTime`. Once we've seen an actual capture of a raid signup in Forver, we can update this later.
 - **`date` and `time` are display strings** in the event's timezone (here `"06-10-2026"`, DD-MM-YYYY, and `"18:00"`). The timezone is not in the object. Raid-Helper's Intro page says the bot needs to know the timezone in which date and time are entered when events are created on a server, so a per-server timezone setting exists (docs snippet, not independently tested). Use `startTime`, not these.
 - **Event `id` is a string**, a Discord snowflake (matches the message ID). Store as `text`, never parse as a number. This fits #31's `raid_helper_event_id text`.
 - **No difficulty field.** Only `title`, `displayTitle`, `description` and `templateId` (`wowretail2`). #31's fallback of `'Unknown'` unless parseable from the title is right. The word "Normal" appears only in the free-text `description`.
@@ -333,11 +333,11 @@ Based only on verified behaviour of `GET https://raid-helper.xyz/api/v4/events/{
 Based on the docs and the verified GET object. Not yet tested against a real webhook request.
 - **Webhooks need Premium, and the team is purchasing it**, so build the receiver below. Polling (4b) is a fallback only. Premium price and whether it is per server or per user: `TODO`.
 - **One endpoint per type:** `POST /api/webhooks/raid-helper/create`, `/update`, `/delete`. The bodies carry no `type`, so the path is the discriminator. Do not register `comp.update`.
-- **Auth:** compare the request's `Authorization` header to the webhook key (constant-time compare, key from an env var such as `RAID_HELPER_WEBHOOK_KEY`). Reject with 401 on mismatch. The check is optional on Raid-Helper's side, so we must enforce it. Use the raw header value with no prefix handling; confirm on a real request.
+- **Auth:** compare the request's `Authorization` header to the webhook key (constant-time compare, key from an env var such as `RAID_HELPER_WEBHOOK_SECRET`). Reject with 401 on mismatch. The check is optional on Raid-Helper's side, so we must enforce it. Use the raw header value with no prefix handling; confirm on a real request.
 - **One struct, one parser** for all three types (identical bodies). Upsert by `id` (`raid_helper_event_id text UNIQUE`). Parse `id` and other Discord IDs as strings.
 - **Idempotent and fast.** `event.update` fires on every signup change. Return `200` quickly (the docs say `200` marks delivery successful; non-200 behaviour is undocumented). Use `lastUpdated` to ignore a stale, out-of-order delivery.
 - **Delete:** use only `id` from the body; ignore the rest.
-- **Fields to store:** `id`, `title`, `startTime`/`endTime`/`closingTime` (Unix seconds, `time.Unix(n, 0).UTC()`), `signUps` (or counts). Ignore `date`/`time` (display strings, no timezone). No difficulty field, default `'Unknown'`.
+- **Fields to store:** `id`, `title`, `startTime`/`endTime`/`closingTime` (Unix seconds, `time.Unix(n, 0).UTC()`), `signUps` (As a separate table. signUps is an array of objects, so it will be its own table.). Ignore `date`/`time` (display strings, no timezone). No difficulty field, default `'Unknown'`.
 - Do not persist `advancedSettings.image` (signed, expiring Discord CDN link).
 - Do not depend on `displayTitle`, `creator`, `announcements` (not listed in the webhook docs).
 - Webhook key and API key are different secrets; keep both out of the repo.
