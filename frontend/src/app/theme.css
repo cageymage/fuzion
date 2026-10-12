@@ -18,6 +18,7 @@
   --legendary: #ff9d3d;
   --legendary-soft: #3d2513;
   --live: #c23b3b;
+  --danger: #e06666;
 
   --font-display: 'Cinzel', Georgia, serif;
   --font-body: 'Crimson Pro', Georgia, serif;
@@ -36,6 +37,17 @@
 
 * {
   box-sizing: border-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 body {

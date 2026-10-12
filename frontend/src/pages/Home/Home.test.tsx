@@ -69,6 +69,35 @@ describe('Home', () => {
     expect(container.querySelector('img[src="https://cdn.example/kill.png"]')).not.toBeNull()
   })
 
+  it('should load the thumbnail rendition of an uploaded image when it is the first image in the post body', async () => {
+    const uploadId = '20af7966-bb2b-4666-9d82-420a48024945'
+    server.use(
+      http.get('/api/news', () =>
+        HttpResponse.json(
+          newsPage([
+            {
+              id: 'post-1',
+              title: 'Server first',
+              excerpt: 'We did it.',
+              category: 'raid-progress',
+              imageUrl: null,
+              authorName: 'Officer',
+              publishedAt: new Date().toISOString(),
+              body: `![Kill](/api/images/${uploadId})`,
+            },
+          ]),
+        ),
+      ),
+    )
+
+    const { container } = renderWithProviders(<Home />)
+
+    await screen.findByRole('heading', { name: 'Server first' })
+    const sources = [...container.querySelectorAll('img')].map((image) => image.getAttribute('src'))
+    expect(sources).toContain(`/api/images/${uploadId}/thumb`)
+    expect(sources).not.toContain(`/api/images/${uploadId}`)
+  })
+
   it('should keep the placeholder graph as the featured thumbnail when the post has no image', async () => {
     const { container } = renderWithProviders(<Home />)
 

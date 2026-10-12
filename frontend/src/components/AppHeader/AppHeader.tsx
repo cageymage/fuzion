@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { loginUrl, logout } from '../../api/auth'
 import { navItems } from '../../app/navigation'
@@ -9,8 +10,19 @@ import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
 import styles from './AppHeader.module.css'
 
 export function AppHeader() {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const navId = useId()
+
+  function closeMenuOnEscape(event: KeyboardEvent) {
+    if (event.key === 'Escape' && menuOpen) {
+      setMenuOpen(false)
+      menuButtonRef.current?.focus()
+    }
+  }
+
   return (
-    <header className={styles.header}>
+    <header className={styles.header} onKeyDown={closeMenuOnEscape}>
       <Link to="/" className={styles.brand}>
         <img
           className={styles.logo}
@@ -22,12 +34,27 @@ export function AppHeader() {
         />
         <span className={styles.wordmark}>FUZION</span>
       </Link>
-      <nav className={styles.nav} aria-label="Main">
+      <button
+        ref={menuButtonRef}
+        type="button"
+        className={styles.menuButton}
+        aria-expanded={menuOpen}
+        aria-controls={navId}
+        onClick={() => setMenuOpen((open) => !open)}
+      >
+        Menu
+      </button>
+      <nav
+        id={navId}
+        className={menuOpen ? `${styles.nav} ${styles.navOpen}` : styles.nav}
+        aria-label="Main"
+      >
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             end={item.path === '/'}
+            onClick={() => setMenuOpen(false)}
             className={({ isActive }) =>
               isActive ? `${styles.navLink} ${styles.active}` : styles.navLink
             }

@@ -58,5 +58,5 @@
 }
 
 .error {
-  color: var(--live);
+  color: var(--danger);
 }

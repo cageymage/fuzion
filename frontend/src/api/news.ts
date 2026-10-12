@@ -7,6 +7,7 @@ import type {
   PostFields,
 } from '../types/news'
 import { firstMarkdownImageUrl } from '../lib/markdown'
+import { thumbnailSrc } from '../lib/uploadedImage'
 import { apiDelete, apiGet, apiSend } from './client'
 
 interface NewsPageQuery {
@@ -34,7 +35,7 @@ export async function fetchNewsPage({
 function withFirstImage<T extends { imageUrl?: string | null; body?: string }>(post: T): T {
   return {
     ...post,
-    imageUrl: post.imageUrl ?? (post.body ? firstMarkdownImageUrl(post.body) : null),
+    imageUrl: post.imageUrl ?? thumbnailSrc(post.body ? firstMarkdownImageUrl(post.body) : null),
   }
 }
 

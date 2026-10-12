@@ -94,7 +94,7 @@
 }
 
 .declined {
-  color: var(--live);
+  color: var(--danger);
 }
 
 .details {
@@ -162,12 +162,12 @@
 }
 
 .button.dangerButton {
-  border-color: var(--live);
-  color: var(--live);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .error {
-  color: var(--live);
+  color: var(--danger);
   font-size: var(--text-meta);
   margin: 0;
 }

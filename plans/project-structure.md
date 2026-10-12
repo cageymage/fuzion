@@ -2,7 +2,7 @@
 
 Status: **decisions confirmed below — ready to scaffold.**
 
-Coding/testing rules derived from this plan live in [CLAUDE.md](../CLAUDE.md) at the repo root — read that alongside this doc when generating code.
+Coding/testing rules derived from this plan live in [CLAUDE.md](../CLAUDE.md) at the repo root — read that alongside this doc when generating code. Visual and accessibility decisions (type scale, colors, logo and image assets) are in [design.md](design.md).
 
 ## Stack summary
 
