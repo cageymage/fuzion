@@ -35,7 +35,7 @@ services:
     runtime: docker
     rootDir: backend
     dockerfilePath: ./Dockerfile
-    plan: free
+    plan: 0.5c-512mb
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
