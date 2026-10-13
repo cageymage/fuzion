@@ -38,4 +38,10 @@ describe('OfflineStreamCard', () => {
     expect(screen.queryByText('LIVE')).not.toBeInTheDocument()
     expect(screen.queryByText('0')).not.toBeInTheDocument()
   })
+
+  it('should expose the full streamer name as a title when the name is long', () => {
+    render(<OfflineStreamCard stream={{ ...offlineStream, streamerName: 'TiaraRoyalQueendom' }} />)
+
+    expect(screen.getByText('TiaraRoyalQueendom')).toHaveAttribute('title', 'TiaraRoyalQueendom')
+  })
 })

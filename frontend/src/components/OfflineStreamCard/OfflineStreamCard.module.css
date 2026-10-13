@@ -14,5 +14,8 @@
 .name {
   font-weight: 600;
   font-size: var(--text-ui);
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

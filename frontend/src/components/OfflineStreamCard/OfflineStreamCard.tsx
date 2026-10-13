@@ -10,7 +10,7 @@ export function OfflineStreamCard({ stream }: OfflineStreamCardProps) {
   return (
     <a className={`card ${styles.card}`} href={stream.channelUrl} target="_blank" rel="noreferrer">
       <StreamerAvatar name={stream.streamerName} avatarUrl={stream.avatarUrl} size="medium" />
-      <span className={styles.name}>{stream.streamerName}</span>
+      <span className={styles.name} title={stream.streamerName}>{stream.streamerName}</span>
     </a>
   )
 }
