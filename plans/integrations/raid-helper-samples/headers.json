@@ -1,0 +1,20 @@
+{
+  "webhookeventcreate": {
+    "content-type": "application/json",
+    "user-agent": "Raid-Helper/1.0",
+    "x-raidhelper-event": "webhookeventcreate",
+    "authorization": "aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bC1"
+  },
+  "webhookeventupdate": {
+    "content-type": "application/json",
+    "user-agent": "Raid-Helper/1.0",
+    "x-raidhelper-event": "webhookeventupdate",
+    "authorization": "aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bC1"
+  },
+  "webhookeventdelete": {
+    "content-type": "application/json",
+    "user-agent": "Raid-Helper/1.0",
+    "x-raidhelper-event": "webhookeventdelete",
+    "authorization": "aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bC1"
+  }
+}
