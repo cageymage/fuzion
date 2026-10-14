@@ -165,7 +165,7 @@ From the docs (screenshot 8):
 Real captured example: **none.** No URL was registered for `comp.update`, so it was never captured. It is not needed for the Calendar (see above). Documented fields only.
 
 Open questions:
-- Is the webhook body the same event object as section 3? Almost: the field names and types match (docs). Webhook adds `templateEmoteId` and `softresId`; the docs do not list `displayTitle`, `creator`, `announcements`. Real capture would confirm.
+- Is the webhook body the same event object as section 3? Almost: the field names and types match (docs). `templateEmoteId` and `softresId` were absent in the real captures, so treat them as optional; the docs do not list `displayTitle`, `creator`, `announcements`, but they were present.
 - How are created/updated/deleted distinguished? By the `x-raidhelper-event` request header (`webhookeventcreate`/`webhookeventupdate`/`webhookeventdelete`), not by the body (VERIFIED on a real capture, header undocumented). Exact value format: `TODO`.
 - Does `deleted` carry the event ID? Yes: the `event.delete` body includes `id` and the same event fields (docs, screenshot 6).
 - Retries on non-2xx, timeout, ordering? `TODO` (docs say only that a `200` counts as delivered)
