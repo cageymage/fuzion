@@ -32,7 +32,17 @@ describe('About', () => {
     for (const link of applyLinks) {
       expect(link).toHaveAttribute('href', '/applications')
     }
-  })
+   });
+
+   it('should link to the calendar and raid progress pages when the page renders', () => {
+     renderWithProviders(<About />)
+
+     expect(screen.getByRole('link', { name: 'calendar' })).toHaveAttribute('href', '/calendar')
+     expect(screen.getByRole('link', { name: 'raid progress' })).toHaveAttribute(
+       'href',
+       '/raid-progress',
+     )
+   })
 
   it('should show the credits section after the main content when the page renders', () => {
     renderWithProviders(<About />)
