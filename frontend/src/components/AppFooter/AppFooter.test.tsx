@@ -12,6 +12,12 @@ describe('AppFooter', () => {
     ).toBeInTheDocument()
   })
 
+  it('should link to the about page', () => {
+    renderWithProviders(<AppFooter />)
+
+    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about')
+  })
+
   it('should link to the legal page', () => {
     renderWithProviders(<AppFooter />)
 

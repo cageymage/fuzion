@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router-dom'
 import { AppFooter } from '../components/AppFooter/AppFooter'
 import { AppHeader } from '../components/AppHeader/AppHeader'
 import { ToastProvider } from '../components/Toast/Toast'
+import { About } from '../pages/About/About'
 import { Applications } from '../pages/Applications/Applications'
 import { Calendar } from '../pages/Calendar/Calendar'
 import { ComingSoon } from '../pages/ComingSoon/ComingSoon'
@@ -64,6 +65,7 @@ export function App() {
             <Route path="/applications" element={<Applications />} />
             <Route path="/professions" element={<Professions />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/about" element={<About />} />
             <Route path="/legal" element={<Legal />} />
             {navItems
               .filter(
