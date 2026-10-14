@@ -27,6 +27,7 @@ Environment:
 | `DISCORD_CLIENT_ID`     | required | from the Discord developer portal (OAuth2 tab) |
 | `DISCORD_CLIENT_SECRET` | required | same place; never commit it        |
 | `DISCORD_REDIRECT_URL`  | required | must be registered on the Discord app; `http://localhost:5173/api/auth/callback` in dev |
+| `RAID_HELPER_WEBHOOK_SECRET` | optional | Raid-Helper's webhook key from `/webhooks show`; without it `POST /api/webhooks/raid-helper` is not registered (404) |
 | `TWITCH_CLIENT_ID`      | optional | `cmd/sync` only; from a dev.twitch.tv app. The Twitch job skips itself unless both are set |
 | `TWITCH_CLIENT_SECRET`  | optional | same place; never commit it        |
 | `SYNC_BLIZZARD_ROSTER_ENABLED` | `false` | `cmd/sync` only; the Blizzard roster job does nothing unless this is `true` |
@@ -69,6 +70,18 @@ Monk, Demon Hunter, Evoker exist on retail only) are skipped and counted in
 the `sync_log` message, and an empty or failed Blizzard response changes
 nothing.
 
+Raid-Helper events reach the `raids` table through its webhook (Premium only).
+Point `/webhooks set` for `event.create`, `event.update` and `event.delete` at
+`https://<site>/api/webhooks/raid-helper` (one URL serves all three: the type is
+in the `X-Raidhelper-Event` header) and leave `comp.update` unset. The title
+becomes `instance_name`, `startTime` becomes `starts_at`, and the difficulty is
+`Normal`, `Heroic` or `Mythic` when the title names one, else `Unknown`. An
+update whose `lastUpdated` is strictly older than the stored one is skipped. A
+delete keeps the row with `deleted_at` set, which hides it from `/api/raids` and
+stops a late create or update from bringing it back. Hand-entered raids (no
+`raid_helper_event_id`) are never touched. Payload details and the captures the
+tests use are in [plans/integrations/raid-helper.md](../plans/integrations/raid-helper.md).
+
 Migrations under `migrations/` are embedded and applied on startup, so there
 is no separate migrate step.
 
@@ -83,6 +96,7 @@ is no separate migrate step.
 | DELETE | `/api/professions/{id}` | officer only: 204; 404 for an unknown or malformed id |
 | GET    | `/api/news`         | one page of news posts as HAL: `{total, _links: {self, first, last, prev?, next?}, _embedded: {news: [...]}}`, newest first (`news` is `[]` when none); `?limit=` 1 to 50 (default 10), `?offset=` 0 or more (default 0), `?category=raid-progress\|recruitment\|guild-news`, else 400; `total` counts the category matches, ignoring limit and offset; links keep the filters and leave out defaults (`offset=0` never appears, `limit` only when you sent it) |
 | GET    | `/api/raids/next`   | soonest upcoming raid, or `null` when none scheduled |
+| POST   | `/api/webhooks/raid-helper` | Raid-Helper only: needs `Authorization: <webhook key>`, else 401. `X-Raidhelper-Event: webhookeventcreate\|webhookeventupdate` upserts the raid by event id, `webhookeventdelete` tombstones it; any other type is a 200 that writes nothing. 400 when the body has no `id` or `startTime` |
 | GET    | `/api/streams`      | every channel, live ones first, then offline by name; each has `title` (empty when offline), `isLive` (WoW) and `isLiveOtherGame` |
 | GET    | `/api/streams/live` | live streamers, most viewers first (`[]` when none); each has `title` |
 | GET    | `/api/applications`  | officer only: applications newest first, `?status=pending\|accepted\|declined` optional (400 on unknown) |

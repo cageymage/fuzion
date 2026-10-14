@@ -31,7 +31,7 @@ func (r *Repo) NextRaid(ctx context.Context) (*Raid, error) {
 	const query = `
 		SELECT id, difficulty, instance_name, starts_at, progress_summary
 		FROM raids
-		WHERE starts_at > now()
+		WHERE starts_at > now() AND deleted_at IS NULL
 		ORDER BY starts_at ASC
 		LIMIT 1`
 
@@ -51,7 +51,7 @@ func (r *Repo) ListUpcoming(ctx context.Context) ([]Raid, error) {
 	const query = `
 		SELECT id, difficulty, instance_name, starts_at, progress_summary
 		FROM raids
-		WHERE starts_at > now()
+		WHERE starts_at > now() AND deleted_at IS NULL
 		ORDER BY starts_at ASC`
 
 	raids := []Raid{}

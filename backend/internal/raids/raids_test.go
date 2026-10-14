@@ -127,3 +127,47 @@ func TestListRaids_ReturnsEmptyArray_WhenNothingIsScheduled(t *testing.T) {
 		t.Errorf("expected an empty array body, got %q", got)
 	}
 }
+
+func TestListUpcomingRaids_ExcludesDeletedRaids(t *testing.T) {
+	// given an upcoming raid and an upcoming raid deleted in Raid-Helper
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO raids (id, difficulty, instance_name, starts_at, progress_summary, raid_helper_event_id, deleted_at)
+		VALUES
+			('11111111-1111-1111-1111-111111111111', 'Mythic', 'Nerubar Palace', '2099-01-01T20:00:00Z', '', NULL, NULL),
+			('22222222-2222-2222-2222-222222222222', 'Unknown', 'Cancelled raid', '2099-01-02T20:00:00Z', '', '1100000000000000001', now())`)
+
+	// when I ask for upcoming raids
+	resp := srv.Get(t, "/api/raids")
+
+	// then I expect only the raid that was not deleted
+	resp.RequireStatus(t, 200)
+	var raids []raidJSON
+	resp.DecodeJSON(t, &raids)
+	if len(raids) != 1 || raids[0].InstanceName != "Nerubar Palace" {
+		t.Errorf("expected only Nerubar Palace, got %+v", raids)
+	}
+}
+
+func TestGetNextRaid_SkipsDeletedRaid_WhenItIsTheSoonest(t *testing.T) {
+	// given a deleted raid that would be the soonest, and a later one
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO raids (id, difficulty, instance_name, starts_at, progress_summary, raid_helper_event_id, deleted_at)
+		VALUES
+			('11111111-1111-1111-1111-111111111111', 'Unknown', 'Cancelled raid', '2099-01-01T20:00:00Z', '', '1100000000000000001', now()),
+			('22222222-2222-2222-2222-222222222222', 'Mythic', 'Nerubar Palace', '2099-01-02T20:00:00Z', '', NULL, NULL)`)
+
+	// when I ask for the next raid
+	resp := srv.Get(t, "/api/raids/next")
+
+	// then I expect the later raid that was not deleted
+	resp.RequireStatus(t, 200)
+	var raid raidJSON
+	resp.DecodeJSON(t, &raid)
+	if raid.InstanceName != "Nerubar Palace" {
+		t.Errorf("expected Nerubar Palace, got %+v", raid)
+	}
+}
