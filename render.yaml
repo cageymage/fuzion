@@ -85,6 +85,12 @@ services:
       # e.g. https://fuziongaming.gg
       - key: SITE_BASE_URL
         sync: false
+      # Optional: without it, POST /api/webhooks/raid-helper is not registered and
+      # Raid-Helper events are not mirrored onto the Calendar. It is the server's
+      # webhook key from `/webhooks show` in Discord (needs Raid-Helper Premium);
+      # treat it as a secret and rotate with `/webhooks refresh-key` if it leaks.
+      - key: RAID_HELPER_WEBHOOK_SECRET
+        sync: false
       # Optional: without both, the Home page has no suggested video when nobody
       # is live. The playlist must be Public or Unlisted.
       - key: YOUTUBE_API_KEY
