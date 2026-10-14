@@ -449,7 +449,7 @@ Based only on verified behaviour of `GET https://raid-helper.xyz/api/v4/events/{
 - A deleted event's response (status code and body) is unknown (`TODO`), which matters for detecting deletions.
 
 ## 5. Recommendations for #31
-Based on the docs and the verified GET object. Not yet tested against a real webhook request.
+Based on the docs, the verified GET object and the real captures in 2.4b.
 - **Webhooks need Premium, and the team is purchasing it**, so build the receiver below. Polling (4b) is a fallback only. Premium price and whether it is per server or per user: `TODO`.
 - **Telling the types apart:** the body has no type. The type arrives in the `x-raidhelper-event` header (observed, undocumented). Two workable designs: (a) one path per type, `/api/webhooks/raid-helper/create|update|delete`, relying only on the documented per-type URL setting, and logging the header as a cross-check; or (b) a single path that dispatches on the header. Recommendation: (a), because it does not depend on an undocumented header. Either way, do not register `comp.update`.
 - **Auth:** compare the request's `Authorization` header to the webhook key (constant-time compare, key from an env var such as `RAID_HELPER_WEBHOOK_KEY`). Reject with 401 on mismatch. The check is optional on Raid-Helper's side, so we must enforce it. The header value is the bare key (VERIFIED, no prefix, 30 characters).
