@@ -6,8 +6,13 @@ export function realmSlug(realm: string): string {
   return realm.trim().toLowerCase().replace(/'/g, '').replace(/\s+/g, '-')
 }
 
-// Forever's Armory path is predicted from retail's (/worldsoul/) and Classic's (/classic/)
-// until Forever launches.
-export function armoryUrl(realm: string, name: string): string {
-  return `https://worldofwarcraft.blizzard.com/en-us/forever/${WOW_REGION}/armory/character/${realmSlug(realm)}/${encodeURIComponent(name.toLowerCase())}`
+// Forever's Armory URL is unconfirmed until launch. Both parts are guesses: the
+// /forever/ path follows retail's /worldsoul/ and Classic's /classic/, and the two
+// names are joined with a hyphen.
+export function armoryUrl(realm: string, name: string, secondaryName: string): string {
+  const characterSlug = [name, secondaryName]
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean)
+    .join('-')
+  return `https://worldofwarcraft.blizzard.com/en-us/forever/${WOW_REGION}/armory/character/${realmSlug(realm)}/${encodeURIComponent(characterSlug)}`
 }

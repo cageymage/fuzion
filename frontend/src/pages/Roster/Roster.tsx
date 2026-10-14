@@ -115,6 +115,21 @@ function RaceCell({ race }: { race: string | null }) {
   return <img className={styles.raceIcon} src={iconUrl} alt={race} title={race} width={24} height={24} />
 }
 
+function ArmoryLink({ character, children }: { character: Character; children: string }) {
+  if (!children) return null
+  return (
+    <a
+      className={styles.characterLink}
+      href={armoryUrl(character.realm, character.name, character.secondaryName)}
+      target="_blank"
+      rel="noreferrer"
+      style={{ color: classColor(character.class) }}
+    >
+      {children}
+    </a>
+  )
+}
+
 export function Roster() {
   const roster = useRosterData()
   const currentUser = useCurrentUser()
@@ -255,11 +270,11 @@ export function Roster() {
                         <RaceCell race={character.race} />
                       </td>
                       <td>
-                        <a href={armoryUrl(character.realm, character.name)} target="_blank" rel="noreferrer">
-                          {character.name}
-                        </a>
+                        <ArmoryLink character={character}>{character.name}</ArmoryLink>
                       </td>
-                      <td>{character.secondaryName}</td>
+                      <td>
+                        <ArmoryLink character={character}>{character.secondaryName}</ArmoryLink>
+                      </td>
                       <td>{character.level}</td>
                       <td style={{ color: classColor(character.class) }}>{character.class}</td>
                       <td>{specLabel(character)}</td>

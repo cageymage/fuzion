@@ -112,6 +112,37 @@ describe('Roster', () => {
     )
   })
 
+  it('should link the secondary name to the same armory profile when the character has one', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, secondaryName: 'Ironhide' }])))
+
+    renderWithProviders(<Roster />)
+
+    const link = within(await screen.findByRole('table')).getByRole('link', { name: 'Ironhide' })
+    expect(link).toHaveAttribute(
+      'href',
+      'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/emberreach/ragnok-ironhide',
+    )
+  })
+
+  it('should color both name links with the class color', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, secondaryName: 'Ironhide' }])))
+
+    renderWithProviders(<Roster />)
+
+    const table = within(await screen.findByRole('table'))
+    expect(table.getByRole('link', { name: 'Ragnok' })).toHaveStyle({ color: '#C79C6E' })
+    expect(table.getByRole('link', { name: 'Ironhide' })).toHaveStyle({ color: '#C79C6E' })
+  })
+
+  it('should not render a secondary name link when the character has no secondary name', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
+
+    renderWithProviders(<Roster />)
+
+    const table = within(await screen.findByRole('table'))
+    expect(table.getAllByRole('link').map((link) => link.textContent)).toEqual(['Ragnok'])
+  })
+
   it('should open the armory link in a new tab', async () => {
     server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
 

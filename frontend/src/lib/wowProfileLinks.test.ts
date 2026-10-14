@@ -12,14 +12,20 @@ describe('realmSlug', () => {
 })
 
 describe('armoryUrl', () => {
-  it('should build an armory URL with a lowercased character name', () => {
-    expect(armoryUrl('Emberreach', 'Ragnok')).toBe(
+  it('should join the name and secondary name with a hyphen when the character has both', () => {
+    expect(armoryUrl('Emberreach', 'Aeliana', 'Dawnsong')).toBe(
+      'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/emberreach/aeliana-dawnsong',
+    )
+  })
+
+  it('should build an armory URL with a lowercased character name when there is no secondary name', () => {
+    expect(armoryUrl('Emberreach', 'Ragnok', '')).toBe(
       'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/emberreach/ragnok',
     )
   })
 
   it('should percent-encode the character name when it has accented letters', () => {
-    expect(armoryUrl('Emberreach', 'Zuljïn')).toBe(
+    expect(armoryUrl('Emberreach', 'Zuljïn', '')).toBe(
       'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/emberreach/zulj%C3%AFn',
     )
   })
