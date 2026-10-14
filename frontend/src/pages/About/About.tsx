@@ -56,20 +56,6 @@ export function About() {
           Apply to Fuzion
         </Link>
       </section>
-
-      <section aria-labelledby="credits-heading" className={styles.credits}>
-        <h2 id="credits-heading" className={styles.creditsTitle}>
-          Credits
-        </h2>
-        <p>Thanks to the services and people who keep this site running:</p>
-        <ul>
-          <li>Hosting: Render.</li>
-          <li>Bot protection: Cloudflare Turnstile.</li>
-          <li>Built with React, Vite and Go.</li>
-          <li>Home page and news card artwork: generated with Midjourney.</li>
-          <li>The officers and members who test the site and report what breaks.</li>
-        </ul>
-      </section>
     </article>
   )
 }
