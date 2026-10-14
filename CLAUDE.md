@@ -86,3 +86,13 @@ Add or adjust a Legal test for the new wording, and say in the PR description wh
 - Never `git push` or open a PR unless explicitly told to. "One PR is fine" describes the shape of the deliverable, not a go-ahead to create it; ask first.
 - Commit subjects and PR titles use Conventional Commits prefixes: `feat:` (new functionality), `fix:` (bug fix), `docs:` (docs/spec-only changes, including decision tickets), `chore:` (deps, tooling, config), `refactor:` (no behavior change), `test:` (test-only changes), `ci:` (CI/deploy config). A scope is optional (`feat(roster): ...`) — add one when it clarifies, skip it when the type alone is clear.
 - Decision-ticket commits/PRs (issues labeled `decision`) use `docs: Issue #N - <short summary>` as the subject/title — see #6, #7, #9.
+
+### Stacked PRs
+
+When one session produces several PRs, stack them instead of branching each one from `main`. Parallel branches off `main` all choose the same next migration number, and all but the first have to be renumbered.
+
+- Branch each new issue from the branch of the session's most recent PR that is still open, and open the PR with `--base <that branch>`. Branch from `main` only when nothing from the session is still open.
+- Number new migrations above the highest one on the parent branch.
+- Start the PR body with `Stacked on #N` so reviewers merge bottom-up.
+- Merge stacked PRs with a merge commit, never squash or rebase. Those rewrite the parent's commits, and the child PR then shows the parent's diff again or conflicts. When the parent's branch is deleted on merge, GitHub retargets the child to `main` with nothing to rebase.
+- To change a lower PR in the stack, commit on its branch and merge it upward into each child (`git switch child && git merge parent`). Don't rebase branches that have already been pushed.

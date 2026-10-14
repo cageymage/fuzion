@@ -41,10 +41,12 @@ gh issue edit N --add-assignee @me
 ## 5. Branch
 
 - Read the issue body fully, plus `plans/project-structure.md` and any spec section it links.
-- Start from up-to-date `main`: `git fetch origin && git switch main && git pull --ff-only`.
+- Pick the parent branch:
+  - **First PR of this session**, or every earlier PR from this session is merged: the parent is `main`. Run `git fetch origin && git switch main && git pull --ff-only`.
+  - **An earlier PR from this session is still open**: stack on it. The parent is the branch of the most recent PR you opened this session. Run `git fetch origin && git switch <parent>`. Do not branch from `main` alongside it. Parallel branches off `main` each pick the same next migration number and have to be renumbered later.
 - If the working tree is dirty, stop and ask (or use a worktree with the user's OK).
-- Create `N-short-slug` (existing examples: `21-middleware`, `11-raids-list-api`).
-- If the issue adds a migration, check the highest number on `main` and in open PRs (`git ls-tree origin/main backend/migrations/`, `gh pr diff`). CI fails a PR numbered at or below main's highest. The number in the issue body is a suggestion; use the next free one and say if it changed.
+- Create `N-short-slug` from the parent (existing examples: `21-middleware`, `11-raids-list-api`).
+- If the issue adds a migration, number it above the highest on the parent branch (`git ls-tree <parent> backend/migrations/`). When the parent is `main`, also check open PRs from other people (`gh pr diff`). CI fails a PR numbered at or below its base branch's highest. The number in the issue body is a suggestion; use the next free one and say if it changed.
 
 ## 6. Clarify, then implement
 
@@ -81,6 +83,7 @@ Show `git status`, a diff summary, and the verification output. Ask: "Commit thi
 Ask: "Push and open the PR?" Only on yes:
 
 - `git push -u origin <branch>`
+- Open it against the parent branch from step 5: `gh pr create --base <parent>`. GitHub moves the base to `main` on its own when the parent PR merges and its branch is deleted.
 - Title: `<type>(scope): Issue #N - <short summary>` (matches existing PRs, for example `feat(raids): Issue #11 - Add GET /api/raids to list upcoming raids`).
-- Body: `Closes #N`, a short summary of what changed, what was verified (include the actual request and response evidence, or say the step was skipped and why), any migration number change, and any follow-ups or soft dependencies. End with the `Generated with Claude Code` line from the session's system reminder.
+- Body: `Closes #N`, a `Stacked on #M` line first when the base is not `main` (so reviewers merge in order), a short summary of what changed, what was verified (include the actual request and response evidence, or say the step was skipped and why), any migration number change, and any follow-ups or soft dependencies. End with the `Generated with Claude Code` line from the session's system reminder.
 - Return the PR URL.
