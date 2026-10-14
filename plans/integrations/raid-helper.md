@@ -221,7 +221,7 @@ Captured body (VERIFIED, real; from the `webhookeventupdate` request sent at eve
 
 What this body shows:
 - **All timestamps are Unix seconds** (10 digits): `startTime`, `endTime`, `closingTime`, `lastUpdated`.
-- **`date`/`time` match `startTime` in a local timezone:** `startTime` 1791849600 is 2026-10-13 00:00:00 UTC while `date`/`time` read `12-10-2026` and `18:00`, so the server's timezone is 6 hours behind UTC for that date (inferred offset). Same pattern as the earlier GET sample. Use `startTime`.
+- **`date`/`time` are display strings in an unknown local timezone:** `startTime` 1791849600 is 2026-10-13 00:00:00 UTC while `date`/`time` read `12-10-2026` and `18:00`. The offset implied by this pair (6 hours behind UTC) does not match a daylight-saving zone such as US Central on that date, so do not derive or hardcode an offset from `date`/`time`. Same pattern as the earlier GET sample. Use `startTime`.
 - **With no duration set (`advancedSettings.duration` 0), `endTime` and `closingTime` equal `startTime`.** Do not assume `endTime > startTime`.
 - **The template differs between events:** `templateId` was `wowforever` here and `wowretail2` in the earlier GET sample. Class and spec lists differ per template (this one includes specs such as Shockadin, Combat and Smite). Do not hardcode classes or specs in #31.
 - **No `type` in the body** (as expected); the type is in the `x-raidhelper-event` header.
