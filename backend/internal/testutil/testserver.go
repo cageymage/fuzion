@@ -26,6 +26,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/images"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/professions"
+	"github.com/cageymage/fuzion/backend/internal/raidhelper"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
 	"github.com/cageymage/fuzion/backend/internal/raids"
 	"github.com/cageymage/fuzion/backend/internal/roster"
@@ -40,6 +41,10 @@ var FixedNow = time.Date(2026, 3, 14, 20, 0, 0, 0, time.UTC)
 
 // SiteBaseURL is the public site address that Discord announcements and notifications link to.
 const SiteBaseURL = "https://fuzion.example"
+
+// RaidHelperWebhookKey is the fake webhook key from plans/integrations/raid-helper-samples:
+// 30 mixed-case alphanumerics, the same shape as a real one.
+const RaidHelperWebhookKey = "aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bC1"
 
 type Server struct {
 	*httptest.Server
@@ -64,6 +69,13 @@ type serverOptions struct {
 	recruitingWebhook    bool
 	announcementsWebhook bool
 	turnstile            bool
+	raidHelperWebhookKey string
+}
+
+// WithoutRaidHelperWebhook builds the server the way a deploy without
+// RAID_HELPER_WEBHOOK_SECRET runs: the webhook endpoint is not registered.
+func WithoutRaidHelperWebhook() ServerOption {
+	return func(o *serverOptions) { o.raidHelperWebhookKey = "" }
 }
 
 // WithoutTurnstile builds the server the way a deploy without
@@ -93,7 +105,7 @@ func WithoutYouTubePlaylist() ServerOption {
 func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	t.Helper()
 
-	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true}
+	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -145,6 +157,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 		Images:        images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL), shell),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
+		RaidHelper:     raidhelper.NewHandler(raidhelper.NewService(raidhelper.NewRepo(db)), options.raidHelperWebhookKey),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.Fixed(FixedNow))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
@@ -344,6 +357,21 @@ func (s *Server) PostRaw(t *testing.T, path, body string) Response {
 		t.Fatalf("build POST %s: %v", path, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	return s.do(t, req)
+}
+
+// PostRawWithHeaders sends body as-is with the given headers, the way a third-party
+// webhook sender would.
+func (s *Server) PostRawWithHeaders(t *testing.T, path string, body []byte, headers map[string]string) Response {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodPost, s.URL+path, bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("build POST %s: %v", path, err)
+	}
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
 	return s.do(t, req)
 }
 
