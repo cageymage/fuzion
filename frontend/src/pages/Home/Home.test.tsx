@@ -18,6 +18,21 @@ const centrifuze: Stream = {
   channelUrl: 'https://www.twitch.tv/centrifuze',
   isLive: true,
   isLiveOtherGame: false,
+  platform: 'twitch',
+}
+
+const youTubeStream: Stream = {
+  id: 'stream-5',
+  streamerName: 'Brannor',
+  gameName: '',
+  title: 'Forever raid night',
+  viewerCount: 312,
+  thumbnailUrl: 'https://i.ytimg.example/live-1/mqdefault_live.jpg',
+  avatarUrl: 'https://yt3.example/brannor.jpg',
+  channelUrl: 'https://www.youtube.com/@brannor',
+  isLive: true,
+  isLiveOtherGame: false,
+  platform: 'youtube',
 }
 
 describe('Home', () => {
@@ -279,6 +294,31 @@ describe('Home', () => {
     expect(await screen.findByRole('link', { name: 'Watch on Twitch →' })).toHaveAttribute(
       'href',
       'https://www.twitch.tv/centrifuze',
+    )
+  })
+
+  it('should show a YouTube stream as a card with its avatar, title, thumbnail and viewer count when the featured stream is on YouTube', async () => {
+    server.use(http.get('/api/streams/live', () => HttpResponse.json([youTubeStream])))
+
+    const { container } = renderWithProviders(<Home />)
+
+    expect(await screen.findByText('Brannor is live')).toBeInTheDocument()
+    expect(screen.getByText('Forever raid night')).toBeInTheDocument()
+    expect(screen.getByText('312')).toBeInTheDocument()
+    const images = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src'))
+    expect(images).toEqual(
+      expect.arrayContaining(['https://i.ytimg.example/live-1/mqdefault_live.jpg', 'https://yt3.example/brannor.jpg']),
+    )
+  })
+
+  it('should link to the channel on YouTube when the featured stream is on YouTube', async () => {
+    server.use(http.get('/api/streams/live', () => HttpResponse.json([youTubeStream])))
+
+    renderWithProviders(<Home />)
+
+    expect(await screen.findByRole('link', { name: 'Watch on YouTube →' })).toHaveAttribute(
+      'href',
+      'https://www.youtube.com/@brannor',
     )
   })
 

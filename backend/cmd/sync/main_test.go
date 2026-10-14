@@ -39,3 +39,16 @@ func TestRunBlizzardRoster_ReturnsError_WhenFlagIsEnabledWithoutCredentials(t *t
 		}
 	}
 }
+
+func TestRunYouTube_DoesNothing_WhenAPIKeyIsMissing(t *testing.T) {
+	// given no YouTube API key is configured
+	cfg := config{databaseURL: unreachableDatabase}
+
+	// when the YouTube sync runs
+	err := runYouTube(context.Background(), cfg)
+
+	// then I expect it to exit cleanly without touching the database
+	if err != nil {
+		t.Errorf("runYouTube = %v, want nil", err)
+	}
+}

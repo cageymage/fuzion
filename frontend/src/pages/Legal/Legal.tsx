@@ -73,7 +73,7 @@ export function Legal() {
         <ul>
           <li>World of Warcraft game content and class names: Blizzard Entertainment, Inc.</li>
           <li>Live status, channel avatars and embedded streams: Twitch Interactive, Inc.</li>
-          <li>Embedded videos: YouTube, a Google LLC service.</li>
+          <li>Embedded videos, live status and channel avatars: YouTube, a Google LLC service.</li>
           <li>Bot protection: Cloudflare, Inc.</li>
           <li>Hosting: Render Services, Inc.</li>
           <li>Home page artwork: generated with Midjourney.</li>

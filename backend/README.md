@@ -30,6 +30,7 @@ Environment:
 | `RAID_HELPER_WEBHOOK_SECRET` | optional | Raid-Helper's webhook key from `/webhooks show`; without it `POST /api/webhooks/raid-helper` is not registered (404) |
 | `TWITCH_CLIENT_ID`      | optional | `cmd/sync` only; from a dev.twitch.tv app. The Twitch job skips itself unless both are set |
 | `TWITCH_CLIENT_SECRET`  | optional | same place; never commit it        |
+| `YOUTUBE_API_KEY`       | optional | YouTube Data API v3 key. The API uses it for the suggested video; `cmd/sync youtube` skips itself without it |
 | `SYNC_BLIZZARD_ROSTER_ENABLED` | `false` | `cmd/sync` only; the Blizzard roster job does nothing unless this is `true` |
 | `BLIZZARD_CLIENT_ID`    | when enabled | from a develop.battle.net client |
 | `BLIZZARD_CLIENT_SECRET` | when enabled | same place; never commit it |
@@ -40,7 +41,7 @@ Environment:
 | `BATTLENET_REDIRECT_URL` | optional | enables Battle.net account linking on `/dashboard`; must be registered on the Blizzard client, `http://localhost:5173/api/auth/battlenet/callback` in dev. Needs `BLIZZARD_CLIENT_ID` and `BLIZZARD_CLIENT_SECRET` on the API too |
 
 Background jobs run from `cmd/sync`, one job per invocation, once and exit
-(Render runs `/sync twitch` every minute). Locally, with the API already run
+(Render runs `/sync twitch` every minute and `/sync youtube` every 5 minutes). Locally, with the API already run
 once so migrations are applied:
 
 ```
@@ -53,6 +54,26 @@ game: a guildie live in retail WoW (game id 18122) is `isLive`, one live in
 another game is `isLiveOtherGame` (never shown on the home page), and anyone
 else has both flags false. It also stores each live stream's title and a
 thumbnail URL with a fixed 440x248 size.
+
+`sync youtube` does the same for rows with a `youtube_channel_id` (the `UC...`
+ID, not the `@handle`). A row has a Twitch login or a YouTube channel ID, never
+both, so a member who streams on both gets two rows and each job only touches
+its own. YouTube has no game category, so any live stream counts as `isLive`.
+For each channel it reads the 10 most recent uploads from the channel's uploads
+playlist and looks them up with `videos.list`: a live stream is one of the
+uploads, though Shorts posted during it can push it below the newest. A channel
+with no uploads playlist is skipped. Each run costs about one quota unit per
+channel plus two; quota errors (`quotaExceeded`) land in `sync_log` like any
+other failure.
+
+To try it locally, add a row for a channel that is live now:
+
+```
+INSERT INTO streams (streamer_name, game_name, channel_url, youtube_channel_id)
+VALUES ('Lofi Girl', '', 'https://www.youtube.com/@LofiGirl', 'UCSJ4gkVC6NrvII8umztf0Ow');
+```
+
+then run `npx dotenv -e .env -e .env.example -- go run -C backend ./cmd/sync youtube`.
 
 `sync blizzard-roster` pulls the guild roster from Blizzard once an hour and
 is off until `SYNC_BLIZZARD_ROSTER_ENABLED=true`. For each member it adds the
