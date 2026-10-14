@@ -4,6 +4,7 @@ import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { classColor } from '../../lib/classColor'
 import { primaryProfessionIcons } from '../../lib/professionIcon'
 import { raceIcon } from '../../lib/raceIcon'
+import { armoryUrl } from '../../lib/wowProfileLinks'
 import { CharacterDialog } from './CharacterDialog'
 import { DeleteCharacterDialog } from './DeleteCharacterDialog'
 import { filterRoster, sortRoster, type RoleFilter, type RosterSort, type SortKey } from './filterRoster'
@@ -253,7 +254,11 @@ export function Roster() {
                       <td>
                         <RaceCell race={character.race} />
                       </td>
-                      <td>{character.name}</td>
+                      <td>
+                        <a href={armoryUrl(character.realm, character.name)} target="_blank" rel="noreferrer">
+                          {character.name}
+                        </a>
+                      </td>
                       <td>{character.secondaryName}</td>
                       <td>{character.level}</td>
                       <td style={{ color: classColor(character.class) }}>{character.class}</td>

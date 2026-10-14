@@ -100,6 +100,28 @@ describe('Roster', () => {
     expect(table.getByText('Ironhide')).toBeInTheDocument()
   })
 
+  it('should render the character name as a link to their armory profile', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
+
+    renderWithProviders(<Roster />)
+
+    const link = within(await screen.findByRole('table')).getByRole('link', { name: 'Ragnok' })
+    expect(link).toHaveAttribute(
+      'href',
+      'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/emberreach/ragnok',
+    )
+  })
+
+  it('should open the armory link in a new tab', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
+
+    renderWithProviders(<Roster />)
+
+    const link = within(await screen.findByRole('table')).getByRole('link', { name: 'Ragnok' })
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noreferrer')
+  })
+
   it('should show both specs joined by a slash when the character has a second spec', async () => {
     const dualSpec: Character = { ...selene, spec: 'Holy', spec2: 'Shadow', role2: 'dps' }
     server.use(http.get('/api/roster', () => HttpResponse.json([dualSpec])))
