@@ -116,8 +116,15 @@ func TestRaidHelperWebhook_StoresOneRaid_WhenCreateAndItsUpdateArriveTogether(t 
 
 	// then I expect a 200 and still exactly one raid
 	resp.RequireStatus(t, 200)
-	if rows := raidRows(t, db); len(rows) != 1 {
-		t.Errorf("expected one raid, got %+v", rows)
+	want := []raidRow{{
+		EventID:      ptr(capturedEventID),
+		Difficulty:   "Unknown",
+		InstanceName: "Test Raid Event",
+		StartsAt:     capturedStart,
+		LastUpdated:  ptr(int64(1791781357)),
+	}}
+	if diff := cmp.Diff(want, raidRows(t, db)); diff != "" {
+		t.Errorf("unexpected raids (-want +got):\n%s", diff)
 	}
 }
 
@@ -155,9 +162,15 @@ func TestRaidHelperWebhook_IgnoresUpdate_WhenItIsOlderThanTheStoredOne(t *testin
 
 	// then I expect a 200 and the newer title kept
 	resp.RequireStatus(t, 200)
-	rows := raidRows(t, db)
-	if len(rows) != 1 || rows[0].InstanceName != "Test Raid Event (edited)" || *rows[0].LastUpdated != 1791781505 {
-		t.Errorf("expected the edited raid to be kept, got %+v", rows)
+	want := []raidRow{{
+		EventID:      ptr(capturedEventID),
+		Difficulty:   "Unknown",
+		InstanceName: "Test Raid Event (edited)",
+		StartsAt:     capturedStart,
+		LastUpdated:  ptr(int64(1791781505)),
+	}}
+	if diff := cmp.Diff(want, raidRows(t, db)); diff != "" {
+		t.Errorf("unexpected raids (-want +got):\n%s", diff)
 	}
 }
 
@@ -173,9 +186,15 @@ func TestRaidHelperWebhook_AppliesUpdate_WhenLastUpdatedEqualsTheStoredOne(t *te
 
 	// then I expect the new title applied, since lastUpdated is unverified for title-only edits
 	resp.RequireStatus(t, 200)
-	rows := raidRows(t, db)
-	if len(rows) != 1 || rows[0].InstanceName != "Retitled without a lastUpdated bump" {
-		t.Errorf("expected the retitled raid, got %+v", rows)
+	want := []raidRow{{
+		EventID:      ptr(capturedEventID),
+		Difficulty:   "Unknown",
+		InstanceName: "Retitled without a lastUpdated bump",
+		StartsAt:     capturedStart,
+		LastUpdated:  ptr(int64(1791781357)),
+	}}
+	if diff := cmp.Diff(want, raidRows(t, db)); diff != "" {
+		t.Errorf("unexpected raids (-want +got):\n%s", diff)
 	}
 }
 
@@ -192,7 +211,18 @@ func TestRaidHelperWebhook_DeletesRaid_WhenEventDeletedIsReceived(t *testing.T) 
 	resp.RequireStatus(t, 200)
 	rows := raidRows(t, db)
 	if len(rows) != 1 || rows[0].DeletedAt == nil {
-		t.Errorf("expected one tombstoned raid, got %+v", rows)
+		t.Fatalf("expected one tombstoned raid, got %+v", rows)
+	}
+	rows[0].DeletedAt = nil
+	want := raidRow{
+		EventID:      ptr(capturedEventID),
+		Difficulty:   "Unknown",
+		InstanceName: "Test Raid Event (edited)",
+		StartsAt:     capturedStart,
+		LastUpdated:  ptr(int64(1791781634)),
+	}
+	if diff := cmp.Diff(want, rows[0]); diff != "" {
+		t.Errorf("unexpected tombstone (-want +got):\n%s", diff)
 	}
 }
 
@@ -236,8 +266,19 @@ func TestRaidHelperWebhook_StoresTombstone_WhenDeleteArrivesForAnUnknownEvent(t 
 	// then I expect a 200 and a tombstone, so a create arriving later cannot add the raid
 	resp.RequireStatus(t, 200)
 	rows := raidRows(t, db)
-	if len(rows) != 1 || rows[0].DeletedAt == nil || *rows[0].EventID != capturedEventID {
-		t.Errorf("expected one tombstone for the event, got %+v", rows)
+	if len(rows) != 1 || rows[0].DeletedAt == nil {
+		t.Fatalf("expected one tombstone for the event, got %+v", rows)
+	}
+	rows[0].DeletedAt = nil
+	want := raidRow{
+		EventID:      ptr(capturedEventID),
+		Difficulty:   "Unknown",
+		InstanceName: "Test Raid Event (edited)",
+		StartsAt:     capturedStart,
+		LastUpdated:  ptr(int64(1791781634)),
+	}
+	if diff := cmp.Diff(want, rows[0]); diff != "" {
+		t.Errorf("unexpected tombstone (-want +got):\n%s", diff)
 	}
 }
 
@@ -357,8 +398,14 @@ func TestRaidHelperWebhook_SetsDifficulty_WhenTheTitleNamesOne(t *testing.T) {
 
 	// then I expect the difficulty taken from the title
 	resp.RequireStatus(t, 200)
-	rows := raidRows(t, db)
-	if len(rows) != 1 || rows[0].Difficulty != "Heroic" {
-		t.Errorf("expected a Heroic raid, got %+v", rows)
+	want := []raidRow{{
+		EventID:      ptr(capturedEventID),
+		Difficulty:   "Heroic",
+		InstanceName: "Week 9 heroic clear",
+		StartsAt:     capturedStart,
+		LastUpdated:  ptr(int64(1791781357)),
+	}}
+	if diff := cmp.Diff(want, raidRows(t, db)); diff != "" {
+		t.Errorf("unexpected raids (-want +got):\n%s", diff)
 	}
 }

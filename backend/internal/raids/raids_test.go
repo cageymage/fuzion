@@ -145,8 +145,15 @@ func TestListUpcomingRaids_ExcludesDeletedRaids(t *testing.T) {
 	resp.RequireStatus(t, 200)
 	var raids []raidJSON
 	resp.DecodeJSON(t, &raids)
-	if len(raids) != 1 || raids[0].InstanceName != "Nerubar Palace" {
-		t.Errorf("expected only Nerubar Palace, got %+v", raids)
+	want := []raidJSON{{
+		ID:              "11111111-1111-1111-1111-111111111111",
+		Difficulty:      "Mythic",
+		InstanceName:    "Nerubar Palace",
+		StartsAt:        "2099-01-01T20:00:00Z",
+		ProgressSummary: "",
+	}}
+	if diff := cmp.Diff(want, raids); diff != "" {
+		t.Errorf("unexpected raids (-want +got):\n%s", diff)
 	}
 }
 
@@ -167,7 +174,14 @@ func TestGetNextRaid_SkipsDeletedRaid_WhenItIsTheSoonest(t *testing.T) {
 	resp.RequireStatus(t, 200)
 	var raid raidJSON
 	resp.DecodeJSON(t, &raid)
-	if raid.InstanceName != "Nerubar Palace" {
-		t.Errorf("expected Nerubar Palace, got %+v", raid)
+	want := raidJSON{
+		ID:              "22222222-2222-2222-2222-222222222222",
+		Difficulty:      "Mythic",
+		InstanceName:    "Nerubar Palace",
+		StartsAt:        "2099-01-02T20:00:00Z",
+		ProgressSummary: "",
+	}
+	if diff := cmp.Diff(want, raid); diff != "" {
+		t.Errorf("unexpected next raid (-want +got):\n%s", diff)
 	}
 }
