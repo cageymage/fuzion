@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, ScrollRestoration } from 'react-router-dom'
 import { AppFooter } from '../components/AppFooter/AppFooter'
 import { AppHeader } from '../components/AppHeader/AppHeader'
 import { ToastProvider } from '../components/Toast/Toast'
