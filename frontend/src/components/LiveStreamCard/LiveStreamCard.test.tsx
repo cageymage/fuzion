@@ -14,6 +14,7 @@ const stream: Stream = {
   channelUrl: 'https://twitch.tv/thundermane',
   isLive: true,
   isLiveOtherGame: false,
+  platform: 'twitch',
 }
 
 describe('LiveStreamCard', () => {
@@ -65,5 +66,18 @@ describe('LiveStreamCard', () => {
     const link = screen.getByRole('link', { name: 'Watch on Twitch →' })
     expect(link).toHaveAttribute('href', 'https://twitch.tv/thundermane')
     expect(link).toHaveAttribute('target', '_blank')
+  })
+
+  it('should link to the channel on YouTube when the stream is on YouTube', () => {
+    render(
+      <LiveStreamCard
+        stream={{ ...stream, platform: 'youtube', channelUrl: 'https://www.youtube.com/@thundermane' }}
+      />,
+    )
+
+    expect(screen.getByRole('link', { name: 'Watch on YouTube →' })).toHaveAttribute(
+      'href',
+      'https://www.youtube.com/@thundermane',
+    )
   })
 })

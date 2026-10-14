@@ -17,6 +17,7 @@ const offlineStream: Stream = {
   channelUrl: 'https://twitch.tv/emberfist',
   isLive: false,
   isLiveOtherGame: false,
+  platform: 'twitch',
 }
 
 const liveStream: Stream = {
@@ -30,6 +31,7 @@ const liveStream: Stream = {
   channelUrl: 'https://twitch.tv/thundermane',
   isLive: true,
   isLiveOtherGame: false,
+  platform: 'twitch',
 }
 
 const otherGameStream: Stream = {
@@ -43,6 +45,7 @@ const otherGameStream: Stream = {
   channelUrl: 'https://twitch.tv/aelith',
   isLive: false,
   isLiveOtherGame: true,
+  platform: 'twitch',
 }
 
 describe('Streams', () => {
@@ -200,5 +203,25 @@ describe('Streams', () => {
     renderWithProviders(<Streams />)
 
     expect(await screen.findByText('Streams could not be loaded.')).toBeInTheDocument()
+  })
+
+  it('should show a live YouTube channel with its title and viewer count when the channel is on YouTube', async () => {
+    const youTubeStream: Stream = {
+      ...liveStream,
+      id: 'stream-5',
+      streamerName: 'Brannor',
+      title: 'Forever raid night',
+      viewerCount: 312,
+      channelUrl: 'https://www.youtube.com/@brannor',
+      platform: 'youtube',
+    }
+    server.use(http.get('/api/streams', () => HttpResponse.json([youTubeStream])))
+
+    renderWithProviders(<Streams />)
+
+    const card = await screen.findByRole('link', { name: /Brannor/ })
+    expect(card).toHaveAttribute('href', 'https://www.youtube.com/@brannor')
+    expect(card).toHaveTextContent('Forever raid night')
+    expect(card).toHaveTextContent('312')
   })
 })

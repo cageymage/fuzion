@@ -14,6 +14,7 @@ const offlineStream: Stream = {
   channelUrl: 'https://twitch.tv/moonveil',
   isLive: false,
   isLiveOtherGame: false,
+  platform: 'twitch',
 }
 
 describe('OfflineStreamCard', () => {

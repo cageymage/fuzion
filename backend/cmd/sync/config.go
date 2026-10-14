@@ -10,6 +10,7 @@ import (
 type config struct {
 	databaseURL string
 	twitch      twitchConfig
+	youTube     youTubeConfig
 	blizzard    blizzardConfig
 }
 
@@ -20,6 +21,14 @@ type twitchConfig struct {
 
 func (c twitchConfig) configured() bool {
 	return c.clientID != "" && c.clientSecret != ""
+}
+
+type youTubeConfig struct {
+	apiKey string
+}
+
+func (c youTubeConfig) configured() bool {
+	return c.apiKey != ""
 }
 
 type blizzardConfig struct {
@@ -65,6 +74,9 @@ func loadConfig() (config, error) {
 		twitch: twitchConfig{
 			clientID:     os.Getenv("TWITCH_CLIENT_ID"),
 			clientSecret: os.Getenv("TWITCH_CLIENT_SECRET"),
+		},
+		youTube: youTubeConfig{
+			apiKey: os.Getenv("YOUTUBE_API_KEY"),
 		},
 		blizzard: blizzardConfig{
 			enabled:      os.Getenv("SYNC_BLIZZARD_ROSTER_ENABLED") == "true",

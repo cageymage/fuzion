@@ -14,4 +14,12 @@ export interface Stream {
   channelUrl: string
   isLive: boolean
   isLiveOtherGame: boolean
+  platform: StreamPlatform
+}
+
+export type StreamPlatform = 'twitch' | 'youtube'
+
+export const streamPlatformNames: Record<StreamPlatform, string> = {
+  twitch: 'Twitch',
+  youtube: 'YouTube',
 }

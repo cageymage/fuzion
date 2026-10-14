@@ -19,9 +19,10 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/streams"
 	"github.com/cageymage/fuzion/backend/internal/synclog"
 	"github.com/cageymage/fuzion/backend/internal/twitch"
+	"github.com/cageymage/fuzion/backend/internal/youtube"
 )
 
-const usage = "usage: sync twitch|blizzard-roster"
+const usage = "usage: sync twitch|youtube|blizzard-roster"
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
@@ -35,6 +36,8 @@ func main() {
 	switch os.Args[1] {
 	case "twitch":
 		run = runTwitch
+	case "youtube":
+		run = runYouTube
 	case "blizzard-roster":
 		run = runBlizzardRoster
 	default:
@@ -76,6 +79,26 @@ func runTwitch(ctx context.Context, cfg config) error {
 	}, &http.Client{Timeout: 10 * time.Second})
 
 	return streams.NewSyncTwitch(streams.NewRepo(db), client, synclog.NewRepo(db)).Run(ctx)
+}
+
+func runYouTube(ctx context.Context, cfg config) error {
+	if !cfg.youTube.configured() {
+		slog.Info("sync youtube skipped: YOUTUBE_API_KEY is not set")
+		return nil
+	}
+
+	db, err := sqlx.ConnectContext(ctx, "pgx", cfg.databaseURL)
+	if err != nil {
+		return fmt.Errorf("connect to database: %w", err)
+	}
+	defer db.Close()
+
+	client := youtube.NewClient(youtube.Config{
+		APIKey:  cfg.youTube.apiKey,
+		BaseURL: youtube.APIBaseURL,
+	}, &http.Client{Timeout: 10 * time.Second})
+
+	return streams.NewSyncYouTube(streams.NewRepo(db), client, synclog.NewRepo(db)).Run(ctx)
 }
 
 func runBlizzardRoster(ctx context.Context, cfg config) error {

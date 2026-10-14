@@ -14,6 +14,7 @@ const liveStream: Stream = {
   channelUrl: 'https://twitch.tv/thundermane',
   isLive: true,
   isLiveOtherGame: false,
+  platform: 'twitch',
 }
 
 describe('StreamCard', () => {
