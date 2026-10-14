@@ -56,6 +56,14 @@ describe('Legal', () => {
     )
   })
 
+  it('should credit YouTube for live status and channel avatars when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Attributions' })).toHaveTextContent(
+      'Embedded videos, live status and channel avatars: YouTube, a Google LLC service.',
+    )
+  })
+
   it('should state the Blizzard disclaimer when the page renders', () => {
     renderWithProviders(<Legal />)
 

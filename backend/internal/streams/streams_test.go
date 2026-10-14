@@ -2,6 +2,7 @@ package streams_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -334,5 +335,50 @@ func TestListLiveStreams_ExcludesStreamer_WhenPlayingAnotherGame(t *testing.T) {
 	resp.DecodeJSON(t, &live)
 	if len(live) != 1 || live[0].StreamerName != "Thundermane" {
 		t.Errorf("expected only Thundermane, got %q", resp.Body)
+	}
+}
+
+func TestListStreams_ReturnsPlatform_WhenChannelsAreOnTwitchAndYouTube(t *testing.T) {
+	// given one Twitch channel and one YouTube channel
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, channel_url, is_live, twitch_login, youtube_channel_id)
+		VALUES
+			('11111111-1111-1111-1111-111111111111', 'Aelith', '', 'https://twitch.tv/aelith', false, 'aelith', NULL),
+			('22222222-2222-2222-2222-222222222222', 'Brannor', '', 'https://www.youtube.com/@brannor', false, NULL, 'UCbrannor')`)
+
+	// when I ask for every stream channel
+	resp := srv.Get(t, "/api/streams")
+
+	// then I expect each channel labelled with its platform
+	resp.RequireStatus(t, 200)
+	type channelPlatform struct {
+		StreamerName string `json:"streamerName"`
+		Platform     string `json:"platform"`
+	}
+	var all []channelPlatform
+	resp.DecodeJSON(t, &all)
+	want := []channelPlatform{
+		{StreamerName: "Aelith", Platform: "twitch"},
+		{StreamerName: "Brannor", Platform: "youtube"},
+	}
+	if diff := cmp.Diff(want, all); diff != "" {
+		t.Errorf("unexpected platforms (-want +got):\n%s", diff)
+	}
+}
+
+func TestStreamsInsert_RejectsRow_WhenBothTwitchLoginAndYouTubeChannelAreSet(t *testing.T) {
+	// given a channel row that names both a Twitch login and a YouTube channel
+	db := testutil.DB(t)
+
+	// when the insert runs
+	_, err := db.Exec(`
+		INSERT INTO streams (streamer_name, game_name, channel_url, twitch_login, youtube_channel_id)
+		VALUES ('Aelith', '', 'https://twitch.tv/aelith', 'aelith', 'UCaelith')`)
+
+	// then I expect the single-platform check to reject it
+	if err == nil || !strings.Contains(err.Error(), "streams_single_platform") {
+		t.Fatalf("expected a streams_single_platform violation, got %v", err)
 	}
 }

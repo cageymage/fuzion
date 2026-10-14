@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -14,6 +15,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/synclog"
 	"github.com/cageymage/fuzion/backend/internal/testutil"
 	"github.com/cageymage/fuzion/backend/internal/twitch"
+	"github.com/cageymage/fuzion/backend/internal/youtube"
 )
 
 type streamRow struct {
@@ -292,5 +294,186 @@ func TestUpdateLiveStatus_ClearsOtherGameFlag_WhenStreamerGoesOffline(t *testing
 	}
 	if diff := cmp.Diff(want, streamRows(t, db)); diff != "" {
 		t.Errorf("unexpected streams (-want +got):\n%s", diff)
+	}
+}
+
+type youTubeRow struct {
+	ChannelID       string  `db:"youtube_channel_id"`
+	IsLive          bool    `db:"is_live"`
+	IsLiveOtherGame bool    `db:"is_live_other_game"`
+	ViewerCount     int     `db:"viewer_count"`
+	GameName        string  `db:"game_name"`
+	Title           string  `db:"stream_title"`
+	ThumbnailURL    *string `db:"thumbnail_url"`
+	ProfileImageURL *string `db:"profile_image_url"`
+}
+
+func youTubeRows(t *testing.T, db *sqlx.DB) []youTubeRow {
+	t.Helper()
+	var rows []youTubeRow
+	if err := db.Select(&rows, `SELECT youtube_channel_id, is_live, is_live_other_game, viewer_count, game_name, stream_title, thumbnail_url, profile_image_url FROM streams WHERE youtube_channel_id IS NOT NULL ORDER BY youtube_channel_id`); err != nil {
+		t.Fatalf("select youtube streams: %v", err)
+	}
+	return rows
+}
+
+func newSyncYouTube(db *sqlx.DB, fake *testutil.FakeYouTube) *streams.SyncYouTube {
+	client := youtube.NewClient(youtube.Config{APIKey: testutil.YouTubeAPIKey, BaseURL: fake.URL}, fake.Client())
+	return streams.NewSyncYouTube(streams.NewRepo(db), client, synclog.NewRepo(db))
+}
+
+func TestUpdateYouTubeLiveStatus_MarksReturnedChannelsLiveAndOthersOffline(t *testing.T) {
+	// given one YouTube channel that was live and one that was offline
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, stream_title, viewer_count, thumbnail_url, channel_url, is_live, youtube_channel_id)
+		VALUES
+			('11111111-1111-1111-1111-111111111111', 'Emberfist', '', 'Old title', 310, 'https://i.ytimg.example/old.jpg', 'https://www.youtube.com/@emberfist', true, 'UCemberfist'),
+			('22222222-2222-2222-2222-222222222222', 'Moonveil', '', '', 0, NULL, 'https://www.youtube.com/@moonveil', false, 'UCmoonveil')`)
+
+	// when I apply a YouTube result in which only Moonveil is live
+	err := streams.NewRepo(db).UpdateYouTubeLiveStatus(context.Background(), map[string]youtube.LiveStream{
+		"UCmoonveil": {ChannelID: "UCmoonveil", VideoID: "live-1", Title: "Forever raid night", ViewerCount: 88, ThumbnailURL: "https://i.ytimg.example/new.jpg"},
+	})
+
+	// then I expect Moonveil live in the guild's game and Emberfist offline with no viewers or title
+	if err != nil {
+		t.Fatalf("UpdateYouTubeLiveStatus: %v", err)
+	}
+	oldThumbnail := "https://i.ytimg.example/old.jpg"
+	newThumbnail := "https://i.ytimg.example/new.jpg"
+	want := []youTubeRow{
+		{ChannelID: "UCemberfist", IsLive: false, ViewerCount: 0, Title: "", ThumbnailURL: &oldThumbnail},
+		{ChannelID: "UCmoonveil", IsLive: true, IsLiveOtherGame: false, ViewerCount: 88, Title: "Forever raid night", ThumbnailURL: &newThumbnail},
+	}
+	if diff := cmp.Diff(want, youTubeRows(t, db)); diff != "" {
+		t.Errorf("unexpected streams (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateLiveStatus_LeavesYouTubeChannelsUntouched(t *testing.T) {
+	// given a live YouTube channel
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, stream_title, viewer_count, channel_url, is_live, youtube_channel_id)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Moonveil', '', 'Forever raid night', 88, 'https://www.youtube.com/@moonveil', true, 'UCmoonveil')`)
+
+	// when I apply a Twitch result with nobody live
+	err := streams.NewRepo(db).UpdateLiveStatus(context.Background(), map[string]twitch.LiveStream{})
+
+	// then I expect the YouTube channel to stay live with its details
+	if err != nil {
+		t.Fatalf("UpdateLiveStatus: %v", err)
+	}
+	want := []youTubeRow{{ChannelID: "UCmoonveil", IsLive: true, ViewerCount: 88, Title: "Forever raid night"}}
+	if diff := cmp.Diff(want, youTubeRows(t, db)); diff != "" {
+		t.Errorf("expected the YouTube channel untouched (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateYouTubeLiveStatus_LeavesTwitchChannelsUntouched(t *testing.T) {
+	// given a live Twitch channel
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, stream_title, viewer_count, channel_url, is_live, twitch_login)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Thundermane', 'World of Warcraft', 'Mythic progress', 1240, 'https://twitch.tv/thundermane', true, 'thundermane')`)
+
+	// when I apply a YouTube result with nobody live
+	err := streams.NewRepo(db).UpdateYouTubeLiveStatus(context.Background(), map[string]youtube.LiveStream{})
+
+	// then I expect the Twitch channel to stay live with its details
+	if err != nil {
+		t.Fatalf("UpdateYouTubeLiveStatus: %v", err)
+	}
+	want := []streamRow{{Login: "thundermane", IsLive: true, ViewerCount: 1240, GameName: "World of Warcraft", Title: "Mythic progress"}}
+	if diff := cmp.Diff(want, streamRows(t, db)); diff != "" {
+		t.Errorf("expected the Twitch channel untouched (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncYouTube_FlipsIsLiveAndWritesOkSyncLog_WhenYouTubeReturnsLiveChannel(t *testing.T) {
+	// given two offline YouTube channels, one of which YouTube reports live
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, viewer_count, channel_url, is_live, youtube_channel_id)
+		VALUES
+			('11111111-1111-1111-1111-111111111111', 'Emberfist', '', 0, 'https://www.youtube.com/@emberfist', false, 'UCemberfist'),
+			('22222222-2222-2222-2222-222222222222', 'Moonveil', '', 0, 'https://www.youtube.com/@moonveil', false, 'UCmoonveil')`)
+	fake := testutil.NewFakeYouTube(t)
+	fake.AddChannel(testutil.YouTubeChannel{ID: "UCemberfist", AvatarURL: "https://yt3.example/emberfist.jpg", Uploads: []testutil.YouTubeUpload{
+		{ID: "live-1", Title: "Forever raid night", Live: true, Viewers: 312, ThumbnailURL: "https://i.ytimg.example/live-1.jpg"},
+	}})
+	fake.AddChannel(testutil.YouTubeChannel{ID: "UCmoonveil", AvatarURL: "https://yt3.example/moonveil.jpg", Uploads: []testutil.YouTubeUpload{
+		{ID: "vod-1", Title: "Last week's highlights"},
+	}})
+
+	// when the YouTube sync runs
+	err := newSyncYouTube(db, fake).Run(context.Background())
+
+	// then I expect Emberfist live, Moonveil offline, both with avatars, and an ok sync_log row
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	thumbnail := "https://i.ytimg.example/live-1.jpg"
+	emberfistAvatar := "https://yt3.example/emberfist.jpg"
+	moonveilAvatar := "https://yt3.example/moonveil.jpg"
+	wantStreams := []youTubeRow{
+		{ChannelID: "UCemberfist", IsLive: true, ViewerCount: 312, Title: "Forever raid night", ThumbnailURL: &thumbnail, ProfileImageURL: &emberfistAvatar},
+		{ChannelID: "UCmoonveil", IsLive: false, ProfileImageURL: &moonveilAvatar},
+	}
+	if diff := cmp.Diff(wantStreams, youTubeRows(t, db)); diff != "" {
+		t.Errorf("unexpected streams (-want +got):\n%s", diff)
+	}
+	wantLog := []syncLogRow{{Source: "youtube", Status: "ok", Message: "1 of 2 channels live"}}
+	if diff := cmp.Diff(wantLog, syncLogRows(t, db)); diff != "" {
+		t.Errorf("unexpected sync_log (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncYouTube_WritesErrorSyncLog_WhenYouTubeIsDown(t *testing.T) {
+	// given a live YouTube channel and a YouTube that answers 503
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, stream_title, viewer_count, channel_url, is_live, youtube_channel_id)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Moonveil', '', 'Still here', 88, 'https://www.youtube.com/@moonveil', true, 'UCmoonveil')`)
+	fake := testutil.NewFakeYouTube(t)
+	fake.Status = http.StatusServiceUnavailable
+
+	// when the YouTube sync runs
+	err := newSyncYouTube(db, fake).Run(context.Background())
+
+	// then I expect an error, an error sync_log row, and the streams table untouched
+	if err == nil {
+		t.Fatal("expected Run to return an error when YouTube is down")
+	}
+	rows := syncLogRows(t, db)
+	if len(rows) != 1 || rows[0].Source != "youtube" || rows[0].Status != "error" || rows[0].Message == "" {
+		t.Errorf("expected one youtube error sync_log row with a message, got %+v", rows)
+	}
+	wantStreams := []youTubeRow{{ChannelID: "UCmoonveil", IsLive: true, ViewerCount: 88, Title: "Still here"}}
+	if diff := cmp.Diff(wantStreams, youTubeRows(t, db)); diff != "" {
+		t.Errorf("expected streams to be untouched (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncYouTube_WritesErrorSyncLogNamingQuota_WhenQuotaIsExceeded(t *testing.T) {
+	// given a YouTube channel and a YouTube project whose daily quota is spent
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO streams (id, streamer_name, game_name, channel_url, is_live, youtube_channel_id)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Moonveil', '', 'https://www.youtube.com/@moonveil', false, 'UCmoonveil')`)
+	fake := testutil.NewFakeYouTube(t)
+	fake.QuotaExceeded = true
+
+	// when the YouTube sync runs
+	err := newSyncYouTube(db, fake).Run(context.Background())
+
+	// then I expect an error sync_log row whose message says the quota ran out
+	if err == nil {
+		t.Fatal("expected Run to return an error when the quota is exceeded")
+	}
+	rows := syncLogRows(t, db)
+	if len(rows) != 1 || rows[0].Status != "error" || !strings.Contains(rows[0].Message, "quotaExceeded") {
+		t.Errorf("expected one error sync_log row mentioning quotaExceeded, got %+v", rows)
 	}
 }

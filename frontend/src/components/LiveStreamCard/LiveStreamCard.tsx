@@ -1,5 +1,5 @@
 import { formatViewerCount } from '../../lib/format'
-import type { Stream } from '../../types/streams'
+import { streamPlatformNames, type Stream } from '../../types/streams'
 import { StreamerAvatar } from '../StreamerAvatar/StreamerAvatar'
 import styles from './LiveStreamCard.module.css'
 
@@ -32,7 +32,7 @@ export function LiveStreamCard({ stream }: LiveStreamCardProps) {
         </p>
       )}
       <a className={styles.watchLink} href={stream.channelUrl} target="_blank" rel="noreferrer">
-        Watch on Twitch →
+        Watch on {streamPlatformNames[stream.platform]} →
       </a>
     </div>
   )

@@ -121,6 +121,7 @@ const liveStreams: Stream[] = [
     channelUrl: 'https://twitch.tv/thundermane',
     isLive: true,
     isLiveOtherGame: false,
+    platform: 'twitch',
   },
 ]
 
@@ -137,6 +138,7 @@ const allStreams: Stream[] = [
     channelUrl: 'https://twitch.tv/moonveil',
     isLive: false,
     isLiveOtherGame: false,
+    platform: 'twitch',
   },
   {
     id: 'stream-3',
@@ -149,6 +151,7 @@ const allStreams: Stream[] = [
     channelUrl: 'https://twitch.tv/aelith',
     isLive: false,
     isLiveOtherGame: false,
+    platform: 'twitch',
   },
 ]
 
