@@ -71,7 +71,7 @@ Research for issue #8. Feeds #31 (webhook receiver) and the on-demand signups fe
 - One key per server, shared by all four webhook types (observed with `/webhooks show`).
 - Success: the docs say any successful `200` response marks the webhook delivered. Behaviour on non-200 (retries, backoff, timeout): `TODO`.
 - Not used (per the docs): no HMAC or body signature, no IP allowlist was mentioned. The header value has **no prefix** (VERIFIED, real capture): it is the bare 30-character alphanumeric key, mixed upper and lower case. Compare the whole header value to the stored key.
-- Implementation note for #31: compare with a constant-time comparison, read the key from an environment variable, and reject with 401 on mismatch.
+- Implementation note for #31: compare with a constant-time comparison, read the key from an environment variable, and reject with 401 on mismatch. If the key is unset or empty, refuse to start (fail closed) rather than accepting every request.
 
 ### 2.4 Event types and payloads
 Paste real captures including headers. Keep field shapes and formats intact when redacting.
