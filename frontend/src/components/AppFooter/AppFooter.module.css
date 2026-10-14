@@ -16,3 +16,8 @@
   text-decoration-color: rgba(211, 162, 77, 0.5);
   text-underline-offset: 4px;
 }
+
+.nav {
+  display: flex;
+  gap: 20px;
+}
