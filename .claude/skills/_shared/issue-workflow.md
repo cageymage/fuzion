@@ -63,6 +63,7 @@ Reread your own diff against CLAUDE.md before verifying, and fix what you find:
 - No mocks of Postgres, hooks, or internal packages.
 - Errors are wrapped with context and never swallowed.
 - Test names follow `<feature> should <expected behavior> when <criteria>`, one "when" per test.
+- Assertions compare the full expected value inline (Go: a whole struct or slice with `cmp.Diff`; FE: the whole rendered text or response), not spot checks like `len(rows) != 1 || rows[0].X != ...`. For a field the test cannot predict (a DB `now()`, a generated ID), assert it is set, clear it, then diff the rest.
 - Nothing outside the issue's scope changed.
 
 Then run the calling skill's verify step. Report results faithfully, including failures. If anything fails, fix it or stop and report; do not proceed to commit on a failing or skipped check without saying so.
