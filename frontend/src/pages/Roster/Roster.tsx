@@ -4,6 +4,7 @@ import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { classColor } from '../../lib/classColor'
 import { primaryProfessionIcons } from '../../lib/professionIcon'
 import { raceIcon } from '../../lib/raceIcon'
+import { armoryUrl } from '../../lib/wowProfileLinks'
 import { CharacterDialog } from './CharacterDialog'
 import { DeleteCharacterDialog } from './DeleteCharacterDialog'
 import { filterRoster, sortRoster, type RoleFilter, type RosterSort, type SortKey } from './filterRoster'
@@ -112,6 +113,21 @@ function RaceCell({ race }: { race: string | null }) {
   const iconUrl = raceIcon(race)
   if (iconUrl === null) return <GenericRaceBadge race={race} />
   return <img className={styles.raceIcon} src={iconUrl} alt={race} title={race} width={24} height={24} />
+}
+
+function ArmoryLink({ character, children }: { character: Character; children: string }) {
+  if (!children) return null
+  return (
+    <a
+      className={styles.characterLink}
+      href={armoryUrl(character.realm, character.name, character.secondaryName)}
+      target="_blank"
+      rel="noreferrer"
+      style={{ color: classColor(character.class) }}
+    >
+      {children}
+    </a>
+  )
 }
 
 export function Roster() {
@@ -253,8 +269,12 @@ export function Roster() {
                       <td>
                         <RaceCell race={character.race} />
                       </td>
-                      <td>{character.name}</td>
-                      <td>{character.secondaryName}</td>
+                      <td>
+                        <ArmoryLink character={character}>{character.name}</ArmoryLink>
+                      </td>
+                      <td>
+                        <ArmoryLink character={character}>{character.secondaryName}</ArmoryLink>
+                      </td>
                       <td>{character.level}</td>
                       <td style={{ color: classColor(character.class) }}>{character.class}</td>
                       <td>{specLabel(character)}</td>
