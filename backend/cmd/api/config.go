@@ -27,6 +27,10 @@ type config struct {
 
 	// Public address of the site, used for links in announcements, e.g. http://localhost:5173 in dev.
 	siteBaseURL string
+
+	// Optional: empty disables the Raid-Helper webhook endpoint, so no event can be
+	// mirrored without the key that proves a request came from Raid-Helper.
+	raidHelperWebhookKey string
 }
 
 // Both values are optional: without them the Home page simply has no suggested
@@ -119,6 +123,7 @@ func loadConfig() (config, error) {
 		announcementsWebhookURL: os.Getenv("DISCORD_ANNOUNCEMENTS_WEBHOOK_URL"),
 		turnstileSecretKey:      os.Getenv("TURNSTILE_SECRET_KEY"),
 		siteBaseURL:             os.Getenv("SITE_BASE_URL"),
+		raidHelperWebhookKey:    os.Getenv("RAID_HELPER_WEBHOOK_SECRET"),
 	}, nil
 }
 
