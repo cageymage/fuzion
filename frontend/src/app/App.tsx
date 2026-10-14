@@ -92,6 +92,7 @@ export function App() {
           </Routes>
         </main>
         <AppFooter />
+        <ScrollRestoration />
       </div>
     </ToastProvider>
   )
