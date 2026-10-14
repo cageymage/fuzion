@@ -255,7 +255,7 @@ Captured body with a signup (VERIFIED, real, from a `webhookeventupdate` request
 - The event `id` is unchanged from the creation bodies, so `id` is a stable key across create, update and delete.
 - **A Healer signup entry has exactly the same 15 keys as the fetch sample's Healer entry** (`id` number, `userId` string, `position` 1, `entryTime` in seconds, and so on). One parser serves the fetch and the webhook. Not every entry has all 15 keys: see the Absence entry below.
 - `lastUpdated` (1791781505) equals the new signup's `entryTime` and is later than the creation body's `lastUpdated` (1791781357). It moves forward when the event changes, so it can order updates. The create and update sent at creation have identical bodies and so identical `lastUpdated`: ties must be harmless, which upserting by `id` already guarantees.
-- Still to verify: `webhookeventdelete` body (expected identical shape, per the docs) and a signup removal or spec change body.
+- Still to verify: a signup removal or spec change body. (The delete body is captured, see below.)
 
 Captured body after the officer marked themselves **Absent** (VERIFIED, real, a `webhookeventupdate` request, confirmed by the tester; an earlier draft of these notes wrongly called it a delete body). Redacted, differences only:
 
