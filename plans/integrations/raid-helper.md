@@ -2,14 +2,14 @@
 
 Research for issue #8. Feeds #31 (webhook receiver) and the on-demand signups fetch.
 
-> **Status:** research is complete from the official docs, the public API and real webhook captures (section 2.4b, `raid-helper-samples/`). Verified from the docs (read by a person in a browser): webhooks require **Raid-Helper Premium**; they are authenticated by an optional `Authorization` header that carries the shared webhook key; `event.create`, `event.update` (called `event.edit` in the docs) and `event.delete` all send the same full event object including `signUps`; `comp.update` is a separate raid-composition webhook that is not needed for the Calendar. Verified from real responses: the public `GET /api/v4/events/{id}` returns the same object with no credentials. Verified from real webhook requests: the event type is the `x-raidhelper-event` header (`webhookeventcreate`, `webhookeventupdate`, `webhookeventdelete`), and the `Authorization` header is the bare key. Earlier attempts on the free tier sent nothing, which the premium requirement explains. Open: what happens on non-200 responses, bodies for a signup removal or spec change, whether the delete capture is genuine (see `webhookeventdelete.json`), and the create-event API endpoint list.
+> **Status:** research is complete from the official docs, the public API and real webhook captures (section 2.4b, `raid-helper-samples/`). Verified from the docs (read by a person in a browser): webhooks require **Raid-Helper Premium**; they are authenticated by an optional `Authorization` header that carries the shared webhook key; `event.create`, `event.update` (called `event.edit` in the docs) and `event.delete` all send the same full event object including `signUps`; `comp.update` is a separate raid-composition webhook that is not needed for the Calendar. Verified from real responses: the public `GET /api/v4/events/{id}` returns the same object with no credentials. Verified from real webhook requests: the event type is the `x-raidhelper-event` header (`webhookeventcreate`, `webhookeventupdate`, `webhookeventdelete`), and the `Authorization` header is the bare key. Earlier attempts on the free tier sent nothing, which the premium requirement explains. Open: what happens on non-200 responses, bodies for a signup removal or spec change, and the create-event API endpoint list.
 
 **Status legend:** `VERIFIED` = confirmed from a real captured sample or the docs. `UNVERIFIED` = secondhand lead or inference, do not build on it. `TODO` = still to find out.
 
 **Sources used:**
 - [x] A real event object from `GET https://raid-helper.xyz/api/v4/events/{id}`, linked from the event page on the Raid-Helper website (see 3.1)
 - [~] Official docs (https://raid-helper.dev/documentation/api): read by a person in a browser (screenshots). Not readable by automated tooling (JavaScript-only shell, tried 2026-10-08). The Webhooks page (7 screenshots) and the API Authorization section were read this way. The REST API endpoint list was not seen.
-- [x] webhook.site capture from the Fuzion Discord server (free tier; tests were done in private channels): attempted, no requests arrived (see 2.1)
+- [x] webhook.site captures from the Fuzion Discord server (tests done in private channels): on the free tier no requests arrived (see 2.1); with Premium active, `event.create`, `event.update` and `event.delete` requests were captured (see 2.4b)
 - [ ] Raid-Helper support Discord: question drafted, reply pending
 
 ---
@@ -40,7 +40,7 @@ Research for issue #8. Feeds #31 (webhook receiver) and the on-demand signups fe
   - `/webhooks refresh-key`: "Generate a new authorization key for your webhooks."
   - `/webhooks set`: "Set a webhook url."
   - `/webhooks reset`: "Reset a specific webhook url."
-- `/webhooks set` has a `type` choice with four values (VERIFIED, from the command picker): `event.create`, `event.update`, `event.delete`, `comp.update`. Each type presumably has its own URL. Note these are the command's option names. The `type` string inside the request body may differ (the ticket assumed `event.created`/`updated`/`deleted`): `TODO`.
+- `/webhooks set` has a `type` choice with four values (VERIFIED, from the command picker): `event.create`, `event.update`, `event.delete`, `comp.update`. Each type presumably has its own URL. Note these are the command's option names. The request body carries no type at all (the ticket assumed `event.created`/`updated`/`deleted`); the type arrives in the `x-raidhelper-event` header (VERIFIED, real capture, see 2.4b).
 - `comp.update` is not in the ticket. The docs (screenshot 8) show it is about raid **compositions** (groups and slots), not signups. See 2.4.
 - After `/webhooks set` was run for each of the four types, `/webhooks show` listed the same key against every type. So there is one key per server, shared by all four webhook types (VERIFIED). A single check on our side covers all of them.
 - Capture attempt 1 (VERIFIED negative result): all four types were set to a webhook.site address, and `/webhooks show` confirmed all four URLs were saved. webhook.site itself was confirmed working (two manual curl POSTs were recorded). Then, in private channels of the Fuzion server: a new event was created, an event was edited, a signup was added and withdrawn, and an event was deleted. **No request arrived for any action.** Cause undetermined. Candidates: webhooks need a premium tier or some other server setting, they fire only for certain creation methods, or they are delayed or broken. The Fuzion server does not have premium (VERIFIED, per the person testing), so a premium requirement is consistent with the silence but not proven. Answer from Raid-Helper support: `TODO`.
@@ -118,7 +118,7 @@ Observations: field names and types match the event object from the public GET (
 Real captured example: [`raid-helper-samples/webhookeventcreate.json`](raid-helper-samples/webhookeventcreate.json) (full redacted body, valid JSON). The create body was captured as well and is identical to the update sent at creation (compared by eye: same fields, same `lastUpdated`, empty `signUps`), so the two files have the same content.
 
 #### `event.update` (titled `event.edit` in the docs)
-Naming mismatch (VERIFIED): the Discord command's `type` choice is `event.update`, but the docs' heading for this webhook is `event.edit`, described as "Receive a request when any event gets updated." Which string, if any, appears in a request: `TODO`. Both names are used here for the same webhook until a real request settles it.
+Naming mismatch (VERIFIED): the Discord command's `type` choice is `event.update`, but the docs' heading for this webhook is `event.edit`, described as "Receive a request when any event gets updated." In real requests the type appears only in the `x-raidhelper-event` header, as `webhookeventupdate` (VERIFIED, see 2.4b), which follows the command's name, not the docs'. Both names are used in these notes for the same webhook.
 
 From the docs (screenshot 4 of several):
 - Method: `POST`.
@@ -166,9 +166,9 @@ Real captured example: **none.** No URL was registered for `comp.update`, so it 
 
 Open questions:
 - Is the webhook body the same event object as section 3? Almost: the field names and types match (docs). `templateEmoteId` and `softresId` were absent in the real captures, so treat them as optional; the docs do not list `displayTitle`, `creator`, `announcements`, but they were present.
-- How are created/updated/deleted distinguished? By the `x-raidhelper-event` request header (`webhookeventcreate`/`webhookeventupdate`/`webhookeventdelete`), not by the body (VERIFIED on a real capture, header undocumented). Exact value format: `TODO`.
+- How are created/updated/deleted distinguished? By the `x-raidhelper-event` request header (`webhookeventcreate`/`webhookeventupdate`/`webhookeventdelete`), not by the body (VERIFIED on a real capture, header undocumented). The values are exactly those three strings, lowercase, with no separators (see 2.4b).
 - Does `deleted` carry the event ID? Yes: the `event.delete` body includes `id` and the same event fields (docs, screenshot 6).
-- Retries on non-2xx, timeout, ordering? `TODO` (docs say only that a `200` counts as delivered)
+- Retries on non-2xx and timeouts? `TODO` (docs say only that a `200` counts as delivered). Ordering: there is no delivery ID or sequence number (2.2), the create and update sent at creation arrive at the same moment, and a delete does not change `lastUpdated` (2.4b), so #31 cannot rely on arrival order (see section 5).
 
 ### 2.4b Observed behaviour (real capture on a Premium server, partial)
 Capture 2: Premium active; `event.create`, `event.update` and `event.delete` all pointed at **one** webhook.site URL (same path for all three). Throwaway event in a private channel. Request counts per action (VERIFIED, reported by the tester):
@@ -221,7 +221,7 @@ Captured body (VERIFIED, real; from the `webhookeventupdate` request sent at eve
 
 What this body shows:
 - **All timestamps are Unix seconds** (10 digits): `startTime`, `endTime`, `closingTime`, `lastUpdated`.
-- **`date`/`time` are display strings in an unknown local timezone:** `startTime` 1791849600 is 2026-10-13 00:00:00 UTC while `date`/`time` read `12-10-2026` and `18:00`. The offset implied by this pair (6 hours behind UTC) does not match a daylight-saving zone such as US Central on that date, so do not derive or hardcode an offset from `date`/`time`. Same pattern as the earlier GET sample. Use `startTime`.
+- **`date`/`time` are display strings in an unknown local timezone:** `startTime` 1791849600 is 2026-10-13 00:00:00 UTC while `date`/`time` read `12-10-2026` and `18:00`. The offset implied by this pair is 6 hours behind UTC. That is not US Central on that date (daylight time, UTC-5, until 1 November), but it does fit US Mountain daylight time or a server set to a fixed UTC-6, and the object does not say which. So do not derive or hardcode an offset from `date`/`time`. Same pattern as the earlier GET sample. Use `startTime`.
 - **With no duration set (`advancedSettings.duration` 0), `endTime` and `closingTime` equal `startTime`.** Do not assume `endTime > startTime`.
 - **The template differs between events:** `templateId` was `wowforever` here and `wowretail2` in the earlier GET sample. Class and spec lists differ per template (this one includes specs such as Shockadin, Combat and Smite). Do not hardcode classes or specs in #31.
 - **No `type` in the body** (as expected); the type is in the `x-raidhelper-event` header.
@@ -322,7 +322,7 @@ All captured bodies are available as redacted, valid-JSON fixtures in [`raid-hel
 - **CORS:** `Access-Control-Allow-Origin: *`, so a browser on any site can call this endpoint directly. The allowed request headers include `Authorization` and a custom `serverid`, which suggests optional authentication and a server-ID header exist, but what they do is `TODO`. (`Allow-Credentials: true` together with `*` is ignored by browsers, so cookies are not sent cross-origin.)
 - **Caching:** no `Cache-Control`, `ETag` or `Last-Modified` was sent, so there is no server-provided caching hint. We would need our own TTL.
 - **Tier:** `TODO`. **Behaviour for a deleted or unknown ID (status code, body):** `TODO`.
-- **Still unknown:** whether the webhook body is this same object. Webhook details are in section 2.
+- **The webhook body is this same object** (VERIFIED, real captures, see 2.4b), apart from optional fields. Webhook details are in section 2.
 
 Consequence for the Calendar page: signups can be fetched on demand by event ID with a plain GET, which is what the spec's "on-demand fetch" needs. Because the limits are per IP and generous for our scale but not unlimited, cache responses on our API (for example 30 to 60 s) rather than fetching once per page view. Because the endpoint is unauthenticated and public, anyone can also read it, so treat signup data (Discord user IDs and names) as already-public but avoid logging or re-exposing it beyond what the page shows.
 
@@ -427,7 +427,7 @@ The sample had 16 signups, and the fields below match a live fetch of the same e
 | `starts_at` | `startTime` | `time.Unix(n, 0).UTC()` | VERIFIED (sample) |
 | ends / duration | `endTime`, `advancedSettings.duration` | minutes | VERIFIED (sample) |
 | difficulty | not provided | default `'Unknown'` | VERIFIED (sample) |
-| event type discriminator | `TODO` | the `event.create` docs list no `type` field in the body, so the type may only be implied by which URL was called. Use a separate path per type in #31 | TODO |
+| event type discriminator | not in the body | the `x-raidhelper-event` request header (`webhookeventcreate`/`webhookeventupdate`/`webhookeventdelete`, undocumented), or a separate URL path per type (see section 5) | VERIFIED (capture) |
 
 ---
 
@@ -456,6 +456,7 @@ Based on the docs, the verified GET object and the real captures in 2.4b.
 - **One struct, one parser** for all three types (identical bodies). Upsert by `id` (`raid_helper_event_id text UNIQUE`). Parse `id` and other Discord IDs as strings.
 - **Idempotent and fast.** `event.update` fires on every signup change. Return `200` quickly (the docs say `200` marks delivery successful; non-200 behaviour is undocumented). Only skip a delivery whose `lastUpdated` is strictly lower than the stored one: equal values must still be applied, and `lastUpdated` is unverified for withdrawals and title-only edits. Do not use `lastUpdated` to discard a delete.
 - **Delete:** the real delete body is the whole event, identical to the update that preceded it (VERIFIED, see 2.4b), so use only `id` and ignore the rest. Handle it by type (`x-raidhelper-event: webhookeventdelete`, or the delete path) and **never discard it because of `lastUpdated`**: a deletion does not change `lastUpdated`, so a delete cannot be ordered against the preceding update. Keep a tombstone (for example `deleted_at`) so a late-arriving update cannot bring the event back.
+- **Create or update after a delete:** Raid-Helper sends no delivery ID or sequence number, and the create at event creation arrives alongside an update, so a delivery for an `id` that already has a tombstone is either a late retry or a duplicate. Return `200` and ignore it; do not clear the tombstone or recreate the row. This assumes a deleted event's `id` is never reused. A recurring event's repost is expected to be a new Discord message, and so a new `id`, but that is `UNVERIFIED` (section 6); if reposts turn out to reuse the `id`, this rule would hide them and needs revisiting.
 - **Fields to store:** `id`, `title`, `startTime`/`endTime`/`closingTime` (Unix seconds, `time.Unix(n, 0).UTC()`), `signUps` (or counts). Ignore `date`/`time` (display strings, no timezone). No difficulty field, default `'Unknown'`.
 - Do not persist `advancedSettings.image` (signed, expiring Discord CDN link).
 - `displayTitle`, `creator`, `announcements` are sent but undocumented, and `templateEmoteId`, `softresId` are documented but were absent: parse all five as optional.
