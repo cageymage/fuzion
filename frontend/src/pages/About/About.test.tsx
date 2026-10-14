@@ -28,10 +28,7 @@ describe('About', () => {
     renderWithProviders(<About />)
 
     const applyLinks = screen.getAllByRole('link', { name: 'Apply to Fuzion' })
-    expect(applyLinks).toHaveLength(2)
-    for (const link of applyLinks) {
-      expect(link).toHaveAttribute('href', '/applications')
-    }
+    expect(applyLinks.map((link) => link.getAttribute('href'))).toEqual(['/applications', '/applications'])
   })
 
   it('should link to the calendar and raid progress pages when the page renders', () => {
