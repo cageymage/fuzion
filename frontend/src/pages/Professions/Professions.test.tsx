@@ -84,6 +84,19 @@ describe('Professions', () => {
     expect(screen.getByRole('region', { name: 'Blacksmithing' })).toBeInTheDocument()
   })
 
+  it('should color the secondary name with the class color when an entry is rendered', async () => {
+    // given a Warrior whose secondary name is Ironhide
+    respondWith([{ id: 'p2', profession: 'Alchemy', skillLevel: 225, character: zephyrion }])
+
+    // when the page renders the entry
+    renderWithProviders(<Professions />)
+
+    // then both halves of the name use the Warrior class color
+    const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    expect(within(alchemy).getByText('Zephyrion')).toHaveStyle({ color: '#C79C6E' })
+    expect(within(alchemy).getByText('Ironhide')).toHaveStyle({ color: '#C79C6E' })
+  })
+
   it('should show a dash instead of a skill level when none is recorded', async () => {
     respondWith([{ id: 'p8', profession: 'Cooking', skillLevel: 0, character: aeliana }])
 
