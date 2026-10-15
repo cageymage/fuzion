@@ -47,9 +47,13 @@ export function Professions() {
             <ul className={styles.entries}>
               {group.entries.map((entry) => (
                 <li key={entry.id} className={styles.entry}>
-                  <span style={{ color: classColor(entry.character.class) }}>
-                    <span className={styles.name}>{entry.character.name}</span>{' '}
-                    <span>{entry.character.secondaryName}</span>
+                  <span>
+                    <span className={styles.name} style={{ color: classColor(entry.character.class) }}>
+                      {entry.character.name}
+                    </span>{' '}
+                    <span style={{ color: classColor(entry.character.class) }}>
+                      {entry.character.secondaryName}
+                    </span>
                   </span>
                   <span className={styles.skill}>{entry.skillLevel > 0 ? entry.skillLevel : '—'}</span>
                 </li>
