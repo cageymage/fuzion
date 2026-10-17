@@ -4,10 +4,9 @@ export function Charter() {
   return (
     <article className={styles.page}>
       <h1 className={styles.title}>Guild charter</h1>
-      <p className={styles.intro}>
-        This is a draft for the guild leaders to review, so details such as the raid schedule and
-        the loot system may change. Nothing here is meant to surprise you later, which is why we
-        write it down. Applying means you have read it.
+      <p>
+        Nothing here is meant to surprise you later, which is why we write it down. Applying means
+        you have read it.
       </p>
 
       <section aria-labelledby="rules-heading" className={styles.section}>
