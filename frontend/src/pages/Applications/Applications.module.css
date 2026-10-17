@@ -170,3 +170,12 @@
   text-decoration-color: rgba(211, 162, 77, 0.5);
   text-underline-offset: 4px;
 }
+
+.errorLead {
+  margin: 0;
+}
+
+.errorList {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}

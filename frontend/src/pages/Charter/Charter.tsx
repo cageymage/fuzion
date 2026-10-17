@@ -6,7 +6,7 @@ export function Charter() {
       <h1 className={styles.title}>Guild charter</h1>
       <p>
         Nothing here is meant to surprise you later, which is why we write it down. Applying means
-        you have read it.
+        you have read it and agree to follow it.
       </p>
 
       <section aria-labelledby="rules-heading" className={styles.section}>

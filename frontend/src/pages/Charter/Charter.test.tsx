@@ -13,12 +13,24 @@ describe('Charter', () => {
     },
   )
 
-  it('should ban GDKP raids and gold buying when the page renders', () => {
+  it('should say applying means agreeing to follow the charter when the page renders', () => {
     renderWithProviders(<Charter />)
 
-    const rules = screen.getByRole('region', { name: 'Guild rules' })
-    expect(rules).toHaveTextContent('Running or joining GDKP raids')
-    expect(rules).toHaveTextContent('Buying gold')
+    expect(screen.getByText(/Applying means you have read it and agree to follow it/)).toBeInTheDocument()
+  })
+
+  it('should ban GDKP raids when the page renders', () => {
+    renderWithProviders(<Charter />)
+
+    expect(screen.getByRole('region', { name: 'Guild rules' })).toHaveTextContent(
+      'Running or joining GDKP raids',
+    )
+  })
+
+  it('should ban buying gold when the page renders', () => {
+    renderWithProviders(<Charter />)
+
+    expect(screen.getByRole('region', { name: 'Guild rules' })).toHaveTextContent('Buying gold')
   })
 
   it('should say banter and adult humor are expected when the page renders', () => {
@@ -40,8 +52,12 @@ describe('Charter', () => {
   it('should name the in-game roll system as the expected loot system when the page renders', () => {
     renderWithProviders(<Charter />)
 
-    const loot = screen.getByRole('region', { name: 'Loot' })
-    expect(loot).toHaveTextContent('in-game roll system')
-    expect(loot).toHaveTextContent('This is not final')
+    expect(screen.getByRole('region', { name: 'Loot' })).toHaveTextContent('in-game roll system')
+  })
+
+  it('should say the loot system is not final when the page renders', () => {
+    renderWithProviders(<Charter />)
+
+    expect(screen.getByRole('region', { name: 'Loot' })).toHaveTextContent('This is not final')
   })
 })

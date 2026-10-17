@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { delay, http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -61,7 +61,7 @@ describe('Applications', () => {
     renderWithProviders(<Applications />)
 
     expect(screen.getByRole('link', { name: 'Legal page' })).toHaveAttribute('href', '/legal')
-    expect(screen.getByText(/by applying you agree/i)).toBeInTheDocument()
+    expect(screen.getByText(/see how we handle your details/i)).toBeInTheDocument()
   })
 
   it('should show a thank-you message when the application is submitted successfully', async () => {
@@ -116,6 +116,23 @@ describe('Applications', () => {
     await user.click(screen.getByRole('button', { name: 'Submit application' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('role: must be tank, healer or dps')
+  })
+
+  it('should show the server error in a dialog when the API rejects the application', async () => {
+    server.use(
+      http.post('/api/applications', () =>
+        HttpResponse.json({ error: 'role: must be tank, healer or dps' }, { status: 400 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<Applications />)
+
+    await fillEveryField(user)
+    await user.click(screen.getByRole('button', { name: 'Submit application' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Application not sent' })).toHaveTextContent(
+      'role: must be tank, healer or dps',
+    )
   })
 
   it('should show a generic error message when the server fails', async () => {
@@ -191,7 +208,7 @@ describe('Applications', () => {
     await user.click(screen.getByRole('checkbox', { name: /guild charter/i }))
     await user.click(screen.getByRole('button', { name: 'Submit application' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Please fill in: Charter agreement')
+    expect(await screen.findByRole('listitem')).toHaveTextContent('Charter agreement')
     expect(submitted).toBe(false)
   })
 
@@ -216,7 +233,7 @@ describe('Applications', () => {
     await turnstile.solve('token-1')
     await user.click(screen.getByRole('button', { name: 'Submit application' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Please fill in: Playstyle')
+    expect(await screen.findByRole('listitem')).toHaveTextContent('Playstyle')
     expect(submitted).toBe(false)
   })
 
@@ -227,9 +244,17 @@ describe('Applications', () => {
     await turnstile.solve('token-1')
     await user.click(screen.getByRole('button', { name: 'Submit application' }))
 
-    expect(await screen.findByRole('dialog', { name: 'Application not sent' })).toHaveTextContent(
-      'Please fill in: Your name',
-    )
+    const dialog = await screen.findByRole('dialog', { name: 'Application not sent' })
+    expect(within(dialog).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Your name',
+      'Character name',
+      'Class',
+      'Role',
+      'Playstyle',
+      'Availability',
+      'Discord handle',
+      'Charter agreement',
+    ])
   })
 
   it('should close the dialog when the applicant clicks OK', async () => {

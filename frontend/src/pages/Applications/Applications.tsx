@@ -54,7 +54,7 @@ const requiredFields: { key: Exclude<keyof SubmitApplicationRequest, 'turnstileT
 export function Applications() {
   const [form, setForm] = useState(emptyForm)
   const [charterAccepted, setCharterAccepted] = useState(false)
-  const [validationError, setValidationError] = useState<string | null>(null)
+  const [missingFields, setMissingFields] = useState<string[]>([])
   const turnstile = useRef<TurnstileInstance>(null)
   const submission = useMutation({ mutationFn: submitApplication })
   const currentUser = useCurrentUser()
@@ -69,10 +69,10 @@ export function Applications() {
       missing.push('Charter agreement')
     }
     if (missing.length > 0) {
-      setValidationError(`Please fill in: ${missing.join(', ')}`)
+      setMissingFields(missing)
       return
     }
-    setValidationError(null)
+    setMissingFields([])
     submission.mutate(form, {
       onError: () => {
         // Tokens are single-use, so a failed submit needs a fresh challenge.
@@ -99,9 +99,9 @@ export function Applications() {
   } else if (submission.isError) {
     serverError = genericError
   }
-  const errorMessage = validationError ?? serverError
+  const showDialog = missingFields.length > 0 || serverError !== null
   const dismissError = () => {
-    setValidationError(null)
+    setMissingFields([])
     submission.reset()
   }
 
@@ -196,6 +196,16 @@ export function Applications() {
             {form.notes.length} / {maxNotesLength}
           </span>
         </label>
+        <Turnstile
+          ref={turnstile}
+          siteKey={turnstileSiteKey}
+          onSuccess={(token) => update('turnstileToken', token)}
+          onExpire={() => update('turnstileToken', '')}
+          onError={() => update('turnstileToken', '')}
+        />
+        <p className={styles.notice}>
+          See how we handle your details on the <Link to="/legal">Legal page</Link>.
+        </p>
         <label className={styles.checkbox}>
           <input
             type="checkbox"
@@ -210,16 +220,6 @@ export function Applications() {
             *
           </span>
         </label>
-        <p className={styles.notice}>
-          By applying you agree to how we handle your details, see the <Link to="/legal">Legal page</Link>.
-        </p>
-        <Turnstile
-          ref={turnstile}
-          siteKey={turnstileSiteKey}
-          onSuccess={(token) => update('turnstileToken', token)}
-          onExpire={() => update('turnstileToken', '')}
-          onError={() => update('turnstileToken', '')}
-        />
         <button
           type="submit"
           className={styles.button}
@@ -228,11 +228,22 @@ export function Applications() {
           {submission.isPending ? 'Sending…' : 'Submit application'}
         </button>
       </form>
-      {errorMessage && (
+      {showDialog && (
         <Dialog title="Application not sent" onClose={dismissError}>
-          <p role="alert" className={styles.error}>
-            {errorMessage}
-          </p>
+          <div role="alert" className={styles.error}>
+            {missingFields.length > 0 ? (
+              <>
+                <p className={styles.errorLead}>Please fill in:</p>
+                <ul className={styles.errorList}>
+                  {missingFields.map((field) => (
+                    <li key={field}>{field}</li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className={styles.errorLead}>{serverError}</p>
+            )}
+          </div>
           <div className={styles.dialogActions}>
             <button type="button" className={styles.button} onClick={dismissError} autoFocus>
               OK
