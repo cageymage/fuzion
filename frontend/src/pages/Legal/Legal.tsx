@@ -15,8 +15,8 @@ export function Legal() {
         <p>The Fuzion site collects only what it needs to run the guild:</p>
         <ul>
           <li>
-            Application fields: your name, character name, class, role, availability, Discord
-            handle and notes.
+            Application fields: your name, character name, class, role, expected playstyle,
+            availability, Discord handle and notes.
           </li>
           <li>
             Discord identity: when you log in with Discord, your Discord ID and username, plus a

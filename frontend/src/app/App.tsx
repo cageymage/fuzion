@@ -9,6 +9,7 @@ import { Calendar } from '../pages/Calendar/Calendar'
 import { ComingSoon } from '../pages/ComingSoon/ComingSoon'
 import { Dashboard } from '../pages/Dashboard/Dashboard'
 import { Home } from '../pages/Home/Home'
+import { Charter } from '../pages/Charter/Charter'
 import { Legal } from '../pages/Legal/Legal'
 import { News } from '../pages/News/News'
 import { OfficerApplications } from '../pages/OfficerApplications/OfficerApplications'
@@ -66,6 +67,7 @@ export function App() {
             <Route path="/professions" element={<Professions />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/about" element={<About />} />
+            <Route path="/charter" element={<Charter />} />
             <Route path="/legal" element={<Legal />} />
             {navItems
               .filter(
