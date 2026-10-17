@@ -9,12 +9,6 @@
   font-size: 38px;
 }
 
-.intro {
-  margin: 0 0 8px;
-  color: var(--muted);
-  font-size: var(--text-meta);
-}
-
 .section {
   margin-top: 28px;
 }

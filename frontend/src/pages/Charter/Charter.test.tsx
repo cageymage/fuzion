@@ -13,12 +13,6 @@ describe('Charter', () => {
     },
   )
 
-  it('should say the charter is a draft when the page renders', () => {
-    renderWithProviders(<Charter />)
-
-    expect(screen.getByText(/This is a draft for the guild leaders to review/)).toBeInTheDocument()
-  })
-
   it('should ban GDKP raids and gold buying when the page renders', () => {
     renderWithProviders(<Charter />)
 
