@@ -40,6 +40,7 @@ describe('buildSitemapXml', () => {
         '  <url><loc>https://forever.fuziongaming.gg/streams</loc></url>',
         '  <url><loc>https://forever.fuziongaming.gg/applications</loc></url>',
         '  <url><loc>https://forever.fuziongaming.gg/professions</loc></url>',
+        '  <url><loc>https://forever.fuziongaming.gg/charter</loc></url>',
         '  <url><loc>https://forever.fuziongaming.gg/legal</loc></url>',
         '</urlset>',
         '',

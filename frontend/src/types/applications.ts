@@ -1,10 +1,13 @@
 export type ApplicationRole = 'tank' | 'healer' | 'dps'
 
+export type ApplicationPlaystyle = 'casual' | 'raider'
+
 export interface SubmitApplicationRequest {
   applicantName: string
   characterName: string
   class: string
   role: ApplicationRole | ''
+  playstyle: ApplicationPlaystyle | ''
   availability: string
   discordHandle: string
   notes: string
@@ -23,6 +26,7 @@ export interface Application {
   characterName: string
   class: string
   role: ApplicationRole
+  playstyle: ApplicationPlaystyle | ''
   availability: string
   discordHandle: string
   notes: string
