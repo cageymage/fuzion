@@ -19,6 +19,7 @@ type Application struct {
 	CharacterName string    `db:"character_name"`
 	Class         string    `db:"class"`
 	Role          string    `db:"role"`
+	Playstyle     string    `db:"playstyle"`
 	Availability  string    `db:"availability"`
 	DiscordHandle string    `db:"discord_handle"`
 	Notes         string    `db:"notes"`
@@ -36,6 +37,7 @@ type Reviewable struct {
 	CharacterName string        `db:"character_name" json:"characterName"`
 	Class         string        `db:"class"          json:"class"`
 	Role          string        `db:"role"           json:"role"`
+	Playstyle     string        `db:"playstyle"      json:"playstyle"`
 	Availability  string        `db:"availability"   json:"availability"`
 	DiscordHandle string        `db:"discord_handle" json:"discordHandle"`
 	Notes         string        `db:"notes"          json:"notes"`
@@ -48,7 +50,7 @@ type Reviewable struct {
 	DiscordMessageID *string `db:"discord_message_id" json:"-"`
 }
 
-const reviewableColumns = `id, applicant_name, character_name, class, role, availability, discord_handle, notes,
+const reviewableColumns = `id, applicant_name, character_name, class, role, playstyle, availability, discord_handle, notes,
 	status, submitted_at, reviewed_by, reviewed_at, review_note, discord_message_id`
 
 type Repo struct {
@@ -61,13 +63,13 @@ func NewRepo(db *sqlx.DB) *Repo {
 
 func (r *Repo) Create(ctx context.Context, app Application) (Submitted, error) {
 	const query = `
-		INSERT INTO applications (id, applicant_name, character_name, class, role, availability, discord_handle, notes)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO applications (id, applicant_name, character_name, class, role, playstyle, availability, discord_handle, notes)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, status, submitted_at`
 
 	var submitted Submitted
 	err := r.db.GetContext(ctx, &submitted, query,
-		app.ID, app.ApplicantName, app.CharacterName, app.Class, app.Role, app.Availability, app.DiscordHandle, app.Notes)
+		app.ID, app.ApplicantName, app.CharacterName, app.Class, app.Role, app.Playstyle, app.Availability, app.DiscordHandle, app.Notes)
 	if err != nil {
 		return Submitted{}, fmt.Errorf("insert application: %w", err)
 	}
