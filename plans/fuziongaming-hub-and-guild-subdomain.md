@@ -35,7 +35,7 @@ One PR would also work given no users. Splitting keeps "did the move break auth?
 - [render.yaml](../render.yaml):
   - `fuzion-web`: add `SITE_BASE_URL` with the value `https://forever.fuziongaming.gg` set in the Blueprint. It is public, so it doesn't need `sync: false`. The static build reads it for canonical, OG, robots.txt and sitemap.xml.
   - Update the example URLs in comments (`DISCORD_REDIRECT_URL`, `BATTLENET_REDIRECT_URL`, `SITE_BASE_URL`) to `forever.fuziongaming.gg`.
-- [README.md](../README.md), [backend/README.md](../backend/README.md): update the prod host wherever it is named.
+- [README.md](../README.md): neither README names the prod host, so nothing to rename. Add a custom-domain step to "First-time setup" instead.
 - [frontend/src/lib/siteFiles.test.ts](../frontend/src/lib/siteFiles.test.ts): switch the test input to `https://forever.fuziongaming.gg` so the fixtures match the real host. The behavior is unchanged.
 
 No backend code changes. `SITE_BASE_URL` already drives application and news Discord links, news link previews, and the `index.html` shell the API wraps around news pages ([cmd/api/main.go:127](../backend/cmd/api/main.go#L127)).
@@ -44,17 +44,21 @@ No backend code changes. `SITE_BASE_URL` already drives application and news Dis
 
 Register the new hosts before switching env vars. Otherwise login fails with "state mismatch" in between.
 
+From step 6 until PR 2 moves the apex, logging in on `fuziongaming.gg` fails with "state mismatch", because the redirect goes to `forever.` and the state cookie is on the apex. Fine while nobody uses the site.
+
 1. **DNS**: CNAME `forever` → `fuzion-web.onrender.com`.
 2. **Render, `fuzion-web`**: add custom domain `forever.fuziongaming.gg` and wait for the certificate. Leave the apex attached until PR 2 deploys the hub.
-3. **Discord developer portal**: add redirect `https://forever.fuziongaming.gg/api/auth/callback`. Rename the application to "Fuzion Gaming", because the name shows on every site's consent screen. Credentials don't change.
-4. **Blizzard developer portal**: add redirect `https://forever.fuziongaming.gg/api/auth/battlenet/callback`.
+3. **Discord developer portal**: add redirect `https://forever.fuziongaming.gg/api/auth/callback`. Rename the application to "Fuzion Gaming", because the name shows on every site's consent screen. If the Terms of Service or Privacy Policy URL fields are set, point them at `https://forever.fuziongaming.gg/legal`. Credentials don't change.
+4. **Blizzard developer portal**: add redirect `https://forever.fuziongaming.gg/api/auth/battlenet/callback`. Update the client's website URL if it has one.
 5. **Cloudflare Turnstile**: add `forever.fuziongaming.gg` to the widget's hostnames. Keys don't change.
 6. **Render env**:
-   - `fuzion-api`: `SITE_BASE_URL`, `DISCORD_REDIRECT_URL`, `BATTLENET_REDIRECT_URL` → `https://forever.fuziongaming.gg/...`
+   - `fuzion-api`: `SITE_BASE_URL`, `DISCORD_REDIRECT_URL`, `BATTLENET_REDIRECT_URL` → `https://forever.fuziongaming.gg/...`. The API fetches `SITE_BASE_URL/index.html` for news link previews, so `forever.` must already resolve with a valid certificate (steps 1 and 2).
    - `fuzion-web`: nothing to set by hand. `SITE_BASE_URL` comes from render.yaml, so check the Blueprint sync picked it up and the deploy after merge rebuilt the site.
 7. **Raid-Helper** (if the webhook is set up): point the webhook URL at `https://forever.fuziongaming.gg/api/webhooks/raid-helper`.
 
 No secrets are rotated. The database and other credentials stay as they are.
+
+After the deploy, update links to `fuziongaming.gg` outside the repo (Discord server, Twitch panels, Bluesky bio). They keep working until PR 2, then land on the hub.
 
 ### Verify on `forever.fuziongaming.gg`
 
