@@ -33,7 +33,7 @@ One PR would also work given no users. Splitting keeps "did the move break auth?
 
 - [frontend/vite.config.ts](../frontend/vite.config.ts): change the `SITE_BASE_URL` fallback to `https://forever.fuziongaming.gg`.
 - [render.yaml](../render.yaml):
-  - `fuzion-web`: add `SITE_BASE_URL` (`sync: false`). The static build reads it for canonical, OG, robots.txt and sitemap.xml. Without it the build falls back to the default.
+  - `fuzion-web`: add `SITE_BASE_URL` with the value `https://forever.fuziongaming.gg` set in the Blueprint. It is public, so it doesn't need `sync: false`. The static build reads it for canonical, OG, robots.txt and sitemap.xml.
   - Update the example URLs in comments (`DISCORD_REDIRECT_URL`, `BATTLENET_REDIRECT_URL`, `SITE_BASE_URL`) to `forever.fuziongaming.gg`.
 - [README.md](../README.md), [backend/README.md](../backend/README.md): update the prod host wherever it is named.
 - [frontend/src/lib/siteFiles.test.ts](../frontend/src/lib/siteFiles.test.ts): switch the test input to `https://forever.fuziongaming.gg` so the fixtures match the real host. The behavior is unchanged.
@@ -51,7 +51,7 @@ Register the new hosts before switching env vars. Otherwise login fails with "st
 5. **Cloudflare Turnstile**: add `forever.fuziongaming.gg` to the widget's hostnames. Keys don't change.
 6. **Render env**:
    - `fuzion-api`: `SITE_BASE_URL`, `DISCORD_REDIRECT_URL`, `BATTLENET_REDIRECT_URL` → `https://forever.fuziongaming.gg/...`
-   - `fuzion-web`: `SITE_BASE_URL=https://forever.fuziongaming.gg`, then redeploy, since the value is baked in at build time.
+   - `fuzion-web`: nothing to set by hand. `SITE_BASE_URL` comes from render.yaml, so check the Blueprint sync picked it up and the deploy after merge rebuilt the site.
 7. **Raid-Helper** (if the webhook is set up): point the webhook URL at `https://forever.fuziongaming.gg/api/webhooks/raid-helper`.
 
 No secrets are rotated. The database and other credentials stay as they are.
@@ -75,6 +75,7 @@ No secrets are rotated. The database and other credentials stay as they are.
 
 - A Vite + React + TS app with the same toolchain as `frontend/` (Vitest + RTL + MSW and the same test conventions from CLAUDE.md).
 - Start small: a landing page (who Fuzion is, links to Discord, Twitch, YouTube and `forever.fuziongaming.gg`) and a Legal page. Add the live-streams / suggested-video section only if wanted. It reads `GET /api/streams/live` and `GET /api/streams/suggested-video`, both public.
+- A footer with the same GitHub icon link to `github.com/cageymage` as the guild footer (#155). If the hub copies the guild's inline SVG mark, its Legal attributions need the same GitHub trademark line.
 - Page and component tests ship with each page, per CLAUDE.md.
 - Its own `SITE_BASE_URL` (`https://fuziongaming.gg`) for canonical and OG tags. Add a robots.txt and sitemap only if they're worth it for a page this small.
 
@@ -90,7 +91,11 @@ No secrets are rotated. The database and other credentials stay as they are.
       source: /*
       destination: /index.html
   ```
-- **Root `package.json`**: `dev:hub` (Vite on port 5174, proxying `/api` to `127.0.0.1:8080` like the frontend), `test:hub`, and add the hub to `postinstall` and `test`. Decide whether `npm run dev` starts the hub too or it stays opt-in.
+- **Local dev**: ports stand in for subdomains. Guild on `localhost:5173`, hub on `localhost:5174`, API on `localhost:8080`.
+  - `hub/vite.config.ts`: port 5174, proxying **only `/api/streams`** to `127.0.0.1:8080`, the same paths as the prod rewrite. A hub feature built against any other endpoint then fails locally, not after deploy.
+  - Root `package.json`: `dev:hub` (same `dotenv` wrapper as `dev:web`), and `npm run dev` starts api, web and hub through `concurrently`. Add `test:hub`, and add the hub to `postinstall` and `test`.
+  - The hub reads the same local API and database, so `npm run db:seed` content appears on both sites.
+  - Known difference from prod: browsers scope cookies by host, not port, so the guild session cookie from `:5173` is also sent to `:5174`. Harmless while the hub calls no auth endpoints. If realistic separation is ever needed (option 3), serve the apps on `forever.localhost` / `hub.localhost` and register those redirect URIs on the dev Discord app.
 - **CI** ([.github/workflows/test.yml](../.github/workflows/test.yml)): a `hub` job matching `web` (`npm ci`, build, test).
 - **Docs**: add `hub/` to [plans/project-structure.md](project-structure.md) and the README's deploy section. Mention the hub's Legal page in the CLAUDE.md Legal section.
 
