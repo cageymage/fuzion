@@ -129,6 +129,10 @@
   border-radius: 4px;
 }
 
+.raceIcon {
+  display: block;
+}
+
 .rowActions {
   display: flex;
   gap: 6px;
