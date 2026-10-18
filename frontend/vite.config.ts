@@ -4,7 +4,7 @@ import { buildRobotsTxt, buildSitemapXml } from './src/lib/siteFiles'
 
 // Link previews (Discord, Bluesky) need absolute URLs and never run the app's JavaScript, so
 // they are filled into index.html at build time. Same name as the API's SITE_BASE_URL.
-const siteBaseUrl = (process.env.SITE_BASE_URL ?? 'https://fuziongaming.gg').replace(/\/$/, '')
+const siteBaseUrl = (process.env.SITE_BASE_URL ?? 'https://forever.fuziongaming.gg').replace(/\/$/, '')
 
 const siteBaseUrlInHtml: Plugin = {
   name: 'site-base-url-in-html',

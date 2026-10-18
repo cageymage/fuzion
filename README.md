@@ -236,6 +236,13 @@ First-time setup:
    `GUILD_REALM_SLUG` and `GUILD_NAME_SLUG`, then flip the flag to `true`. Check
    the first run's `sync_log` row before trusting it; see
    [backend/README.md](backend/README.md) for what the job writes.
+7. Custom domain: the guild site is `forever.fuziongaming.gg`. Add it under
+   `fuzion-web` → Custom Domains, then create the record Render shows (a
+   CNAME `forever` → `fuzion-web.onrender.com`) at the domain's DNS host.
+   Once the certificate is issued, register the `forever.` OAuth redirect
+   URLs with Discord and Blizzard, add the hostname to Turnstile, and set
+   `SITE_BASE_URL`, `DISCORD_REDIRECT_URL` and `BATTLENET_REDIRECT_URL` on
+   `fuzion-api` to the `forever.` host.
 
 Postgres runs on the paid Basic plan (`0.1c-256mb`, $6/mo), not the free
 tier. That is deliberate: a free database expires after 30 days, and losing

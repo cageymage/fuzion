@@ -13,6 +13,11 @@ services:
       # the bundle at build time, so changing it needs a redeploy.
       - key: VITE_TURNSTILE_SITE_KEY
         sync: false
+      # Public address of the guild site, filled into canonical and link-preview
+      # tags, robots.txt and sitemap.xml at build time, so changing it needs a
+      # redeploy. Same value as the API's SITE_BASE_URL.
+      - key: SITE_BASE_URL
+        value: https://forever.fuziongaming.gg
     # Order matters: /api is proxied to the API service so the browser only
     # ever talks to one origin (same as the Vite proxy in local dev); anything
     # else falls through to the SPA. If Render assigned the API a different
@@ -47,7 +52,7 @@ services:
       # use the hostname people actually browse the site on (the custom domain,
       # not fuzion-web.onrender.com and not the API): the OAuth state cookie is
       # per-host, so a callback on any other host fails with "state mismatch".
-      # e.g. https://fuziongaming.gg/api/auth/callback
+      # e.g. https://forever.fuziongaming.gg/api/auth/callback
       - key: DISCORD_CLIENT_ID
         sync: false
       - key: DISCORD_CLIENT_SECRET
@@ -58,7 +63,7 @@ services:
       # account. When it is set, BLIZZARD_CLIENT_ID and BLIZZARD_CLIENT_SECRET are
       # required too (the same Blizzard client as the roster sync). The redirect URL
       # must be registered on that client and use the host people actually browse,
-      # e.g. https://fuziongaming.gg/api/auth/battlenet/callback
+      # e.g. https://forever.fuziongaming.gg/api/auth/battlenet/callback
       - key: BATTLENET_REDIRECT_URL
         sync: false
       - key: BLIZZARD_CLIENT_ID
@@ -82,7 +87,7 @@ services:
         sync: false
       # Public address of the site, used for the post link in announcements. Use
       # the host people actually browse (the custom domain, not onrender.com),
-      # e.g. https://fuziongaming.gg
+      # e.g. https://forever.fuziongaming.gg
       - key: SITE_BASE_URL
         sync: false
       # Optional: without it, POST /api/webhooks/raid-helper is not registered and
