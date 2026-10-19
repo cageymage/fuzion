@@ -1,4 +1,4 @@
-# Render Blueprint: one static site, one Docker web service, one Postgres.
+# Render Blueprint: two static sites (guild, hub), one Docker web service, one Postgres.
 # Deploy via Render dashboard -> New -> Blueprint, pointed at this repo.
 
 services:
@@ -31,6 +31,28 @@ services:
       - type: rewrite
         source: /news/:id
         destination: https://fuzion-api.onrender.com/api/news/:id/page
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # The fuziongaming.gg hub. It has no backend of its own: it proxies only the
+  # public endpoints it uses to fuzion-api, so the auth callbacks and officer
+  # endpoints, which only work on the guild host, are not reachable here.
+  - type: web
+    name: fuzion-hub
+    runtime: static
+    rootDir: hub
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      # Public address of the hub, filled into canonical and link-preview tags at
+      # build time, so changing it needs a redeploy.
+      - key: SITE_BASE_URL
+        value: https://fuziongaming.gg
+    routes:
+      - type: rewrite
+        source: /api/streams/*
+        destination: https://fuzion-api.onrender.com/api/streams/*
       - type: rewrite
         source: /*
         destination: /index.html

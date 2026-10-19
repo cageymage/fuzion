@@ -1,0 +1,17 @@
+.icon {
+  flex-shrink: 0;
+  fill: currentColor;
+}
+
+.twitch {
+  color: #9146ff;
+}
+
+.youtube {
+  color: #ff0000;
+}
+
+/* The YouTube glyph cuts the play button out of the red shape; the logo shows it white. */
+.youtubePlay {
+  fill: #fff;
+}
