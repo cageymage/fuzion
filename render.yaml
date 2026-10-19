@@ -3,7 +3,7 @@
 
 services:
   - type: web
-    name: fuzion-web
+    name: forever-fuzion-web
     runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build
@@ -58,7 +58,7 @@ services:
         destination: /index.html
 
   - type: web
-    name: fuzion-api
+    name: fuzion-api # may need to update this depending on if we split APIs for retail or the hub
     runtime: docker
     rootDir: backend
     dockerfilePath: ./Dockerfile
@@ -72,7 +72,7 @@ services:
       # Discord OAuth app credentials; Render prompts for these on first deploy.
       # DISCORD_REDIRECT_URL must be registered on the Discord application and
       # use the hostname people actually browse the site on (the custom domain,
-      # not fuzion-web.onrender.com and not the API): the OAuth state cookie is
+      # not the static site's onrender.com host and not the API): the OAuth state cookie is
       # per-host, so a callback on any other host fails with "state mismatch".
       # e.g. https://forever.fuziongaming.gg/api/auth/callback
       - key: DISCORD_CLIENT_ID

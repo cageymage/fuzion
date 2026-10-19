@@ -212,7 +212,7 @@ clean database: `docker compose down -v` then `npm run dev` again.
 ## Deploying
 
 Production is the Render services declared in [render.yaml](render.yaml):
-a static site for the guild frontend (`fuzion-web`), a static site for the
+a static site for the guild frontend (`forever-fuzion-web`), a static site for the
 `fuziongaming.gg` hub (`fuzion-hub`), a Docker web service for the API, a cron
 job that syncs Twitch live status every minute (the API's image, run as
 `/sync twitch`), a cron job that syncs the guild roster from Blizzard hourly
@@ -253,15 +253,15 @@ First-time setup:
    the first run's `sync_log` row before trusting it; see
    [backend/README.md](backend/README.md) for what the job writes.
 7. Custom domain: the guild site is `forever.fuziongaming.gg`. Add it under
-   `fuzion-web` → Custom Domains, then create the record Render shows (a
-   CNAME `forever` → `fuzion-web.onrender.com`) at the domain's DNS host.
+   `forever-fuzion-web` → Custom Domains, then create the record Render shows (a
+   CNAME `forever` → the service's `onrender.com` hostname) at the domain's DNS host.
    Once the certificate is issued, register the `forever.` OAuth redirect
    URLs with Discord and Blizzard, add the hostname to Turnstile, and set
    `SITE_BASE_URL`, `DISCORD_REDIRECT_URL` and `BATTLENET_REDIRECT_URL` on
    `fuzion-api` to the `forever.` host.
 8. Hub domain: the apex `fuziongaming.gg` and `www` belong to `fuzion-hub`.
    Add both under `fuzion-hub` → Custom Domains (remove the apex from
-   `fuzion-web` first if it is still attached there) and update the DNS
+   `forever-fuzion-web` first if it is still attached there) and update the DNS
    records to the values Render shows. The hub has no login, so nothing is
    registered with Discord, Blizzard or Turnstile for it; remove any old
    apex redirect URIs and the apex Turnstile hostname.
