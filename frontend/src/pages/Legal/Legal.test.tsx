@@ -15,6 +15,30 @@ describe('Legal', () => {
     expect(screen.getByRole('heading', { level: 2, name: heading })).toBeInTheDocument()
   })
 
+  it('should name forever.fuziongaming.gg as the site the privacy policy covers when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'This policy covers the Fuzion guild site, forever.fuziongaming.gg.',
+    )
+  })
+
+  it('should say other fuziongaming.gg sites have their own notices when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'fuziongaming.gg and other fuziongaming.gg sites are run by the same people and have their own notices.',
+    )
+  })
+
+  it('should say a Discord login on one fuziongaming.gg site does not log you in on another when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'Logging in with Discord on one of them does not log you in on another.',
+    )
+  })
+
   it('should name the third parties that handle data when the page renders', () => {
     renderWithProviders(<Legal />)
 

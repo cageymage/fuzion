@@ -12,7 +12,10 @@ export function Legal() {
         <h2 id="privacy-heading" className={styles.sectionTitle}>
           Privacy policy
         </h2>
-        <p>The Fuzion site collects only what it needs to run the guild:</p>
+        <p>
+          This policy covers the Fuzion guild site, forever.fuziongaming.gg. It collects only what
+          it needs to run the guild:
+        </p>
         <ul>
           <li>
             Application fields: your name, character name, class, role, expected playstyle,
@@ -38,6 +41,10 @@ export function Legal() {
         <p>
           We do not sell your data. To have your application or other data removed, ask an officer
           on Discord.
+        </p>
+        <p>
+          fuziongaming.gg and other fuziongaming.gg sites are run by the same people and have their
+          own notices. Logging in with Discord on one of them does not log you in on another.
         </p>
       </section>
 

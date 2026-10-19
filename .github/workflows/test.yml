@@ -37,6 +37,22 @@ jobs:
       - run: npm run build
       - run: npm test
 
+  hub:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: hub/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
   # A dev or production database records the highest migration it has applied,
   # so a branch that numbers a new migration at or below what already landed on
   # main has it skipped forever rather than applied. Each branch's own test run

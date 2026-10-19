@@ -1,7 +1,8 @@
 # Fuzion
 
 WoW guild site: Go API (chi + sqlx + Postgres) under `backend/`, React/TS
-client (Vite) under `frontend/`. Architecture and rationale live in
+client (Vite) under `frontend/`, and the `fuziongaming.gg` hub (a static
+Vite app with no backend of its own) under `hub/`. Architecture and rationale live in
 [plans/project-structure.md](plans/project-structure.md); coding and testing
 rules in [CLAUDE.md](CLAUDE.md).
 
@@ -12,17 +13,22 @@ Once the [prerequisites](#prerequisites) below are installed:
 ```
 git clone https://github.com/cageymage/fuzion.git
 cd fuzion
-npm install     # root tooling + frontend deps (postinstall)
-npm run dev     # Postgres via docker compose, Go API on 127.0.0.1:8080, Vite on :5173
+npm install     # root tooling + frontend and hub deps (postinstall)
+npm run dev     # Postgres via docker compose, Go API on 127.0.0.1:8080, guild on :5173, hub on :5174
 npm run db:seed # sample news/raid/stream rows so the home page has content
 ```
 
-Open http://localhost:5173. Vite proxies `/api` to the Go API, so the
-browser only ever talks to one origin. Both servers hot-reload on save.
+Open http://localhost:5173 for the guild site. Vite proxies `/api` to the Go API, so the
+browser only ever talks to one origin. All servers hot-reload on save.
 
-After pulling or merging changes that touch `package.json` or
-`frontend/package.json`, re-run `npm install` and restart `npm run dev` so Vite
-picks up the new packages.
+The hub is on http://localhost:5174. Its Vite proxy forwards only
+`/api/streams`, the same paths its Render rewrite does, so a hub feature that
+calls any other endpoint fails locally rather than after deploy. Both sites
+read the same local API and database.
+
+After pulling or merging changes that touch `package.json`,
+`frontend/package.json` or `hub/package.json`, re-run `npm install` and restart
+`npm run dev` so Vite picks up the new packages.
 
 The first `npm run dev` is slow: it pulls the `postgres:16-alpine` image and
 Go downloads/compiles the backend's modules. Subsequent runs take a few
@@ -31,9 +37,10 @@ seconds.
 ## Running the tests
 
 ```
-npm test            # everything: Go suite, then Vitest
+npm test            # everything: Go suite, then both Vitest suites
 npm run test:api    # Go only — Docker Desktop must be running
-npm run test:web    # Vitest only — no Docker needed
+npm run test:web    # guild Vitest only — no Docker needed
+npm run test:hub    # hub Vitest only — no Docker needed
 ```
 
 The Go suite runs against a real Postgres: each test package starts its own
@@ -149,7 +156,7 @@ builds leave `ADDR` unset and bind all interfaces on Render's `PORT`.
 
 ### Port already in use
 
-`npm run dev` needs 5173 (Vite), 8080 (API) and 5432 (Postgres) free. A local
+`npm run dev` needs 5173 (guild Vite), 5174 (hub Vite), 8080 (API) and 5432 (Postgres) free. A local
 Postgres service is the usual 5432 culprit — stop it, or change the host port
 in [docker-compose.yml](docker-compose.yml) and `DATABASE_URL` in `.env`.
 
@@ -162,15 +169,17 @@ All run from the repo root.
 
 | Script        | What it does                                                |
 | ------------- | ----------------------------------------------------------- |
-| `dev`         | `db:up`, then API and web dev servers side by side          |
+| `dev`         | `db:up`, then API, web and hub dev servers side by side     |
 | `dev:api`     | just the Go API, restarts on `.go`/`.sql` changes (nodemon)  |
-| `dev:web`     | just the Vite dev server                                    |
+| `dev:web`     | just the guild site's Vite dev server                       |
+| `dev:hub`     | just the hub's Vite dev server                              |
 | `db:up`       | start Postgres and wait until it accepts connections        |
 | `db:down`     | stop Postgres; data persists in the `pgdata` volume         |
 | `db:seed`     | load `backend/seed/dev_seed.sql` into the running Postgres  |
-| `test`        | Go tests then Vitest — see [Running the tests](#running-the-tests) |
+| `test`        | Go tests then both Vitest suites — see [Running the tests](#running-the-tests) |
 | `test:api`    | Go tests only — needs Docker running, not `db:up`           |
-| `test:web`    | Vitest only — no Docker needed, HTTP is intercepted by MSW  |
+| `test:web`    | guild Vitest only — no Docker needed, HTTP is intercepted by MSW |
+| `test:hub`    | hub Vitest only — no Docker needed, HTTP is intercepted by MSW |
 
 ## Environment
 
@@ -202,8 +211,9 @@ clean database: `docker compose down -v` then `npm run dev` again.
 
 ## Deploying
 
-Production is five Render services declared in [render.yaml](render.yaml):
-a static site for the frontend, a Docker web service for the API, a cron
+Production is the Render services declared in [render.yaml](render.yaml):
+a static site for the guild frontend (`forever-fuzion-web`), a static site for the
+`fuziongaming.gg` hub (`fuzion-hub`), a Docker web service for the API, a cron
 job that syncs Twitch live status every minute (the API's image, run as
 `/sync twitch`), a cron job that syncs the guild roster from Blizzard hourly
 (`/sync blizzard-roster`, off by default), and a managed Postgres. Render deploys `main` on push; GitHub Actions
@@ -213,10 +223,16 @@ The static site rewrites `/api/*` to the API service, so the browser only
 ever talks to one origin — the same as the Vite proxy locally. No CORS
 config or `VITE_API_BASE_URL` is needed in prod.
 
+The hub rewrites only `/api/streams/*` to the API, not all of `/api/*`, so
+the auth callbacks, application form and officer endpoints are not reachable
+on `fuziongaming.gg`. When a hub feature needs another public endpoint, add a
+rewrite for exactly that path in `render.yaml` and the matching proxy entry in
+[hub/vite.config.ts](hub/vite.config.ts).
+
 First-time setup:
 
 1. Render dashboard → **New → Blueprint**, pick this repo. Render creates
-   all five services from `render.yaml` and wires `DATABASE_URL`. Later
+   all the services in `render.yaml` and wires `DATABASE_URL`. Later
    additions to `render.yaml` are picked up when the Blueprint syncs, which
    happens on push to `main` if the Blueprint's auto-sync is on.
 2. Check the API's hostname in the dashboard. If it isn't
@@ -237,12 +253,18 @@ First-time setup:
    the first run's `sync_log` row before trusting it; see
    [backend/README.md](backend/README.md) for what the job writes.
 7. Custom domain: the guild site is `forever.fuziongaming.gg`. Add it under
-   `fuzion-web` → Custom Domains, then create the record Render shows (a
-   CNAME `forever` → `fuzion-web.onrender.com`) at the domain's DNS host.
+   `forever-fuzion-web` → Custom Domains, then create the record Render shows (a
+   CNAME `forever` → the service's `onrender.com` hostname) at the domain's DNS host.
    Once the certificate is issued, register the `forever.` OAuth redirect
    URLs with Discord and Blizzard, add the hostname to Turnstile, and set
    `SITE_BASE_URL`, `DISCORD_REDIRECT_URL` and `BATTLENET_REDIRECT_URL` on
    `fuzion-api` to the `forever.` host.
+8. Hub domain: the apex `fuziongaming.gg` and `www` belong to `fuzion-hub`.
+   Add both under `fuzion-hub` → Custom Domains (remove the apex from
+   `forever-fuzion-web` first if it is still attached there) and update the DNS
+   records to the values Render shows. The hub has no login, so nothing is
+   registered with Discord, Blizzard or Turnstile for it; remove any old
+   apex redirect URIs and the apex Turnstile hostname.
 
 Postgres runs on the paid Basic plan (`0.1c-256mb`, $6/mo), not the free
 tier. That is deliberate: a free database expires after 30 days, and losing

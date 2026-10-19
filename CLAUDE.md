@@ -71,7 +71,7 @@ Pattern: **`<feature/endpoint> should <expected behavior> when <discriminating c
 
 ## Legal page
 
-`frontend/src/pages/Legal/Legal.tsx` is the privacy policy, content notice and attributions. Update it in the same PR whenever a change affects what it says:
+`frontend/src/pages/Legal/Legal.tsx` is the guild site's privacy policy, content notice and attributions, and `hub/src/pages/Legal/Legal.tsx` is the hub's. Each covers only its own site. Update the matching page in the same PR whenever a change affects what it says:
 
 - New personal data collected or stored (new form fields, linked accounts such as Battle.net OAuth, new cookies)
 - A new third party that receives data or is embedded (APIs, embeds, analytics, hosting)
