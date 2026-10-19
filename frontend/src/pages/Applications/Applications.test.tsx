@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { delay, http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -20,9 +20,11 @@ async function fillEveryField(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/character name/i), 'Ragnok')
   await user.selectOptions(screen.getByLabelText(/class/i), 'Warrior')
   await user.click(screen.getByRole('radio', { name: 'Tank' }))
+  await user.click(screen.getByRole('radio', { name: 'Raider' }))
   await user.type(screen.getByLabelText(/availability/i), 'Tue/Thu 8-11 EST')
   await user.type(screen.getByLabelText(/discord handle/i), 'terry#1234')
   await user.type(screen.getByRole('textbox', { name: /notes/i }), 'Looking for a raid home')
+  await user.click(screen.getByRole('checkbox', { name: /guild charter/i }))
   await turnstile.solve('token-1')
 }
 
@@ -59,7 +61,7 @@ describe('Applications', () => {
     renderWithProviders(<Applications />)
 
     expect(screen.getByRole('link', { name: 'Legal page' })).toHaveAttribute('href', '/legal')
-    expect(screen.getByText(/by applying you agree/i)).toBeInTheDocument()
+    expect(screen.getByText(/see how we handle your details/i)).toBeInTheDocument()
   })
 
   it('should show a thank-you message when the application is submitted successfully', async () => {
@@ -93,6 +95,7 @@ describe('Applications', () => {
       characterName: 'Ragnok',
       class: 'Warrior',
       role: 'tank',
+      playstyle: 'raider',
       availability: 'Tue/Thu 8-11 EST',
       discordHandle: 'terry#1234',
       notes: 'Looking for a raid home',
@@ -113,6 +116,23 @@ describe('Applications', () => {
     await user.click(screen.getByRole('button', { name: 'Submit application' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('role: must be tank, healer or dps')
+  })
+
+  it('should show the server error in a dialog when the API rejects the application', async () => {
+    server.use(
+      http.post('/api/applications', () =>
+        HttpResponse.json({ error: 'role: must be tank, healer or dps' }, { status: 400 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<Applications />)
+
+    await fillEveryField(user)
+    await user.click(screen.getByRole('button', { name: 'Submit application' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Application not sent' })).toHaveTextContent(
+      'role: must be tank, healer or dps',
+    )
   })
 
   it('should show a generic error message when the server fails', async () => {
@@ -163,6 +183,89 @@ describe('Applications', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/character name/i)
     expect(submitted).toBe(false)
     expect(screen.getByRole('button', { name: 'Submit application' })).toBeEnabled()
+  })
+
+  it('should link the charter in a new tab when the form is shown', () => {
+    renderWithProviders(<Applications />)
+
+    const link = screen.getByRole('link', { name: 'guild charter' })
+    expect(link).toHaveAttribute('href', '/charter')
+    expect(link).toHaveAttribute('target', '_blank')
+  })
+
+  it('should not submit when the charter box is unchecked', async () => {
+    let submitted = false
+    server.use(
+      http.post('/api/applications', () => {
+        submitted = true
+        return HttpResponse.json({ id: 'app-1' }, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<Applications />)
+
+    await fillEveryField(user)
+    await user.click(screen.getByRole('checkbox', { name: /guild charter/i }))
+    await user.click(screen.getByRole('button', { name: 'Submit application' }))
+
+    expect(await screen.findByRole('listitem')).toHaveTextContent('Charter agreement')
+    expect(submitted).toBe(false)
+  })
+
+  it('should not submit when no playstyle is selected', async () => {
+    let submitted = false
+    server.use(
+      http.post('/api/applications', () => {
+        submitted = true
+        return HttpResponse.json({ id: 'app-1' }, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<Applications />)
+
+    await user.type(screen.getByLabelText(/your name/i), 'Terry')
+    await user.type(screen.getByLabelText(/character name/i), 'Ragnok')
+    await user.selectOptions(screen.getByLabelText(/class/i), 'Warrior')
+    await user.click(screen.getByRole('radio', { name: 'Tank' }))
+    await user.type(screen.getByLabelText(/availability/i), 'Tue/Thu 8-11 EST')
+    await user.type(screen.getByLabelText(/discord handle/i), 'terry#1234')
+    await user.click(screen.getByRole('checkbox', { name: /guild charter/i }))
+    await turnstile.solve('token-1')
+    await user.click(screen.getByRole('button', { name: 'Submit application' }))
+
+    expect(await screen.findByRole('listitem')).toHaveTextContent('Playstyle')
+    expect(submitted).toBe(false)
+  })
+
+  it('should show the missing fields in a dialog when a required field is empty', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<Applications />)
+
+    await turnstile.solve('token-1')
+    await user.click(screen.getByRole('button', { name: 'Submit application' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Application not sent' })
+    expect(within(dialog).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Your name',
+      'Character name',
+      'Class',
+      'Role',
+      'Playstyle',
+      'Availability',
+      'Discord handle',
+      'Charter agreement',
+    ])
+  })
+
+  it('should close the dialog when the applicant clicks OK', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<Applications />)
+
+    await turnstile.solve('token-1')
+    await user.click(screen.getByRole('button', { name: 'Submit application' }))
+    await user.click(await screen.findByRole('button', { name: 'OK' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('should disable the submit button while the request is in flight', async () => {

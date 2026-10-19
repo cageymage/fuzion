@@ -18,6 +18,12 @@ describe('AppFooter', () => {
     expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about')
   })
 
+  it('should link to the charter page', () => {
+    renderWithProviders(<AppFooter />)
+
+    expect(screen.getByRole('link', { name: 'Charter' })).toHaveAttribute('href', '/charter')
+  })
+
   it('should link to the legal page', () => {
     renderWithProviders(<AppFooter />)
 

@@ -4,9 +4,14 @@ import { useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { submitApplication } from '../../api/applications'
 import { ApiError } from '../../api/client'
+import { Dialog } from '../../components/Dialog/Dialog'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { wowClasses } from '../../lib/wowClasses'
-import type { ApplicationRole, SubmitApplicationRequest } from '../../types/applications'
+import type {
+  ApplicationPlaystyle,
+  ApplicationRole,
+  SubmitApplicationRequest,
+} from '../../types/applications'
 import styles from './Applications.module.css'
 
 const maxNotesLength = 2000
@@ -19,11 +24,17 @@ const roles: { value: ApplicationRole; label: string }[] = [
   { value: 'dps', label: 'DPS' },
 ]
 
+const playstyles: { value: ApplicationPlaystyle; label: string }[] = [
+  { value: 'casual', label: 'Casual' },
+  { value: 'raider', label: 'Raider' },
+]
+
 const emptyForm: SubmitApplicationRequest = {
   applicantName: '',
   characterName: '',
   class: '',
   role: '',
+  playstyle: '',
   availability: '',
   discordHandle: '',
   notes: '',
@@ -35,13 +46,15 @@ const requiredFields: { key: Exclude<keyof SubmitApplicationRequest, 'turnstileT
   { key: 'characterName', label: 'Character name' },
   { key: 'class', label: 'Class' },
   { key: 'role', label: 'Role' },
+  { key: 'playstyle', label: 'Playstyle' },
   { key: 'availability', label: 'Availability' },
   { key: 'discordHandle', label: 'Discord handle' },
 ]
 
 export function Applications() {
   const [form, setForm] = useState(emptyForm)
-  const [validationError, setValidationError] = useState<string | null>(null)
+  const [charterAccepted, setCharterAccepted] = useState(false)
+  const [missingFields, setMissingFields] = useState<string[]>([])
   const turnstile = useRef<TurnstileInstance>(null)
   const submission = useMutation({ mutationFn: submitApplication })
   const currentUser = useCurrentUser()
@@ -51,12 +64,15 @@ export function Applications() {
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
-    const missing = requiredFields.filter(({ key }) => form[key].trim() === '')
+    const missing = requiredFields.filter(({ key }) => form[key].trim() === '').map(({ label }) => label)
+    if (!charterAccepted) {
+      missing.push('Charter agreement')
+    }
     if (missing.length > 0) {
-      setValidationError(`Please fill in: ${missing.map(({ label }) => label).join(', ')}`)
+      setMissingFields(missing)
       return
     }
-    setValidationError(null)
+    setMissingFields([])
     submission.mutate(form, {
       onError: () => {
         // Tokens are single-use, so a failed submit needs a fresh challenge.
@@ -83,7 +99,11 @@ export function Applications() {
   } else if (submission.isError) {
     serverError = genericError
   }
-  const errorMessage = validationError ?? serverError
+  const showDialog = missingFields.length > 0 || serverError !== null
+  const dismissError = () => {
+    setMissingFields([])
+    submission.reset()
+  }
 
   return (
     <section className={styles.page}>
@@ -94,11 +114,6 @@ export function Applications() {
         </Link>
       )}
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
-        {errorMessage && (
-          <p role="alert" className={styles.error}>
-            {errorMessage}
-          </p>
-        )}
         <label className={styles.field}>
           Your name *
           <input
@@ -139,6 +154,21 @@ export function Applications() {
             </label>
           ))}
         </fieldset>
+        <fieldset className={styles.roles}>
+          <legend>Expected playstyle *</legend>
+          {playstyles.map(({ value, label }) => (
+            <label key={value} className={styles.radio}>
+              <input
+                type="radio"
+                name="playstyle"
+                value={value}
+                checked={form.playstyle === value}
+                onChange={() => update('playstyle', value)}
+              />
+              {label}
+            </label>
+          ))}
+        </fieldset>
         <label className={styles.field}>
           Availability *
           <input
@@ -166,9 +196,6 @@ export function Applications() {
             {form.notes.length} / {maxNotesLength}
           </span>
         </label>
-        <p className={styles.notice}>
-          By applying you agree to how we handle your details, see the <Link to="/legal">Legal page</Link>.
-        </p>
         <Turnstile
           ref={turnstile}
           siteKey={turnstileSiteKey}
@@ -176,6 +203,23 @@ export function Applications() {
           onExpire={() => update('turnstileToken', '')}
           onError={() => update('turnstileToken', '')}
         />
+        <p className={styles.notice}>
+          See how we handle your details on the <Link to="/legal">Legal page</Link>.
+        </p>
+        <label className={styles.checkbox}>
+          <input
+            type="checkbox"
+            checked={charterAccepted}
+            onChange={(event) => setCharterAccepted(event.target.checked)}
+          />
+          <span>
+            I have read and agree to the{' '}
+            <Link to="/charter" target="_blank" rel="noreferrer">
+              guild charter
+            </Link>{' '}
+            *
+          </span>
+        </label>
         <button
           type="submit"
           className={styles.button}
@@ -184,6 +228,29 @@ export function Applications() {
           {submission.isPending ? 'Sending…' : 'Submit application'}
         </button>
       </form>
+      {showDialog && (
+        <Dialog title="Application not sent" onClose={dismissError}>
+          <div role="alert" className={styles.error}>
+            {missingFields.length > 0 ? (
+              <>
+                <p className={styles.errorLead}>Please fill in:</p>
+                <ul className={styles.errorList}>
+                  {missingFields.map((field) => (
+                    <li key={field}>{field}</li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className={styles.errorLead}>{serverError}</p>
+            )}
+          </div>
+          <div className={styles.dialogActions}>
+            <button type="button" className={styles.button} onClick={dismissError} autoFocus>
+              OK
+            </button>
+          </div>
+        </Dialog>
+      )}
     </section>
   )
 }

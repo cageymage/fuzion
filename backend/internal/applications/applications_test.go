@@ -23,6 +23,7 @@ type applicationBody struct {
 	CharacterName string `json:"characterName"`
 	Class         string `json:"class"`
 	Role          string `json:"role"`
+	Playstyle     string `json:"playstyle"`
 	Availability  string `json:"availability"`
 	DiscordHandle string `json:"discordHandle"`
 	Notes         string `json:"notes"`
@@ -33,13 +34,14 @@ type applicationBody struct {
 func validApplication() applicationBody {
 	return applicationBody{
 		TurnstileToken: testutil.ValidTurnstileToken,
-		ApplicantName: "Mira",
-		CharacterName: "Thornleaf",
-		Class:         "Druid",
-		Role:          "healer",
-		Availability:  "Tue/Thu 8-11pm ET",
-		DiscordHandle: "mira.heals",
-		Notes:         "Cleared Mythic Ansurek with my previous guild.",
+		ApplicantName:  "Mira",
+		CharacterName:  "Thornleaf",
+		Class:          "Druid",
+		Role:           "healer",
+		Playstyle:      "raider",
+		Availability:   "Tue/Thu 8-11pm ET",
+		DiscordHandle:  "mira.heals",
+		Notes:          "Cleared Mythic Ansurek with my previous guild.",
 	}
 }
 
@@ -65,6 +67,7 @@ func TestSubmitApplication_ReturnsCreated_WhenBodyIsValid(t *testing.T) {
 		CharacterName: " Thornleaf",
 		Class:         "Druid ",
 		Role:          " healer ",
+		Playstyle:     " casual ",
 		Availability:  "Tue/Thu 8-11pm ET\n",
 		DiscordHandle: "\tmira.heals",
 		Notes:         "  Cleared Mythic Ansurek with my previous guild.  ",
@@ -99,6 +102,7 @@ func TestSubmitApplication_ReturnsCreated_WhenBodyIsValid(t *testing.T) {
 		CharacterName string `db:"character_name"`
 		Class         string `db:"class"`
 		Role          string `db:"role"`
+		Playstyle     string `db:"playstyle"`
 		Availability  string `db:"availability"`
 		DiscordHandle string `db:"discord_handle"`
 		Notes         string `db:"notes"`
@@ -106,7 +110,7 @@ func TestSubmitApplication_ReturnsCreated_WhenBodyIsValid(t *testing.T) {
 	}
 	var row applicationRow
 	err := db.Get(&row, `
-		SELECT applicant_name, character_name, class, role, availability, discord_handle, notes, status
+		SELECT applicant_name, character_name, class, role, playstyle, availability, discord_handle, notes, status
 		FROM applications
 		WHERE id = $1`, got.ID)
 	if err != nil {
@@ -117,6 +121,7 @@ func TestSubmitApplication_ReturnsCreated_WhenBodyIsValid(t *testing.T) {
 		CharacterName: "Thornleaf",
 		Class:         "Druid",
 		Role:          "healer",
+		Playstyle:     "casual",
 		Availability:  "Tue/Thu 8-11pm ET",
 		DiscordHandle: "mira.heals",
 		Notes:         "Cleared Mythic Ansurek with my previous guild.",
@@ -176,6 +181,7 @@ func TestSubmitApplication_PostsSummaryToDiscordWebhook(t *testing.T) {
 		{"Applicant", "Mira"},
 		{"Character", "Thornleaf"},
 		{"Class / Role", "Druid / healer"},
+		{"Playstyle", "raider"},
 		{"Availability", "Tue/Thu 8-11pm ET"},
 		{"Discord", "mira.heals"},
 	}
@@ -381,6 +387,50 @@ func TestSubmitApplication_ReturnsBadRequest_WhenRoleIsInvalid(t *testing.T) {
 	}
 }
 
+func TestSubmitApplication_ReturnsBadRequest_WhenPlaystyleIsInvalid(t *testing.T) {
+	// given an application with a playstyle the guild does not offer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	body := validApplication()
+	body.Playstyle = "hardcore"
+
+	// when I submit the application
+	resp := srv.Post(t, "/api/applications", body)
+
+	// then I expect a 400 naming the playstyle field, and nothing stored
+	resp.RequireStatus(t, 400)
+	var got errorJSON
+	resp.DecodeJSON(t, &got)
+	if diff := cmp.Diff(errorJSON{Error: "playstyle: must be one of casual, raider"}, got); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+	if n := countApplications(t, db); n != 0 {
+		t.Errorf("expected no stored applications, found %d", n)
+	}
+}
+
+func TestSubmitApplication_ReturnsBadRequest_WhenPlaystyleIsMissing(t *testing.T) {
+	// given an application that leaves the playstyle out
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	body := validApplication()
+	body.Playstyle = ""
+
+	// when I submit the application
+	resp := srv.Post(t, "/api/applications", body)
+
+	// then I expect a 400 naming the playstyle field, and nothing stored
+	resp.RequireStatus(t, 400)
+	var got errorJSON
+	resp.DecodeJSON(t, &got)
+	if diff := cmp.Diff(errorJSON{Error: "playstyle: is required"}, got); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+	if n := countApplications(t, db); n != 0 {
+		t.Errorf("expected no stored applications, found %d", n)
+	}
+}
+
 func TestSubmitApplication_ReturnsBadRequest_WhenRequiredFieldIsBlank(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -480,6 +530,7 @@ type reviewedApplicationJSON struct {
 	CharacterName string  `json:"characterName"`
 	Class         string  `json:"class"`
 	Role          string  `json:"role"`
+	Playstyle     string  `json:"playstyle"`
 	Availability  string  `json:"availability"`
 	DiscordHandle string  `json:"discordHandle"`
 	Notes         string  `json:"notes"`
@@ -494,8 +545,8 @@ func insertApplication(t *testing.T, db *sqlx.DB, characterName, status string, 
 	t.Helper()
 	id := uuid.NewString()
 	db.MustExec(`
-		INSERT INTO applications (id, applicant_name, character_name, class, role, availability, discord_handle, status, submitted_at)
-		VALUES ($1, 'Mira', $2, 'Druid', 'healer', 'Tue/Thu 8-11pm ET', 'mira.heals', $3, $4)`,
+		INSERT INTO applications (id, applicant_name, character_name, class, role, playstyle, availability, discord_handle, status, submitted_at)
+		VALUES ($1, 'Mira', $2, 'Druid', 'healer', 'raider', 'Tue/Thu 8-11pm ET', 'mira.heals', $3, $4)`,
 		id, characterName, status, submittedAt)
 	return id
 }
@@ -523,6 +574,7 @@ func TestListApplications_ReturnsPendingOnly_WhenStatusFilterIsPending(t *testin
 		CharacterName: "Thornleaf",
 		Class:         "Druid",
 		Role:          "healer",
+		Playstyle:     "raider",
 		Availability:  "Tue/Thu 8-11pm ET",
 		DiscordHandle: "mira.heals",
 		Status:        "pending",
@@ -619,6 +671,7 @@ func TestGetApplication_ReturnsTheApplication_WhenOfficerRequestsItsID(t *testin
 		CharacterName: "Thornleaf",
 		Class:         "Druid",
 		Role:          "healer",
+		Playstyle:     "raider",
 		Availability:  "Tue/Thu 8-11pm ET",
 		DiscordHandle: "mira.heals",
 		Status:        "pending",
@@ -707,6 +760,7 @@ func TestReviewApplication_MarksAccepted_AndRecordsReviewer(t *testing.T) {
 		CharacterName: "Thornleaf",
 		Class:         "Druid",
 		Role:          "healer",
+		Playstyle:     "raider",
 		Availability:  "Tue/Thu 8-11pm ET",
 		DiscordHandle: "mira.heals",
 		Status:        "accepted",
@@ -907,6 +961,35 @@ func TestReviewApplication_EditsDiscordMessageToAccepted_WhenApplicationWasAnnou
 	last := embed.Fields[len(embed.Fields)-1]
 	if last.Name != "Review note" || last.Value != "Invite for Tuesday." {
 		t.Errorf("expected a trailing Review note field, got %q = %q", last.Name, last.Value)
+	}
+}
+
+func TestReviewApplication_OmitsPlaystyleField_WhenApplicationPredatesPlaystyle(t *testing.T) {
+	// given an announced application stored before playstyle existed
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	id := submitAnnouncedApplication(t, srv)
+	db.MustExec(`UPDATE applications SET playstyle = '' WHERE id = $1`, id)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+
+	// when I accept it
+	resp := srv.Patch(t, "/api/applications/"+id, map[string]string{"status": "accepted"})
+
+	// then I expect a 200
+	resp.RequireStatus(t, 200)
+
+	// and the edited announcement has no Playstyle field, since Discord rejects empty field values
+	edits := srv.Webhook.Edits()
+	if len(edits) != 1 {
+		t.Fatalf("expected exactly 1 webhook edit, got %d", len(edits))
+	}
+	var gotNames []string
+	for _, field := range decodeEditedEmbed(t, edits[0]).Fields {
+		gotNames = append(gotNames, field.Name)
+	}
+	wantNames := []string{"Applicant", "Character", "Class / Role", "Availability", "Discord"}
+	if diff := cmp.Diff(wantNames, gotNames); diff != "" {
+		t.Errorf("unexpected embed field names (-want +got):\n%s", diff)
 	}
 }
 

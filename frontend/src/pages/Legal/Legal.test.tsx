@@ -24,6 +24,14 @@ describe('Legal', () => {
     }
   })
 
+  it('should list the expected playstyle among the application fields when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'role, expected playstyle, availability',
+    )
+  })
+
   it('should describe the data stored when a member links Battle.net when the page renders', () => {
     renderWithProviders(<Legal />)
 
