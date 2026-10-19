@@ -79,7 +79,7 @@ After the deploy, update links to `fuziongaming.gg` outside the repo (Discord se
 
 - A Vite + React + TS app with the same toolchain as `frontend/` (Vitest + RTL + MSW and the same test conventions from CLAUDE.md).
 - Start small: a landing page (who Fuzion is, links to Discord, Twitch, YouTube and `forever.fuziongaming.gg`) and a Legal page. Add the live-streams / suggested-video section only if wanted. It reads `GET /api/streams/live` and `GET /api/streams/suggested-video`, both public.
-- A footer with the same GitHub icon link to `github.com/cageymage` as the guild footer (#155). If the hub copies the guild's inline SVG mark, its Legal attributions need the same GitHub trademark line.
+- A footer with the same GitHub icon link to `github.com/cageymage/fuzion` as the guild footer (#155). If the hub copies the guild's inline SVG mark, its Legal attributions need the same GitHub trademark line.
 - Page and component tests ship with each page, per CLAUDE.md.
 - Its own `SITE_BASE_URL` (`https://fuziongaming.gg`) for canonical and OG tags. Add a robots.txt and sitemap only if they're worth it for a page this small.
 

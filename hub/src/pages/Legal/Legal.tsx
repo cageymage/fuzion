@@ -69,7 +69,7 @@ export function Legal() {
           </li>
           <li>
             GitHub and the GitHub logo: trademarks of GitHub, Inc., shown only to link to this
-            site&apos;s source code.
+            site&apos;s source code. Icon shape from Simple Icons (CC0).
           </li>
           <li>Fonts: Google Fonts, a Google LLC service.</li>
           <li>Hosting: Render Services, Inc.</li>
