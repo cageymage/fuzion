@@ -81,6 +81,14 @@ describe('Legal', () => {
     )
   })
 
+  it('should credit the GitHub logo to GitHub when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Attributions' })).toHaveTextContent(
+      'GitHub and the GitHub logo: trademarks of GitHub, Inc.',
+    )
+  })
+
   it('should credit Render for hosting when the page renders', () => {
     renderWithProviders(<Legal />)
 

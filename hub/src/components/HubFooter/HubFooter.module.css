@@ -19,5 +19,15 @@
 
 .nav {
   display: flex;
+  align-items: center;
   gap: 20px;
+}
+
+.iconLink {
+  display: inline-flex;
+}
+
+.icon {
+  width: 1.2em;
+  height: 1.2em;
 }

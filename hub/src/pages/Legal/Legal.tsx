@@ -67,6 +67,10 @@ export function Legal() {
             Twitch and YouTube logos: trademarks of Twitch Interactive, Inc. and Google LLC, shown
             only to link to Fuzion&apos;s channels. Icon shapes from Simple Icons (CC0).
           </li>
+          <li>
+            GitHub and the GitHub logo: trademarks of GitHub, Inc., shown only to link to this
+            site&apos;s source code. Icon shape from Simple Icons (CC0).
+          </li>
           <li>Fonts: Google Fonts, a Google LLC service.</li>
           <li>Hosting: Render Services, Inc.</li>
         </ul>
