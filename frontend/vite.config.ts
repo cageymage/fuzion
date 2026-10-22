@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
+import { buildAboutPageHtml } from './src/lib/pageMeta'
 import { buildRobotsTxt, buildSitemapXml } from './src/lib/siteFiles'
 
 // Link previews (Discord, Bluesky) need absolute URLs and never run the app's JavaScript, so
@@ -33,8 +34,25 @@ const crawlerFiles: Plugin = {
   },
 }
 
+const aboutPageMeta: Plugin = {
+  name: 'about-page-meta',
+  apply: 'build',
+  enforce: 'post',
+  generateBundle(_, bundle) {
+    const index = bundle['index.html']
+    if (index?.type !== 'asset') {
+      throw new Error('index.html was not emitted before the about page')
+    }
+    this.emitFile({
+      type: 'asset',
+      fileName: 'about.html',
+      source: buildAboutPageHtml(String(index.source), siteBaseUrl),
+    })
+  },
+}
+
 export default defineConfig({
-  plugins: [react(), siteBaseUrlInHtml, crawlerFiles],
+  plugins: [react(), siteBaseUrlInHtml, crawlerFiles, aboutPageMeta],
   server: {
     port: 5173,
     proxy: {
