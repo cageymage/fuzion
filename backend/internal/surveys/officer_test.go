@@ -386,7 +386,7 @@ func TestUpdateSurvey_ChangesOnlyTheDescription_WhenOfficerSendsADescription(t *
 func insertResponse(t *testing.T, db *sqlx.DB, surveyID, discordID, guildName string, inServer bool, submittedAt string) string {
 	t.Helper()
 	var userID string
-	if err := db.Get(&userID, `INSERT INTO users (id, discord_id, username) VALUES (gen_random_uuid(), $1, $1) RETURNING id`, discordID); err != nil {
+	if err := db.Get(&userID, `INSERT INTO users (id, discord_id, username, in_discord_server) VALUES (gen_random_uuid(), $1, $1, $2) RETURNING id`, discordID, inServer); err != nil {
 		t.Fatalf("insert user: %v", err)
 	}
 	var responseID string
@@ -466,6 +466,35 @@ func TestListResponses_ReturnsEveryResponseWithDiscordDetailsAndVoids_WhenCaller
 		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected responses (-want +got):\n%s", diff)
+	}
+}
+
+func TestListResponses_ReportsTheAccountsCurrentServerFlag_WhenItChangedAfterTheResponseWasSubmitted(t *testing.T) {
+	// given a response saved while its author was not known to be in the Discord server
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
+	srv.LoginAs(t, officerDiscordID, "officer1", testutil.AsOfficer())
+	insertResponse(t, db, openSurveyID, "ana", "Anaria", false, "2026-03-10T12:00:00Z")
+	// and the author has since logged in again and been found in the server
+	db.MustExec(`UPDATE users SET in_discord_server = true WHERE discord_id = 'ana'`)
+
+	// when I list the responses
+	resp := srv.Get(t, "/api/surveys/"+openSurveyID+"/responses")
+
+	// then I expect the response to show the account's current flag
+	resp.RequireStatus(t, 200)
+	var got []struct {
+		DiscordUsername string `json:"discordUsername"`
+		InDiscordServer bool   `json:"inDiscordServer"`
+	}
+	resp.DecodeJSON(t, &got)
+	type row = struct {
+		DiscordUsername string `json:"discordUsername"`
+		InDiscordServer bool   `json:"inDiscordServer"`
+	}
+	if diff := cmp.Diff([]row{{DiscordUsername: "ana", InDiscordServer: true}}, got); diff != "" {
 		t.Errorf("unexpected responses (-want +got):\n%s", diff)
 	}
 }
