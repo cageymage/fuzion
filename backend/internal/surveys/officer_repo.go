@@ -129,9 +129,10 @@ func (r *Repo) UpdateSurvey(ctx context.Context, id uuid.UUID, update surveyUpda
 // A non-nil responseID narrows it to that one response.
 func (r *Repo) Responses(ctx context.Context, surveyID uuid.UUID, responseID *uuid.UUID) ([]officerRow, error) {
 	const query = `
-		SELECT r.id, r.discord_username, r.guild_name, r.in_discord_server, r.submitted_at, r.updated_at,
+		SELECT r.id, r.discord_username, r.guild_name, u.in_discord_server, r.submitted_at, r.updated_at,
 		       r.voided_at, v.username AS voided_by, r.void_reason
 		FROM survey_responses r
+		JOIN users u ON u.id = r.user_id
 		LEFT JOIN users v ON v.id = r.voided_by
 		WHERE r.survey_id = $1 AND ($2::uuid IS NULL OR r.id = $2)
 		ORDER BY r.submitted_at, r.id`
