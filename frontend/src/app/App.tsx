@@ -14,6 +14,9 @@ import { Legal } from '../pages/Legal/Legal'
 import { News } from '../pages/News/News'
 import { OfficerApplications } from '../pages/OfficerApplications/OfficerApplications'
 import { OfficerRaidProgress } from '../pages/OfficerRaidProgress/OfficerRaidProgress'
+import { OfficerSurveyManage } from '../pages/OfficerSurveyManage/OfficerSurveyManage'
+import { OfficerSurveyNew } from '../pages/OfficerSurveyNew/OfficerSurveyNew'
+import { OfficerSurveys } from '../pages/OfficerSurveys/OfficerSurveys'
 import { Professions } from '../pages/Professions/Professions'
 import { RaidProgress } from '../pages/RaidProgress/RaidProgress'
 import { Roster } from '../pages/Roster/Roster'
@@ -55,6 +58,9 @@ export function App() {
             <Route path="/raid-progress" element={<RaidProgress />} />
             <Route path="/officer/raid-progress" element={<OfficerRaidProgress />} />
             <Route path="/officer/applications" element={<OfficerApplications />} />
+            <Route path="/officer/surveys" element={<OfficerSurveys />} />
+            <Route path="/officer/surveys/new" element={<OfficerSurveyNew />} />
+            <Route path="/officer/surveys/:id" element={<OfficerSurveyManage />} />
             <Route
               path="/officer/news/:id"
               element={
