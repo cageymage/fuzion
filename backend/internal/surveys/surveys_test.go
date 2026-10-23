@@ -514,18 +514,12 @@ func TestGetResults_ReturnsNotFound_WhenSurveyDoesNotExist(t *testing.T) {
 // insertClosedResponse stores a response to the closed survey for a fresh user.
 func insertClosedResponse(t *testing.T, db *sqlx.DB, discordID string, voided bool, class, nights string) {
 	t.Helper()
-	var userID string
-	if err := db.Get(&userID, `INSERT INTO users (id, discord_id, username) VALUES (gen_random_uuid(), $1, $1) RETURNING id`, discordID); err != nil {
-		t.Fatalf("insert user: %v", err)
+	responseID := insertResponse(t, db, closedSurveyID, discordID, "", true, "2026-03-10T12:00:00Z")
+	if voided {
+		db.MustExec(`UPDATE survey_responses SET voided_at = now() WHERE id = $1`, responseID)
 	}
-	var responseID string
-	if err := db.Get(&responseID, `
-		INSERT INTO survey_responses (survey_id, user_id, discord_username, in_discord_server, voided_at)
-		VALUES ($1, $2, $3, true, CASE WHEN $4 THEN now() END) RETURNING id`, closedSurveyID, userID, discordID, voided); err != nil {
-		t.Fatalf("insert response: %v", err)
-	}
-	db.MustExec(`INSERT INTO survey_answers (response_id, question_id, chosen) VALUES ($1, $2, $3), ($1, $4, $5)`,
-		responseID, closedQuestions.class, `["`+class+`"]`, closedQuestions.nights, nights)
+	insertAnswer(t, db, responseID, closedQuestions.class, `["`+class+`"]`)
+	insertAnswer(t, db, responseID, closedQuestions.nights, nights)
 }
 
 func TestGetResults_ReturnsCountsPerOptionIncludingZeroes_WhenSurveyHasClosed(t *testing.T) {
