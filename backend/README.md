@@ -27,7 +27,7 @@ Environment:
 | `DISCORD_CLIENT_ID`     | required | from the Discord developer portal (OAuth2 tab) |
 | `DISCORD_CLIENT_SECRET` | required | same place; never commit it        |
 | `DISCORD_REDIRECT_URL`  | required | must be registered on the Discord app; `http://localhost:5173/api/auth/callback` in dev |
-| `DISCORD_GUILD_ID`      | optional | the guild Discord server's ID (Developer Mode, right-click the server, Copy Server ID). When set, login also asks for the `guilds` scope and records whether the user is in that server; survey responses carry that flag for officers |
+| `DISCORD_GUILD_ID`      | optional | the guild Discord server's ID (Developer Mode, right-click the server, Copy Server ID). When set, login also asks for the `guilds` scope and records whether the user is in that server; survey responses carry that flag for officers. It is read at login, so a response can carry a value up to 30 days old (the session length). Without it the flag is false for everyone, so the officer "only people in our Discord server" filter hides every response |
 | `RAID_HELPER_WEBHOOK_SECRET` | optional | Raid-Helper's webhook key from `/webhooks show`; without it `POST /api/webhooks/raid-helper` is not registered (404) |
 | `TWITCH_CLIENT_ID`      | optional | `cmd/sync` only; from a dev.twitch.tv app. The Twitch job skips itself unless both are set |
 | `TWITCH_CLIENT_SECRET`  | optional | same place; never commit it        |
@@ -128,6 +128,10 @@ is no separate migrate step.
 | GET    | `/api/auth/callback` | Discord lands here; verifies state, upserts the user, sets `fuzion_session`, 302 to `/` |
 | POST   | `/api/auth/logout`   | deletes the session server-side, clears the cookie, 204 |
 | GET    | `/api/auth/me`       | `{id, username, avatarUrl}` for the cookie's user, or 401 |
+| GET    | `/api/surveys`       | every survey, latest deadline first: `[{id, title, closesAt, status}]`, `status` being `open` or `closed` |
+| GET    | `/api/surveys/{id}`  | the survey with its questions in order (`{id, prompt, type: "single"\|"multi", required, options}`) and `myResponse: {guildName, answers: [{questionId, values}]}` for a logged-in caller who has answered, else `null`; 404 for an unknown or malformed id |
+| PUT    | `/api/surveys/{id}/response` | login required: `{guildName?, answers: [{questionId, values}]}` creates or replaces the caller's response, 200 with what was saved; 400 for an unanswered required question, a value that is not an option, two values on a single-choice question, a question from another survey or a guild name over 64 characters; 409 after the deadline; 404 for an unknown survey. Saving over a voided response clears the void |
+| GET    | `/api/surveys/{id}/results` | 403 until the deadline passes, then public: `{surveyId, title, turnout, questions: [{id, prompt, type, options: [{label, count}]}]}` with voided responses left out and unchosen options at 0 |
 
 These are exactly what the frontend's `src/api/` modules call.
 
