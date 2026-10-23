@@ -8,6 +8,7 @@ func setRequiredConfig(t *testing.T) {
 	t.Setenv("DISCORD_CLIENT_ID", "id")
 	t.Setenv("DISCORD_CLIENT_SECRET", "secret")
 	t.Setenv("DISCORD_REDIRECT_URL", "http://localhost/callback")
+	t.Setenv("DISCORD_GUILD_ID", "")
 	t.Setenv("DISCORD_ANNOUNCEMENTS_WEBHOOK_URL", "")
 	t.Setenv("DISCORD_RECRUITING_WEBHOOK_URL", "")
 	t.Setenv("SITE_BASE_URL", "")
@@ -77,5 +78,22 @@ func TestLoadConfig_Succeeds_WhenRecruitingWebhookAndSiteBaseURLAreSet(t *testin
 	}
 	if cfg.siteBaseURL != "https://fuzion.example" {
 		t.Errorf("expected siteBaseURL %q, got %q", "https://fuzion.example", cfg.siteBaseURL)
+	}
+}
+
+func TestLoadConfig_ReadsDiscordGuildID_WhenItIsSet(t *testing.T) {
+	// given the guild's Discord server ID in the environment
+	setRequiredConfig(t)
+	t.Setenv("DISCORD_GUILD_ID", "987654321098765432")
+
+	// when I load the config
+	cfg, err := loadConfig()
+
+	// then I expect the guild ID to be passed along for the membership check
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.discord.guildID != "987654321098765432" {
+		t.Errorf("expected guild ID 987654321098765432, got %q", cfg.discord.guildID)
 	}
 }

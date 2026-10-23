@@ -16,12 +16,16 @@ const (
 	DiscordClientID     = "123456789012345678"
 	DiscordClientSecret = "test-client-secret"
 	DiscordRedirectURL  = "http://localhost:5173/api/auth/callback"
+	DiscordGuildID      = "987654321098765432"
 )
 
 type DiscordUser struct {
 	ID       string  `json:"id"`
 	Username string  `json:"username"`
 	Avatar   *string `json:"avatar"`
+
+	// Guilds are the server IDs /users/@me/guilds lists; they are not part of the user object.
+	Guilds []string `json:"-"`
 }
 
 // FakeDiscord stands in for Discord's OAuth2 API. Codes handed to GrantCode are
@@ -32,6 +36,8 @@ type FakeDiscord struct {
 
 	// UserEndpointStatus, when non-zero, makes /users/@me fail with that status.
 	UserEndpointStatus int
+	// GuildsEndpointStatus, when non-zero, makes /users/@me/guilds fail with that status.
+	GuildsEndpointStatus int
 
 	mu    sync.Mutex
 	codes map[string]DiscordUser
@@ -44,6 +50,7 @@ func NewFakeDiscord(t *testing.T) *FakeDiscord {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /oauth2/token", fake.token(t))
 	mux.HandleFunc("GET /users/@me", fake.me)
+	mux.HandleFunc("GET /users/@me/guilds", fake.guilds)
 	fake.Server = httptest.NewServer(mux)
 	t.Cleanup(fake.Close)
 	return fake
@@ -86,7 +93,7 @@ func (f *FakeDiscord) token(t *testing.T) http.HandlerFunc {
 			"access_token": "token-for-" + code,
 			"token_type":   "Bearer",
 			"expires_in":   604800,
-			"scope":        "identify",
+			"scope":        "identify guilds",
 		})
 	}
 }
@@ -111,4 +118,24 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+func (f *FakeDiscord) guilds(w http.ResponseWriter, r *http.Request) {
+	if f.GuildsEndpointStatus != 0 {
+		w.WriteHeader(f.GuildsEndpointStatus)
+		return
+	}
+	code, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer token-for-")
+	f.mu.Lock()
+	user, known := f.codes[code]
+	f.mu.Unlock()
+	if !ok || !known {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"message": "401: Unauthorized", "code": 0})
+		return
+	}
+	guilds := make([]map[string]string, len(user.Guilds))
+	for i, id := range user.Guilds {
+		guilds[i] = map[string]string{"id": id}
+	}
+	writeJSON(w, http.StatusOK, guilds)
 }

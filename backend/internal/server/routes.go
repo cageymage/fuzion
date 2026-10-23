@@ -18,6 +18,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/raids"
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/surveys"
 )
 
 type Deps struct {
@@ -31,6 +32,7 @@ type Deps struct {
 	Raids          *raids.Handler
 	Roster         *roster.Handler
 	Streams        *streams.Handler
+	Surveys        *surveys.Handler
 	AllowedOrigins []string
 }
 
@@ -46,7 +48,7 @@ func New(deps Deps) *chi.Mux {
 	// pointed at the API directly via VITE_API_BASE_URL.
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   deps.AllowedOrigins,
-		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodOptions},
+		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
 		AllowedHeaders:   []string{"Accept", "Content-Type"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -65,6 +67,7 @@ func New(deps Deps) *chi.Mux {
 		deps.Raids.Register(api)
 		deps.Roster.Register(api)
 		deps.Streams.Register(api)
+		deps.Surveys.Register(api)
 	})
 
 	return r

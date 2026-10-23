@@ -27,6 +27,7 @@ Environment:
 | `DISCORD_CLIENT_ID`     | required | from the Discord developer portal (OAuth2 tab) |
 | `DISCORD_CLIENT_SECRET` | required | same place; never commit it        |
 | `DISCORD_REDIRECT_URL`  | required | must be registered on the Discord app; `http://localhost:5173/api/auth/callback` in dev |
+| `DISCORD_GUILD_ID`      | optional | the guild Discord server's ID (Developer Mode, right-click the server, Copy Server ID). When set, login also asks for the `guilds` scope and records whether the user is in that server; survey responses carry that flag for officers |
 | `RAID_HELPER_WEBHOOK_SECRET` | optional | Raid-Helper's webhook key from `/webhooks show`; without it `POST /api/webhooks/raid-helper` is not registered (404) |
 | `TWITCH_CLIENT_ID`      | optional | `cmd/sync` only; from a dev.twitch.tv app. The Twitch job skips itself unless both are set |
 | `TWITCH_CLIENT_SECRET`  | optional | same place; never commit it        |

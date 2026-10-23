@@ -60,6 +60,7 @@ type discordConfig struct {
 	clientID     string
 	clientSecret string
 	redirectURL  string
+	guildID      string
 }
 
 func loadConfig() (config, error) {
@@ -133,6 +134,7 @@ func loadDiscordConfig() (discordConfig, error) {
 		clientID:     os.Getenv("DISCORD_CLIENT_ID"),
 		clientSecret: os.Getenv("DISCORD_CLIENT_SECRET"),
 		redirectURL:  os.Getenv("DISCORD_REDIRECT_URL"),
+		guildID:      os.Getenv("DISCORD_GUILD_ID"),
 	}
 	for _, v := range []struct{ name, value string }{
 		{"DISCORD_CLIENT_ID", cfg.clientID},
