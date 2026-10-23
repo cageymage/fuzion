@@ -85,6 +85,12 @@ services:
         sync: false
       - key: DISCORD_REDIRECT_URL
         sync: false
+      # Optional: the guild's Discord server ID (Developer Mode, right-click the
+      # server, Copy Server ID). When it is set, login also asks Discord which servers
+      # the user is in (the guilds scope) and records whether one is this server, which
+      # survey officers can filter on. Without it that flag is false for everyone.
+      - key: DISCORD_GUILD_ID
+        sync: false
       # Optional: without BATTLENET_REDIRECT_URL, members cannot link a Battle.net
       # account. When it is set, BLIZZARD_CLIENT_ID and BLIZZARD_CLIENT_SECRET are
       # required too (the same Blizzard client as the roster sync). The redirect URL
