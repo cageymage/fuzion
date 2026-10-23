@@ -85,6 +85,7 @@ export function Legal() {
           <li>Hosting: Render Services, Inc.</li>
           <li>Home page artwork: generated with Midjourney.</li>
           <li>News card background artwork: generated with Midjourney.</li>
+          <li>About page artwork: generated with Midjourney.</li>
           <li>
             GitHub and the GitHub logo: trademarks of GitHub, Inc., shown only to link to this
             site&apos;s source code. Icon shape from Simple Icons (CC0).

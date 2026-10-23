@@ -88,6 +88,14 @@ describe('Legal', () => {
     )
   })
 
+  it('should credit Midjourney for the about page artwork when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Attributions' })).toHaveTextContent(
+      'About page artwork: generated with Midjourney.',
+    )
+  })
+
   it('should credit YouTube for live status and channel avatars when the page renders', () => {
     renderWithProviders(<Legal />)
 
