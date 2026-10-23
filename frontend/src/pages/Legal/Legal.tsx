@@ -29,6 +29,11 @@ export function Legal() {
             Battle.net link: if you choose to link Battle.net on your dashboard, your Battle.net ID
             and BattleTag. Unlinking deletes both.
           </li>
+          <li>
+            Survey responses: your answers, the guild name you optionally enter, and your Discord
+            username at the time you respond. Officers can see these per person, and the public
+            results show totals only.
+          </li>
           <li>Images uploaded by officers, such as news post images.</li>
         </ul>
         <p>Other services are involved in running the site:</p>
