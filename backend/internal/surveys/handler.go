@@ -30,6 +30,7 @@ func (h *Handler) Register(r chi.Router) {
 		officer.Use(auth.RequireOfficer)
 		officer.Post("/surveys", h.create)
 		officer.Patch("/surveys/{id}", h.update)
+		officer.Post("/surveys/{id}/questions/{questionId}/options", h.addOption)
 		officer.Get("/surveys/{id}/live-results", h.liveResults)
 		officer.Get("/surveys/{id}/responses", h.listResponses)
 		officer.Get("/surveys/{id}/responses.csv", h.exportResponses)
@@ -104,6 +105,8 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, action stri
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "survey not found"})
 	case errors.Is(err, ErrResponseNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrResponseNotFound.Error()})
+	case errors.Is(err, ErrQuestionNotFound):
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrQuestionNotFound.Error()})
 	case errors.Is(err, ErrQuestionsLocked):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrQuestionsLocked.Error()})
 	case errors.Is(err, ErrClosed):

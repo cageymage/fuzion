@@ -54,7 +54,7 @@ export function SurveyEditorForm({
         <>
           <p className={styles.notice}>Questions cannot change once people have responded.</p>
           <ol className={styles.lockedList}>
-            {draft.questions.map((question) => (
+            {initial.questions.map((question) => (
               <li key={question.key}>
                 <strong>{question.prompt}</strong> ({question.type === 'single' ? 'single choice' : 'multiple choice'}
                 {question.required ? ', required' : ''}): {question.customOptions.split('\n').join(', ')}

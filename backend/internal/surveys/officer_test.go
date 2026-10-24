@@ -1,6 +1,8 @@
 package surveys_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -380,6 +382,229 @@ func TestUpdateSurvey_ChangesOnlyTheDescription_WhenOfficerSendsADescription(t *
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("unexpected survey (-want +got):\n%s", diff)
 	}
+}
+
+func addOptionPath(surveyID, questionID string) string {
+	return "/api/surveys/" + surveyID + "/questions/" + questionID + "/options"
+}
+
+func TestAddOption_ReturnsForbidden_WhenCallerIsOnlyAMember(t *testing.T) {
+	// given an open survey and a logged-in member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
+	srv.LoginAs(t, memberDiscordID, "member")
+
+	// when I add an option to the class question
+	resp := srv.Post(t, addOptionPath(openSurveyID, openQuestions.class), map[string]any{"option": "Druid"})
+
+	// then I expect a 403 and the options unchanged
+	resp.RequireStatus(t, 403)
+	var options string
+	if err := db.Get(&options, `SELECT options::text FROM survey_questions WHERE id = $1`, openQuestions.class); err != nil {
+		t.Fatalf("select options: %v", err)
+	}
+	if options != `["Mage", "Priest", "Warrior"]` {
+		t.Errorf("expected the options to stay unchanged, got %s", options)
+	}
+}
+
+func TestAddOption_AppendsOptionToTheQuestion_WhenSurveyAlreadyHasResponses(t *testing.T) {
+	// given an open survey with a response and a logged-in officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
+	anaID := insertResponse(t, db, openSurveyID, "ana", "Anaria", true, "2026-03-10T12:00:00Z")
+	insertAnswer(t, db, anaID, openQuestions.class, `["Mage"]`)
+	srv.LoginAs(t, officerDiscordID, "officer1", testutil.AsOfficer())
+
+	// when I add a missing option to the class question
+	resp := srv.Post(t, addOptionPath(openSurveyID, openQuestions.class), map[string]any{"option": "  Druid  "})
+
+	// then I expect the survey back with the trimmed option last, other questions untouched
+	resp.RequireStatus(t, 200)
+	var got map[string]any
+	resp.DecodeJSON(t, &got)
+	want := map[string]any{
+		"id":          openSurveyID,
+		"title":       "Spring roster",
+		"description": "Help us plan",
+		"closesAt":    "2026-03-21T20:00:00Z",
+		"status":      "open",
+		"questions": []any{
+			map[string]any{"id": openQuestions.class, "prompt": "Class", "type": "single", "required": true, "options": []any{"Mage", "Priest", "Warrior", "Druid"}},
+			map[string]any{"id": openQuestions.secondary, "prompt": "Secondary class", "type": "single", "required": false, "options": []any{"Mage", "Priest", "Warrior"}},
+			map[string]any{"id": openQuestions.nights, "prompt": "Raid nights", "type": "multi", "required": true, "options": []any{"Tuesday", "Wednesday", "Thursday"}},
+		},
+		"myResponse": nil,
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected survey (-want +got):\n%s", diff)
+	}
+}
+
+func TestAddOption_KeepsExistingAnswersAndAcceptsTheNewOption_WhenMemberRespondsAfterwards(t *testing.T) {
+	// given an open survey where ana answered Mage and an officer has since added Druid
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
+	anaID := insertResponse(t, db, openSurveyID, "ana", "Anaria", true, "2026-03-10T12:00:00Z")
+	insertAnswer(t, db, anaID, openQuestions.class, `["Mage"]`)
+	srv.LoginAs(t, officerDiscordID, "officer1", testutil.AsOfficer())
+	srv.Post(t, addOptionPath(openSurveyID, openQuestions.class), map[string]any{"option": "Druid"}).RequireStatus(t, 200)
+	srv.LoginAs(t, memberDiscordID, "member", testutil.InDiscordServer())
+
+	// when I submit a response choosing the new option
+	resp := srv.Put(t, "/api/surveys/"+openSurveyID+"/response", map[string]any{
+		"answers": []map[string]any{
+			{"questionId": openQuestions.class, "values": []string{"Druid"}},
+			{"questionId": openQuestions.nights, "values": []string{"Tuesday"}},
+		},
+	})
+
+	// then I expect it saved next to ana's untouched answer
+	resp.RequireStatus(t, 200)
+	var chosen []string
+	if err := db.Select(&chosen, `SELECT chosen::text FROM survey_answers WHERE question_id = $1 ORDER BY chosen::text`, openQuestions.class); err != nil {
+		t.Fatalf("select answers: %v", err)
+	}
+	if diff := cmp.Diff([]string{`["Druid"]`, `["Mage"]`}, chosen); diff != "" {
+		t.Errorf("unexpected class answers (-want +got):\n%s", diff)
+	}
+}
+
+func TestAddOption_ReturnsBadRequest_WhenOptionIsRejected(t *testing.T) {
+	tests := []struct {
+		name      string
+		option    string
+		wantError string
+	}{
+		{"the option is blank", "  ", "option: options must not be blank"},
+		{"the option is longer than 100 characters", strings.Repeat("a", 101), "option: options must be at most 100 characters each"},
+		{"the option is already listed", "Mage", `option: "Mage" is already an option`},
+		{"the option only differs by surrounding spaces from a listed one", " Mage ", `option: "Mage" is already an option`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// given an open survey and a logged-in officer
+			db := testutil.DB(t)
+			srv := testutil.NewServer(t, db)
+			insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
+			srv.LoginAs(t, officerDiscordID, "officer1", testutil.AsOfficer())
+
+			// when I add that option to the class question
+			resp := srv.Post(t, addOptionPath(openSurveyID, openQuestions.class), map[string]any{"option": tt.option})
+
+			// then I expect a 400 naming the problem and the options unchanged
+			resp.RequireStatus(t, 400)
+			var got map[string]string
+			resp.DecodeJSON(t, &got)
+			if diff := cmp.Diff(map[string]string{"error": tt.wantError}, got); diff != "" {
+				t.Errorf("unexpected error body (-want +got):\n%s", diff)
+			}
+			var options string
+			if err := db.Get(&options, `SELECT options::text FROM survey_questions WHERE id = $1`, openQuestions.class); err != nil {
+				t.Fatalf("select options: %v", err)
+			}
+			if options != `["Mage", "Priest", "Warrior"]` {
+				t.Errorf("expected the options to stay unchanged, got %s", options)
+			}
+		})
+	}
+}
+
+func TestAddOption_ReturnsBadRequest_WhenQuestionAlreadyHasFiftyOptions(t *testing.T) {
+	// given an open survey whose class question is full and a logged-in officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
+	full := make([]string, 50)
+	for i := range full {
+		full[i] = fmt.Sprintf("Option %d", i+1)
+	}
+	encoded, err := json.Marshal(full)
+	if err != nil {
+		t.Fatalf("encode options: %v", err)
+	}
+	db.MustExec(`UPDATE survey_questions SET options = $2 WHERE id = $1`, openQuestions.class, string(encoded))
+	srv.LoginAs(t, officerDiscordID, "officer1", testutil.AsOfficer())
+
+	// when I add one more option
+	resp := srv.Post(t, addOptionPath(openSurveyID, openQuestions.class), map[string]any{"option": "One too many"})
+
+	// then I expect a 400 naming the limit
+	resp.RequireStatus(t, 400)
+	var got map[string]string
+	resp.DecodeJSON(t, &got)
+	if diff := cmp.Diff(map[string]string{"error": "option: a question can have at most 50 options"}, got); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+}
+
+func TestAddOption_ReturnsConflict_WhenSurveyHasClosed(t *testing.T) {
+	// given a closed survey and a logged-in officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertSurvey(t, db, closedSurveyID, "Winter plans", closedInThePast)
+	srv.LoginAs(t, officerDiscordID, "officer1", testutil.AsOfficer())
+
+	// when I add an option to its class question
+	resp := srv.Post(t, addOptionPath(closedSurveyID, closedQuestions.class), map[string]any{"option": "Druid"})
+
+	// then I expect a 409 and the options unchanged
+	resp.RequireStatus(t, 409)
+	var got map[string]string
+	resp.DecodeJSON(t, &got)
+	if diff := cmp.Diff(map[string]string{"error": "survey is closed"}, got); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+	var options string
+	if err := db.Get(&options, `SELECT options::text FROM survey_questions WHERE id = $1`, closedQuestions.class); err != nil {
+		t.Fatalf("select options: %v", err)
+	}
+	if options != `["Mage", "Priest", "Warrior"]` {
+		t.Errorf("expected the options to stay unchanged, got %s", options)
+	}
+}
+
+func TestAddOption_ReturnsNotFound_WhenQuestionBelongsToAnotherSurvey(t *testing.T) {
+	// given two surveys and a logged-in officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
+	insertSurvey(t, db, closedSurveyID, "Winter plans", closedInThePast)
+	srv.LoginAs(t, officerDiscordID, "officer1", testutil.AsOfficer())
+
+	// when I add an option through the open survey to a question of the other one
+	resp := srv.Post(t, addOptionPath(openSurveyID, closedQuestions.class), map[string]any{"option": "Druid"})
+
+	// then I expect a 404 and the other survey's options unchanged
+	resp.RequireStatus(t, 404)
+	var got map[string]string
+	resp.DecodeJSON(t, &got)
+	if diff := cmp.Diff(map[string]string{"error": "question not found"}, got); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+	var options string
+	if err := db.Get(&options, `SELECT options::text FROM survey_questions WHERE id = $1`, closedQuestions.class); err != nil {
+		t.Fatalf("select options: %v", err)
+	}
+	if options != `["Mage", "Priest", "Warrior"]` {
+		t.Errorf("expected the options to stay unchanged, got %s", options)
+	}
+}
+
+func TestAddOption_ReturnsNotFound_WhenSurveyDoesNotExist(t *testing.T) {
+	// given a logged-in officer and no surveys
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, officerDiscordID, "officer1", testutil.AsOfficer())
+
+	// when I add an option to a survey nobody created
+	resp := srv.Post(t, addOptionPath(openSurveyID, openQuestions.class), map[string]any{"option": "Druid"})
+
+	// then I expect a 404
+	resp.RequireStatus(t, 404)
 }
 
 // insertResponse stores a response to a survey for a fresh user and returns the response id.
