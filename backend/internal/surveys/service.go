@@ -256,6 +256,19 @@ func (s *Service) Results(ctx context.Context, rawID string) (Results, error) {
 	if !s.closed(sv) {
 		return Results{}, ErrResultsNotAvailable
 	}
+	return s.tally(ctx, sv)
+}
+
+// LiveResults is for officers, who can follow a survey's counts before the deadline.
+func (s *Service) LiveResults(ctx context.Context, rawID string) (Results, error) {
+	sv, err := s.load(ctx, rawID)
+	if err != nil {
+		return Results{}, fmt.Errorf("get live survey results: %w", err)
+	}
+	return s.tally(ctx, sv)
+}
+
+func (s *Service) tally(ctx context.Context, sv survey) (Results, error) {
 	questions, err := s.repo.Questions(ctx, sv.ID)
 	if err != nil {
 		return Results{}, fmt.Errorf("get survey results: %w", err)

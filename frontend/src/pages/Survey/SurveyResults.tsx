@@ -1,3 +1,4 @@
+import type { SurveyResults as SurveyResultsData } from '../../types/surveys'
 import styles from './Survey.module.css'
 import { useSurveyResults } from './useSurvey'
 
@@ -23,7 +24,11 @@ export function SurveyResults({ surveyId }: SurveyResultsProps) {
     )
   }
 
-  const { turnout, questions } = results.data
+  return <SurveyResultsView results={results.data} />
+}
+
+export function SurveyResultsView({ results }: { results: SurveyResultsData }) {
+  const { turnout, questions } = results
   return (
     <section aria-label="Results">
       <p className={styles.turnout}>
