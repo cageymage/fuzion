@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { loginUrl } from '../../api/auth'
+import { useLoginUrl } from '../../hooks/useLoginUrl'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import type { RaidTier } from '../../types/raidProgress'
 import { useRaidTiersData } from '../RaidProgress/useRaidProgressData'
@@ -426,6 +426,7 @@ function OfficerTools() {
 
 export function OfficerRaidProgress() {
   const currentUser = useCurrentUser()
+  const loginUrl = useLoginUrl()
 
   return (
     <section className={styles.page}>

@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 )
 
 const (
-	SessionCookieName = "fuzion_session"
-	stateCookieName   = "fuzion_oauth_state"
-	stateTTL          = 10 * time.Minute
+	SessionCookieName  = "fuzion_session"
+	stateCookieName    = "fuzion_oauth_state"
+	returnToCookieName = "fuzion_return_to"
+	stateTTL           = 10 * time.Minute
 )
 
 func newSessionToken() (string, error) {
@@ -37,6 +39,11 @@ func sessionCookie(r *http.Request, token string) *http.Cookie {
 
 func stateCookie(r *http.Request, state string) *http.Cookie {
 	return newCookie(r, stateCookieName, state, int(stateTTL/time.Second))
+}
+
+// The path is query-escaped so characters cookies cannot carry survive the round trip to Discord.
+func returnToCookie(r *http.Request, path string) *http.Cookie {
+	return newCookie(r, returnToCookieName, url.QueryEscape(path), int(stateTTL/time.Second))
 }
 
 func expiredCookie(r *http.Request, name string) *http.Cookie {
