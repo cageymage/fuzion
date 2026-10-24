@@ -13,13 +13,14 @@ import {
 import { useToast } from '../../components/Toast/Toast'
 import { useSurveyResponses, useUpdateSurvey } from '../../hooks/useSurveyAdmin'
 import { useSurvey } from '../Survey/useSurvey'
+import { LiveResults } from './LiveResults'
 import styles from './OfficerSurveyManage.module.css'
 import { ResponsesTable } from './ResponsesTable'
 
 function ManageSurvey() {
   const { id = '' } = useParams()
   const survey = useSurvey(id)
-  const responses = useSurveyResponses(id)
+  const responses = useSurveyResponses(id, { refresh: survey.data?.status === 'open' })
   const update = useUpdateSurvey(id)
   const { showToast } = useToast()
   const [confirmingClose, setConfirmingClose] = useState(false)
@@ -97,6 +98,8 @@ function ManageSurvey() {
           </button>
         )}
       </div>
+
+      {data.status === 'open' && <LiveResults surveyId={data.id} />}
 
       <h2 className={styles.heading}>Settings</h2>
       {/* Keyed on the deadline so closing the survey resets the form; a stale future deadline would reopen it on the next save. */}

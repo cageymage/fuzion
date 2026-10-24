@@ -30,6 +30,7 @@ func (h *Handler) Register(r chi.Router) {
 		officer.Use(auth.RequireOfficer)
 		officer.Post("/surveys", h.create)
 		officer.Patch("/surveys/{id}", h.update)
+		officer.Get("/surveys/{id}/live-results", h.liveResults)
 		officer.Get("/surveys/{id}/responses", h.listResponses)
 		officer.Get("/surveys/{id}/responses.csv", h.exportResponses)
 		officer.Patch("/surveys/{id}/responses/{responseId}", h.voidResponse)
@@ -80,6 +81,15 @@ func (h *Handler) results(w http.ResponseWriter, r *http.Request) {
 	results, err := h.service.Results(r.Context(), chi.URLParam(r, "id"))
 	if err != nil {
 		h.writeError(w, r, "get survey results", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, results)
+}
+
+func (h *Handler) liveResults(w http.ResponseWriter, r *http.Request) {
+	results, err := h.service.LiveResults(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		h.writeError(w, r, "get live survey results", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, results)

@@ -23,6 +23,10 @@ export function fetchSurveyResults(id: string): Promise<SurveyResults> {
   return apiGet<SurveyResults>(`/surveys/${id}/results`)
 }
 
+export function fetchLiveSurveyResults(id: string): Promise<SurveyResults> {
+  return apiGet<SurveyResults>(`/surveys/${id}/live-results`)
+}
+
 export function submitSurveyResponse(id: string, request: SubmitSurveyRequest): Promise<SurveyResponse> {
   return apiSend<SurveyResponse>('PUT', `/surveys/${id}/response`, request)
 }

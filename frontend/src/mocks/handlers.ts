@@ -407,6 +407,34 @@ export const closedSurveyResults: SurveyResults = {
   ],
 }
 
+export const liveSurveyResults: SurveyResults = {
+  surveyId: 'survey-1',
+  title: 'Spring roster',
+  turnout: 2,
+  questions: [
+    {
+      id: 'q-class',
+      prompt: 'Class',
+      type: 'single',
+      options: [
+        { label: 'Mage', count: 1 },
+        { label: 'Priest', count: 1 },
+        { label: 'Warrior', count: 0 },
+      ],
+    },
+    {
+      id: 'q-nights',
+      prompt: 'Raid nights',
+      type: 'multi',
+      options: [
+        { label: 'Tuesday', count: 2 },
+        { label: 'Wednesday', count: 0 },
+        { label: 'Thursday', count: 1 },
+      ],
+    },
+  ],
+}
+
 export const officerSurveyResponses: OfficerSurveyResponse[] = [
   {
     id: 'response-1',
@@ -506,6 +534,7 @@ export const handlers = [
   http.get('/api/surveys/:id/results', () => HttpResponse.json(closedSurveyResults)),
   http.post('/api/surveys', () => HttpResponse.json(openSurvey, { status: 201 })),
   http.patch('/api/surveys/:id', () => HttpResponse.json(openSurvey)),
+  http.get('/api/surveys/:id/live-results', () => HttpResponse.json(liveSurveyResults)),
   http.get('/api/surveys/:id/responses', () => HttpResponse.json(officerSurveyResponses)),
   http.patch('/api/surveys/:id/responses/:responseId', () => HttpResponse.json(officerSurveyResponses[0])),
 ]
