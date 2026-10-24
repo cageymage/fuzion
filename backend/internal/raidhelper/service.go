@@ -17,6 +17,8 @@ type Event struct {
 	Title       string `json:"title"`
 	StartTime   int64  `json:"startTime"`
 	LastUpdated int64  `json:"lastUpdated"`
+	ChannelID   string `json:"channelId"`
+	ChannelName string `json:"channelName"`
 }
 
 type Service struct {

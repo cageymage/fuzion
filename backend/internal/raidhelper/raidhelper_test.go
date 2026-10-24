@@ -332,6 +332,110 @@ func TestRaidHelperWebhook_IgnoresUnknownEventTypes(t *testing.T) {
 	}
 }
 
+const (
+	retailRaidPlanningChannelID = "1281325821813985391"
+	unknownChannelID            = "1399999999999999999"
+)
+
+func TestRaidHelperWebhook_IgnoresEvent_WhenChannelIsUnknown(t *testing.T) {
+	// given no raids
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when the captured create arrives from a channel the site does not know
+	body := withFields(t, "webhookeventcreate.json", map[string]any{"channelId": unknownChannelID, "channelName": "officer-test"})
+	resp := deliver(t, srv, "webhookeventcreate", body)
+
+	// then I expect a 200 and nothing written
+	resp.RequireStatus(t, 200)
+	if rows := raidRows(t, db); len(rows) != 0 {
+		t.Errorf("expected no raids, got %+v", rows)
+	}
+}
+
+func TestRaidHelperWebhook_IgnoresEvent_WhenChannelIsRetailRaidPlanning(t *testing.T) {
+	// given no raids
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when the captured create arrives from the Retail raid-planning channel
+	body := withFields(t, "webhookeventcreate.json", map[string]any{"channelId": retailRaidPlanningChannelID, "channelName": "retail-raid-planning"})
+	resp := deliver(t, srv, "webhookeventcreate", body)
+
+	// then I expect a 200 and nothing written, since the Calendar mirrors only Forever raids
+	resp.RequireStatus(t, 200)
+	if rows := raidRows(t, db); len(rows) != 0 {
+		t.Errorf("expected no raids, got %+v", rows)
+	}
+}
+
+func TestRaidHelperWebhook_DoesNotUpdateRaid_WhenUpdateComesFromUnknownChannel(t *testing.T) {
+	// given a raid mirrored from the captured create
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	deliver(t, srv, "webhookeventcreate", fixture(t, "webhookeventcreate.json")).RequireStatus(t, 200)
+
+	// when the edited update for the same event arrives from an unknown channel
+	body := withFields(t, "webhookeventupdate-signup.json", map[string]any{"channelId": unknownChannelID})
+	resp := deliver(t, srv, "webhookeventupdate", body)
+
+	// then I expect a 200 and the raid exactly as the create left it
+	resp.RequireStatus(t, 200)
+	want := []raidRow{{
+		EventID:      ptr(capturedEventID),
+		Difficulty:   "Unknown",
+		InstanceName: "Test Raid Event",
+		StartsAt:     capturedStart,
+		LastUpdated:  ptr(int64(1791781357)),
+	}}
+	if diff := cmp.Diff(want, raidRows(t, db)); diff != "" {
+		t.Errorf("unexpected raids (-want +got):\n%s", diff)
+	}
+}
+
+func TestRaidHelperWebhook_DoesNotDeleteRaid_WhenDeleteComesFromUnknownChannel(t *testing.T) {
+	// given a raid mirrored from the captured Absence update
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	deliver(t, srv, "webhookeventupdate", fixture(t, "webhookeventupdate-absence.json")).RequireStatus(t, 200)
+
+	// when the captured delete arrives from an unknown channel
+	body := withFields(t, "webhookeventdelete.json", map[string]any{"channelId": unknownChannelID})
+	resp := deliver(t, srv, "webhookeventdelete", body)
+
+	// then I expect a 200 and the raid still live
+	resp.RequireStatus(t, 200)
+	want := []raidRow{{
+		EventID:      ptr(capturedEventID),
+		Difficulty:   "Unknown",
+		InstanceName: "Test Raid Event (edited)",
+		StartsAt:     capturedStart,
+		LastUpdated:  ptr(int64(1791781634)),
+	}}
+	if diff := cmp.Diff(want, raidRows(t, db)); diff != "" {
+		t.Errorf("unexpected raids (-want +got):\n%s", diff)
+	}
+}
+
+func TestRaidHelperWebhook_ReturnsUnauthorized_WhenKeyIsInvalidAndChannelIsUnknown(t *testing.T) {
+	// given no raids
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when a create from an unknown channel arrives with the wrong key
+	body := withFields(t, "webhookeventcreate.json", map[string]any{"channelId": unknownChannelID})
+	resp := srv.PostRawWithHeaders(t, webhookPath, body, map[string]string{
+		"Authorization":      "zZ9yY8xX7wW6vV5uU4tT3sS2rR1qQ0",
+		"X-Raidhelper-Event": "webhookeventcreate",
+	})
+
+	// then I expect a 401, not the 200 an unknown channel gets, and nothing written
+	resp.RequireStatus(t, 401)
+	if rows := raidRows(t, db); len(rows) != 0 {
+		t.Errorf("expected no raids, got %+v", rows)
+	}
+}
+
 func TestRaidHelperWebhook_ReturnsBadRequest_WhenBodyHasNoEventId(t *testing.T) {
 	// given no raids
 	db := testutil.DB(t)
