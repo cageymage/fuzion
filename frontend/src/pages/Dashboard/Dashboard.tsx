@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { battlenetLinkUrl, loginUrl, unlinkBattlenet } from '../../api/auth'
+import { battlenetLinkUrl, unlinkBattlenet } from '../../api/auth'
 import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
+import { useLoginUrl } from '../../hooks/useLoginUrl'
 import styles from './Dashboard.module.css'
 
 export function Dashboard() {
   const currentUser = useCurrentUser()
+  const loginUrl = useLoginUrl()
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
   const unlink = useMutation({

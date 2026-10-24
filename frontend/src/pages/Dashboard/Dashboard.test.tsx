@@ -27,7 +27,10 @@ describe('Dashboard', () => {
   it('should prompt to log in when the visitor is logged out', async () => {
     renderWithProviders(<Dashboard />, '/dashboard')
 
-    expect(await screen.findByRole('link', { name: 'Log in with Discord' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Log in with Discord' })).toHaveAttribute(
+      'href',
+      'http://localhost:3000/api/auth/login?returnTo=%2Fdashboard',
+    )
     expect(screen.queryByRole('link', { name: 'Link Battle.net' })).not.toBeInTheDocument()
   })
 

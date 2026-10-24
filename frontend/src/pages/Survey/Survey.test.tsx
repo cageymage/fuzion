@@ -46,10 +46,13 @@ describe('Survey', () => {
     expect(screen.getByText(/^Closes /)).toBeInTheDocument()
   })
 
-  it('should offer a Discord login link instead of the form when the visitor is not logged in', async () => {
+  it('should offer a Discord login link that returns to the survey instead of the form when the visitor is not logged in', async () => {
     renderSurveyPage()
 
-    expect(await screen.findByRole('link', { name: 'Log in with Discord' })).toHaveAttribute('href', loginUrl)
+    expect(await screen.findByRole('link', { name: 'Log in with Discord' })).toHaveAttribute(
+      'href',
+      `${loginUrl}?returnTo=%2Fsurveys%2Fsurvey-1`,
+    )
     expect(screen.queryByRole('button', { name: 'Submit response' })).not.toBeInTheDocument()
   })
 
