@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { loginUrl } from '../../api/auth'
+import { useLoginUrl } from '../../hooks/useLoginUrl'
 import { ApiError } from '../../api/client'
 import type {
   Application,
@@ -145,6 +145,7 @@ function ApplicationRow({ application, expanded, onToggle, onReviewed }: Applica
 }
 
 function AccessDenied({ anonymous }: { anonymous: boolean }) {
+  const loginUrl = useLoginUrl()
   return (
     <div className={styles.noticeText}>
       <p>Only officers can review applications.</p>

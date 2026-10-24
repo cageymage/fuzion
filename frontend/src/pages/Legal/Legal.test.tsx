@@ -39,6 +39,14 @@ describe('Legal', () => {
     )
   })
 
+  it('should describe the short-lived cookie that remembers your page during login when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'a short-lived cookie that remembers which page you were on so we can send you back to it after you log in, deleted when login finishes',
+    )
+  })
+
   it('should name the third parties that handle data when the page renders', () => {
     renderWithProviders(<Legal />)
 

@@ -23,7 +23,9 @@ export function Legal() {
           </li>
           <li>
             Discord identity: when you log in with Discord, your Discord ID and username, plus a
-            session cookie that keeps you logged in.
+            session cookie that keeps you logged in and a short-lived cookie that remembers which
+            page you were on so we can send you back to it after you log in, deleted when login
+            finishes.
           </li>
           <li>
             Discord server check: when you log in, we also ask Discord which servers you are in,

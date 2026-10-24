@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { ApiError } from '../../api/client'
-import { loginUrl } from '../../api/auth'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
+import { useLoginUrl } from '../../hooks/useLoginUrl'
 import { formatDeadline } from '../../lib/format'
 import styles from './Survey.module.css'
 import { SurveyForm } from './SurveyForm'
@@ -12,6 +12,7 @@ export function Survey() {
   const { id = '' } = useParams()
   const survey = useSurvey(id)
   const currentUser = useCurrentUser()
+  const loginUrl = useLoginUrl()
 
   if (survey.isPending) {
     return (

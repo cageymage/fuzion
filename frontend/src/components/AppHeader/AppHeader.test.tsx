@@ -96,6 +96,15 @@ describe('AppHeader', () => {
     expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument()
   })
 
+  it('should send the current page and its query string with the login link when nobody is logged in on a page', async () => {
+    renderWithProviders(<AppHeader />, '/surveys/survey-1?tab=results')
+
+    expect(await screen.findByRole('link', { name: 'Log in with Discord' })).toHaveAttribute(
+      'href',
+      'http://localhost:3000/api/auth/login?returnTo=%2Fsurveys%2Fsurvey-1%3Ftab%3Dresults',
+    )
+  })
+
   it('should hide the surveys link when nobody is logged in', async () => {
     renderWithProviders(<AppHeader />)
 

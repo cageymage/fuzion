@@ -2,6 +2,12 @@ import type { AuthUser } from '../types/auth'
 import { apiDelete, apiPost, baseUrl } from './client'
 
 export const loginUrl = `${baseUrl}/auth/login`
+
+// The server sends the browser back to returnTo once Discord login finishes; home is the default, so it needs no param.
+export function loginUrlFor(returnTo: string): string {
+  return returnTo === '/' ? loginUrl : `${loginUrl}?returnTo=${encodeURIComponent(returnTo)}`
+}
+
 // A plain anchor target, like loginUrl: the server has to answer it so it can redirect to Battle.net.
 export const battlenetLinkUrl = `${baseUrl}/auth/battlenet/link`
 

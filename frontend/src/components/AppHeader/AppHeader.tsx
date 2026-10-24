@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { loginUrl, logout } from '../../api/auth'
+import { logout } from '../../api/auth'
 import { navItems } from '../../app/navigation'
 import logo144 from '../../assets/logo-144.webp'
 import logo48 from '../../assets/logo-48.webp'
 import logo96 from '../../assets/logo-96.webp'
 import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
+import { useLoginUrl } from '../../hooks/useLoginUrl'
 import styles from './AppHeader.module.css'
 
 export function AppHeader() {
@@ -72,6 +73,7 @@ export function AppHeader() {
 
 function AccountMenu() {
   const currentUser = useCurrentUser()
+  const loginUrl = useLoginUrl()
   const queryClient = useQueryClient()
   const logoutMutation = useMutation({
     mutationFn: logout,
