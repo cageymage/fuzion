@@ -32,6 +32,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/surveys"
 	"github.com/cageymage/fuzion/backend/internal/turnstile"
 	"github.com/cageymage/fuzion/backend/internal/youtube"
 )
@@ -138,6 +139,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 		ClientSecret: DiscordClientSecret,
 		RedirectURL:  DiscordRedirectURL,
 		BaseURL:      discord.URL,
+		GuildID:      DiscordGuildID,
 	}, discord.Client())
 
 	fakeBattleNet := NewFakeBattleNet(t)
@@ -162,6 +164,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), suggestedVideos),
+		Surveys:        surveys.NewHandler(surveys.NewService(surveys.NewRepo(db), clock.Fixed(FixedNow))),
 		AllowedOrigins: []string{"http://localhost:5173"},
 	})
 
@@ -235,6 +238,7 @@ func NewMiddlewareProbeServer(t *testing.T, db *sqlx.DB) *Server {
 		ClientSecret: DiscordClientSecret,
 		RedirectURL:  DiscordRedirectURL,
 		BaseURL:      discord.URL,
+		GuildID:      DiscordGuildID,
 	}, discord.Client())
 	authHandler := auth.NewHandler(auth.NewService(provider, auth.NewRepo(db)))
 

@@ -21,16 +21,17 @@ var (
 const uniqueViolationCode = "23505"
 
 type User struct {
-	ID           uuid.UUID `db:"id"`
-	DiscordID    string    `db:"discord_id"`
-	Username     string    `db:"username"`
-	AvatarURL    *string   `db:"avatar_url"`
-	BattleNetID  *string   `db:"battlenet_id"`
-	BattleNetTag *string   `db:"battlenet_tag"`
-	IsAdmin      bool      `db:"is_admin"`
-	IsOfficer    bool      `db:"is_officer"`
-	CreatedAt    time.Time `db:"created_at"`
-	LastSeenAt   time.Time `db:"last_seen_at"`
+	ID              uuid.UUID `db:"id"`
+	DiscordID       string    `db:"discord_id"`
+	Username        string    `db:"username"`
+	AvatarURL       *string   `db:"avatar_url"`
+	BattleNetID     *string   `db:"battlenet_id"`
+	BattleNetTag    *string   `db:"battlenet_tag"`
+	IsAdmin         bool      `db:"is_admin"`
+	IsOfficer       bool      `db:"is_officer"`
+	InDiscordServer bool      `db:"in_discord_server"`
+	CreatedAt       time.Time `db:"created_at"`
+	LastSeenAt      time.Time `db:"last_seen_at"`
 }
 
 // HasOfficerAccess is the effective officer permission: admins get
@@ -56,13 +57,14 @@ func (r *Repo) UpsertUserByDiscordID(ctx context.Context, identity Identity) (Us
 	// xmax is zero only on a row this statement inserted, which is how an
 	// upsert distinguishes a brand new account from a returning login.
 	const query = `
-		INSERT INTO users (id, discord_id, username, avatar_url, is_admin)
-		VALUES ($1, $2, $3, $4, NOT EXISTS (SELECT 1 FROM users))
+		INSERT INTO users (id, discord_id, username, avatar_url, in_discord_server, is_admin)
+		VALUES ($1, $2, $3, $4, $5, NOT EXISTS (SELECT 1 FROM users))
 		ON CONFLICT (discord_id) DO UPDATE
 			SET username = EXCLUDED.username,
 			    avatar_url = EXCLUDED.avatar_url,
+			    in_discord_server = EXCLUDED.in_discord_server,
 			    last_seen_at = now()
-		RETURNING id, discord_id, username, avatar_url, battlenet_id, battlenet_tag, is_admin, is_officer, created_at, last_seen_at,
+		RETURNING id, discord_id, username, avatar_url, battlenet_id, battlenet_tag, is_admin, is_officer, in_discord_server, created_at, last_seen_at,
 		          (xmax = 0 AND is_admin) AS granted_first_admin`
 
 	var avatarURL *string
@@ -74,7 +76,7 @@ func (r *Repo) UpsertUserByDiscordID(ctx context.Context, identity Identity) (Us
 		User
 		GrantedFirstAdmin bool `db:"granted_first_admin"`
 	}
-	if err := r.db.GetContext(ctx, &row, query, uuid.New(), identity.ProviderUserID, identity.Username, avatarURL); err != nil {
+	if err := r.db.GetContext(ctx, &row, query, uuid.New(), identity.ProviderUserID, identity.Username, avatarURL, identity.InDiscordServer); err != nil {
 		return User{}, false, fmt.Errorf("upsert user by discord id: %w", err)
 	}
 	return row.User.utc(), row.GrantedFirstAdmin, nil
@@ -153,7 +155,7 @@ func (r *Repo) CreateSession(ctx context.Context, token string, userID uuid.UUID
 
 func (r *Repo) FindSession(ctx context.Context, token string) (User, error) {
 	const query = `
-		SELECT u.id, u.discord_id, u.username, u.avatar_url, u.battlenet_id, u.battlenet_tag, u.is_admin, u.is_officer, u.created_at, u.last_seen_at
+		SELECT u.id, u.discord_id, u.username, u.avatar_url, u.battlenet_id, u.battlenet_tag, u.is_admin, u.is_officer, u.in_discord_server, u.created_at, u.last_seen_at
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		WHERE s.token = $1 AND s.expires_at > now()`

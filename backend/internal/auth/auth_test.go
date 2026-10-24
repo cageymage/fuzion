@@ -331,3 +331,48 @@ func TestAuthLogout_ReturnsNoContent_WhenNobodyIsLoggedIn(t *testing.T) {
 	// then I expect a 204
 	resp.RequireStatus(t, 204)
 }
+
+func TestAuthCallback_StoresServerMembership_WhenUserIsInTheGuildServer(t *testing.T) {
+	// given a login by someone who is in the guild's Discord server
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	state := startLogin(t, srv)
+	srv.Discord.GrantCode("code-1", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane", Guilds: []string{testutil.DiscordGuildID}})
+
+	// when Discord sends the browser back with the code
+	resp := srv.Get(t, "/api/auth/callback?code=code-1&state="+state)
+
+	// then I expect the user row to be flagged as in the server
+	resp.RequireStatus(t, 302)
+	var inServer bool
+	if err := db.Get(&inServer, `SELECT in_discord_server FROM users WHERE discord_id = '80351110224678912'`); err != nil {
+		t.Fatalf("select in_discord_server: %v", err)
+	}
+	if !inServer {
+		t.Error("expected in_discord_server to be true")
+	}
+}
+
+func TestAuthCallback_ClearsServerMembership_WhenReturningUserHasLeftTheGuildServer(t *testing.T) {
+	// given a user flagged as in the server who has since left it
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO users (id, discord_id, username, in_discord_server)
+		VALUES ('11111111-1111-1111-1111-111111111111', '80351110224678912', 'thundermane', true)`)
+	state := startLogin(t, srv)
+	srv.Discord.GrantCode("code-1", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane", Guilds: []string{"111111111111111111"}})
+
+	// when they log in again
+	resp := srv.Get(t, "/api/auth/callback?code=code-1&state="+state)
+
+	// then I expect the flag to be cleared
+	resp.RequireStatus(t, 302)
+	var inServer bool
+	if err := db.Get(&inServer, `SELECT in_discord_server FROM users WHERE discord_id = '80351110224678912'`); err != nil {
+		t.Fatalf("select in_discord_server: %v", err)
+	}
+	if inServer {
+		t.Error("expected in_discord_server to be false")
+	}
+}
