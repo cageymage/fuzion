@@ -1,0 +1,18 @@
+.page {
+  padding: 28px var(--gutter) 40px;
+}
+
+.title {
+  margin: 0 0 12px;
+  font-size: 38px;
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: var(--gold);
+  font-size: var(--text-ui);
+  text-decoration: underline;
+  text-decoration-color: rgba(211, 162, 77, 0.5);
+  text-underline-offset: 4px;
+}

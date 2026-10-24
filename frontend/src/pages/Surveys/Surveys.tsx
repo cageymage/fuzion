@@ -2,15 +2,22 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { fetchSurveys } from '../../api/surveys'
 import { Chip } from '../../components/Chip/Chip'
+import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { formatDeadline } from '../../lib/format'
 import styles from './Surveys.module.css'
 
 export function Surveys() {
   const surveys = useQuery({ queryKey: ['surveys'], queryFn: fetchSurveys })
+  const currentUser = useCurrentUser()
 
   return (
     <section className={styles.page}>
       <h1 className={styles.title}>Surveys</h1>
+      {currentUser.data?.isOfficer && (
+        <Link to="/officer/surveys" className={styles.manageLink}>
+          Manage surveys
+        </Link>
+      )}
       {surveys.isPending && <p className={styles.notice}>Loading surveys…</p>}
       {surveys.isError && (
         <p role="alert" className={styles.error}>

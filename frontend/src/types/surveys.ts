@@ -53,3 +53,45 @@ export interface SurveyResults {
   turnout: number
   questions: QuestionResult[]
 }
+
+export type SurveyOptionPreset = 'wow-classes' | 'wow-roles' | 'weekdays'
+
+export interface SurveyQuestionInput {
+  prompt: string
+  type: SurveyQuestionType
+  required: boolean
+  options?: string[]
+  preset?: SurveyOptionPreset
+}
+
+export interface CreateSurveyRequest {
+  title: string
+  description: string
+  closesAt: string
+  questions: SurveyQuestionInput[]
+}
+
+export interface UpdateSurveyRequest {
+  title?: string
+  description?: string
+  closesAt?: string
+  questions?: SurveyQuestionInput[]
+}
+
+export interface OfficerSurveyResponse {
+  id: string
+  discordUsername: string
+  guildName: string
+  inDiscordServer: boolean
+  submittedAt: string
+  updatedAt: string
+  voidedAt: string | null
+  voidedBy: string | null
+  voidReason: string
+  answers: SurveyAnswer[]
+}
+
+export interface VoidSurveyResponseRequest {
+  voided: boolean
+  reason?: string
+}

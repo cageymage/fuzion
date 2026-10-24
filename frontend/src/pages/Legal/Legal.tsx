@@ -26,6 +26,11 @@ export function Legal() {
             session cookie that keeps you logged in.
           </li>
           <li>
+            Discord server check: when you log in, we also ask Discord which servers you are in,
+            only to record whether you are in the guild&apos;s Discord server. We store that yes or
+            no, not the list.
+          </li>
+          <li>
             Battle.net link: if you choose to link Battle.net on your dashboard, your Battle.net ID
             and BattleTag. Unlinking deletes both.
           </li>

@@ -3,7 +3,7 @@ import { fetchSurvey, fetchSurveyResults, submitSurveyResponse } from '../../api
 import { ApiError } from '../../api/client'
 import type { SubmitSurveyRequest } from '../../types/surveys'
 
-const surveyQueryKey = (id: string) => ['survey', id] as const
+export const surveyQueryKey = (id: string) => ['survey', id] as const
 
 function isNotFound(error: unknown): boolean {
   return error instanceof ApiError && error.status === 404

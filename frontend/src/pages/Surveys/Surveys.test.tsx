@@ -35,6 +35,31 @@ describe('Surveys', () => {
     expect(await screen.findByText('No surveys yet.')).toBeInTheDocument()
   })
 
+  it('should link to the officer survey page when the visitor is an officer', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ id: 'user-1', username: 'Officer', avatarUrl: null, isOfficer: true }),
+      ),
+    )
+
+    renderWithProviders(<Surveys />, '/surveys')
+
+    expect(await screen.findByRole('link', { name: 'Manage surveys' })).toHaveAttribute('href', '/officer/surveys')
+  })
+
+  it('should not link to the officer survey page when the visitor is not an officer', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ id: 'user-2', username: 'Member', avatarUrl: null, isOfficer: false }),
+      ),
+    )
+
+    renderWithProviders(<Surveys />, '/surveys')
+
+    await screen.findByRole('link', { name: 'Spring roster' })
+    expect(screen.queryByRole('link', { name: 'Manage surveys' })).not.toBeInTheDocument()
+  })
+
   it('should show an error when the surveys fail to load', async () => {
     server.use(http.get('/api/surveys', () => new HttpResponse(null, { status: 500 })))
 

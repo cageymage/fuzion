@@ -120,6 +120,14 @@ describe('Legal', () => {
     )
   })
 
+  it('should explain the Discord server check at login and what is kept when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      "Discord server check: when you log in, we also ask Discord which servers you are in, only to record whether you are in the guild's Discord server. We store that yes or no, not the list.",
+    )
+  })
+
   it('should state the Blizzard disclaimer when the page renders', () => {
     renderWithProviders(<Legal />)
 

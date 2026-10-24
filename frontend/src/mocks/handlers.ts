@@ -6,7 +6,7 @@ import type { Raid } from '../types/raids'
 import type { ProfessionEntry } from '../types/professions'
 import type { Character } from '../types/roster'
 import type { Stream } from '../types/streams'
-import type { Survey, SurveyResults } from '../types/surveys'
+import type { OfficerSurveyResponse, Survey, SurveyResults } from '../types/surveys'
 
 const newsPosts: NewsPost[] = [
   {
@@ -407,6 +407,39 @@ export const closedSurveyResults: SurveyResults = {
   ],
 }
 
+export const officerSurveyResponses: OfficerSurveyResponse[] = [
+  {
+    id: 'response-1',
+    discordUsername: 'ana',
+    guildName: 'Anaria',
+    inDiscordServer: true,
+    submittedAt: '2026-03-10T12:00:00Z',
+    updatedAt: '2026-03-10T12:00:00Z',
+    voidedAt: null,
+    voidedBy: null,
+    voidReason: '',
+    answers: [
+      { questionId: 'q-class', values: ['Mage'] },
+      { questionId: 'q-nights', values: ['Tuesday', 'Thursday'] },
+    ],
+  },
+  {
+    id: 'response-2',
+    discordUsername: 'ben',
+    guildName: '',
+    inDiscordServer: false,
+    submittedAt: '2026-03-10T13:00:00Z',
+    updatedAt: '2026-03-10T13:00:00Z',
+    voidedAt: '2026-03-11T09:00:00Z',
+    voidedBy: 'Officer',
+    voidReason: 'joke answers',
+    answers: [
+      { questionId: 'q-class', values: ['Priest'] },
+      { questionId: 'q-nights', values: ['Wednesday'] },
+    ],
+  },
+]
+
 export const handlers = [
   http.post('/api/applications', () => HttpResponse.json({ id: 'app-1' }, { status: 201 })),
   http.get('/api/applications', ({ request }) => {
@@ -471,4 +504,8 @@ export const handlers = [
   http.get('/api/surveys/:id', () => HttpResponse.json(openSurvey)),
   http.put('/api/surveys/:id/response', async ({ request }) => HttpResponse.json(await request.json())),
   http.get('/api/surveys/:id/results', () => HttpResponse.json(closedSurveyResults)),
+  http.post('/api/surveys', () => HttpResponse.json(openSurvey, { status: 201 })),
+  http.patch('/api/surveys/:id', () => HttpResponse.json(openSurvey)),
+  http.get('/api/surveys/:id/responses', () => HttpResponse.json(officerSurveyResponses)),
+  http.patch('/api/surveys/:id/responses/:responseId', () => HttpResponse.json(officerSurveyResponses[0])),
 ]

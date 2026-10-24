@@ -1,0 +1,144 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  font-size: var(--text-meta);
+  color: var(--muted);
+}
+
+.field input,
+.field select,
+.field textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.heading {
+  margin: 8px 0 0;
+  font-size: 22px;
+}
+
+.builder {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.questionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 16px;
+}
+
+.questionCard legend {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  font-size: var(--text-meta);
+  color: var(--text);
+}
+
+.checkbox input {
+  margin: 0;
+  accent-color: var(--gold);
+}
+
+.questionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.smallButton {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-meta);
+  cursor: pointer;
+}
+
+.smallButton:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold-hover);
+}
+
+.smallButton:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.button {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--gold);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--gold-soft);
+  color: var(--gold-hover);
+}
+
+.button:disabled {
+  border-color: var(--border-strong);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.notice {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+
+.lockedList {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: var(--text-meta);
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-meta);
+}
