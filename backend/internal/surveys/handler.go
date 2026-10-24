@@ -25,7 +25,7 @@ func (h *Handler) Register(r chi.Router) {
 	r.Get("/surveys", h.list)
 	r.Get("/surveys/{id}", h.get)
 	r.Get("/surveys/{id}/results", h.results)
-	r.With(auth.RequireUser).Put("/surveys/{id}/response", h.submit)
+	r.With(auth.RequireGuildMember).Put("/surveys/{id}/response", h.submit)
 	r.Group(func(officer chi.Router) {
 		officer.Use(auth.RequireOfficer)
 		officer.Post("/surveys", h.create)

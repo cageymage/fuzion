@@ -44,6 +44,7 @@ type meResponse struct {
 	AvatarURL       *string   `json:"avatarUrl"`
 	IsOfficer       bool      `json:"isOfficer"`
 	IsAdmin         bool      `json:"isAdmin"`
+	IsGuildMember   bool      `json:"isGuildMember"`
 	BattleNetLinked bool      `json:"battlenetLinked"`
 	BattleTag       *string   `json:"battletag"`
 }
@@ -122,11 +123,12 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, meResponse{
-		ID:        user.ID,
-		Username:  user.Username,
-		AvatarURL: user.AvatarURL,
-		IsOfficer: user.HasOfficerAccess(),
-		IsAdmin:   user.IsAdmin,
+		ID:            user.ID,
+		Username:      user.Username,
+		AvatarURL:     user.AvatarURL,
+		IsOfficer:     user.HasOfficerAccess(),
+		IsAdmin:       user.IsAdmin,
+		IsGuildMember: user.IsGuildMember,
 
 		BattleNetLinked: user.BattleNetID != nil,
 		BattleTag:       user.BattleNetTag,

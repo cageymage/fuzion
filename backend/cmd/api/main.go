@@ -62,7 +62,7 @@ func run() error {
 	defer db.Close()
 
 	if cfg.discord.guildID == "" {
-		slog.Info("discord server membership flag disabled: DISCORD_GUILD_ID is not set")
+		slog.Warn("discord server membership check disabled, every logged-in user counts as a guild member: DISCORD_GUILD_ID is not set")
 	}
 	discord := auth.NewDiscord(auth.DiscordConfig{
 		ClientID:     cfg.discord.clientID,
@@ -72,8 +72,8 @@ func run() error {
 		BaseURL:      auth.DiscordAPIBaseURL,
 	}, &http.Client{Timeout: 10 * time.Second})
 
+	authOptions := []auth.ServiceOption{auth.WithDiscordServerMembership(cfg.discord.guildID)}
 	// Assign only when configured: a typed-nil *BattleNet in the option would read as enabled.
-	var authOptions []auth.ServiceOption
 	if cfg.battleNet.enabled() {
 		authOptions = append(authOptions, auth.WithBattleNet(auth.NewBattleNet(auth.BattleNetConfig{
 			ClientID:     cfg.battleNet.clientID,

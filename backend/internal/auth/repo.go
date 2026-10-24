@@ -32,6 +32,9 @@ type User struct {
 	InDiscordServer bool      `db:"in_discord_server"`
 	CreatedAt       time.Time `db:"created_at"`
 	LastSeenAt      time.Time `db:"last_seen_at"`
+
+	// IsGuildMember is only resolved for session users; see WithDiscordServerMembership.
+	IsGuildMember bool `db:"-"`
 }
 
 // HasOfficerAccess is the effective officer permission: admins get

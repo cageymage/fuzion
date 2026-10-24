@@ -51,8 +51,13 @@ export function Survey() {
       {data.description && <p className={styles.description}>{data.description}</p>}
       {closed ? (
         <SurveyResults surveyId={data.id} />
-      ) : currentUser.isPending ? null : currentUser.data ? (
+      ) : currentUser.isPending ? null : currentUser.data?.isGuildMember ? (
         <SurveyForm survey={data} />
+      ) : currentUser.data ? (
+        <p className={styles.notice}>
+          Only members of the guild Discord server can respond. If you have just joined, log out
+          and back in to refresh your membership.
+        </p>
       ) : (
         <p>
           <a href={loginUrl}>Log in with Discord</a> to respond.
