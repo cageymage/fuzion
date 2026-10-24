@@ -39,6 +39,10 @@ export function updateSurvey(id: string, request: UpdateSurveyRequest): Promise<
   return apiSend<Survey>('PATCH', `/surveys/${id}`, request)
 }
 
+export function addSurveyOption(surveyId: string, questionId: string, option: string): Promise<Survey> {
+  return apiSend<Survey>('POST', `/surveys/${surveyId}/questions/${questionId}/options`, { option })
+}
+
 export function fetchSurveyResponses(id: string): Promise<OfficerSurveyResponse[]> {
   return apiGet<OfficerSurveyResponse[]>(`/surveys/${id}/responses`)
 }

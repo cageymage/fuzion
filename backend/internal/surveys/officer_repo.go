@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +15,9 @@ import (
 var (
 	ErrQuestionsLocked  = errors.New("questions cannot change once responses exist")
 	ErrResponseNotFound = errors.New("response not found")
+	ErrQuestionNotFound = errors.New("question not found")
+	ErrDuplicateOption  = errors.New("option already exists")
+	ErrTooManyOptions   = errors.New("question has the maximum number of options")
 )
 
 type surveyUpdate struct {
@@ -121,6 +125,41 @@ func (r *Repo) UpdateSurvey(ctx context.Context, id uuid.UUID, update surveyUpda
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit update survey: %w", err)
+	}
+	return nil
+}
+
+func (r *Repo) AddOption(ctx context.Context, surveyID, questionID uuid.UUID, option string) (err error) {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin add survey option: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	var options stringList
+	err = tx.GetContext(ctx, &options, `SELECT options FROM survey_questions WHERE id = $1 AND survey_id = $2 FOR UPDATE`, questionID, surveyID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrQuestionNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("lock survey question: %w", err)
+	}
+	if slices.Contains(options, option) {
+		return ErrDuplicateOption
+	}
+	if len(options) >= maxOptions {
+		return ErrTooManyOptions
+	}
+
+	if _, err := tx.ExecContext(ctx, `UPDATE survey_questions SET options = $2 WHERE id = $1`, questionID, append(options, option)); err != nil {
+		return fmt.Errorf("append survey option: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit add survey option: %w", err)
 	}
 	return nil
 }

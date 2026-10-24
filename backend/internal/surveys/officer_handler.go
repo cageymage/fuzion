@@ -46,6 +46,23 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, updated)
 }
 
+func (h *Handler) addOption(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+
+	var req AddOptionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body: must be valid JSON"})
+		return
+	}
+
+	updated, err := h.service.AddOption(r.Context(), chi.URLParam(r, "id"), chi.URLParam(r, "questionId"), req)
+	if err != nil {
+		h.writeError(w, r, "add survey option", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
 func (h *Handler) listResponses(w http.ResponseWriter, r *http.Request) {
 	responses, err := h.service.Responses(r.Context(), chi.URLParam(r, "id"))
 	if err != nil {

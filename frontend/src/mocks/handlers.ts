@@ -534,6 +534,7 @@ export const handlers = [
   http.get('/api/surveys/:id/results', () => HttpResponse.json(closedSurveyResults)),
   http.post('/api/surveys', () => HttpResponse.json(openSurvey, { status: 201 })),
   http.patch('/api/surveys/:id', () => HttpResponse.json(openSurvey)),
+  http.post('/api/surveys/:id/questions/:questionId/options', () => HttpResponse.json(openSurvey)),
   http.get('/api/surveys/:id/live-results', () => HttpResponse.json(liveSurveyResults)),
   http.get('/api/surveys/:id/responses', () => HttpResponse.json(officerSurveyResponses)),
   http.patch('/api/surveys/:id/responses/:responseId', () => HttpResponse.json(officerSurveyResponses[0])),

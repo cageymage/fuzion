@@ -2,6 +2,7 @@ package surveys
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -49,6 +50,10 @@ type UpdateRequest struct {
 	Description *string          `json:"description"`
 	ClosesAt    *time.Time       `json:"closesAt"`
 	Questions   *[]QuestionInput `json:"questions"`
+}
+
+type AddOptionRequest struct {
+	Option string `json:"option"`
 }
 
 type VoidRequest struct {
@@ -133,6 +138,37 @@ func (s *Service) Update(ctx context.Context, rawID string, req UpdateRequest) (
 		return Detail{}, fmt.Errorf("update survey: %w", err)
 	}
 	return s.Get(ctx, rawID, nil)
+}
+
+// AddOption appends to a question's options. Unlike replacing questions it is
+// allowed once responses exist, because every stored answer still names an option that exists.
+func (s *Service) AddOption(ctx context.Context, rawSurveyID, rawQuestionID string, req AddOptionRequest) (Detail, error) {
+	sv, err := s.load(ctx, rawSurveyID)
+	if err != nil {
+		return Detail{}, fmt.Errorf("add survey option: %w", err)
+	}
+	questionID, err := uuid.Parse(rawQuestionID)
+	if err != nil {
+		return Detail{}, ErrQuestionNotFound
+	}
+	if s.closed(sv) {
+		return Detail{}, ErrClosed
+	}
+	option, err := validateOption(req.Option, "option")
+	if err != nil {
+		return Detail{}, err
+	}
+
+	err = s.repo.AddOption(ctx, sv.ID, questionID, option)
+	switch {
+	case errors.Is(err, ErrDuplicateOption):
+		return Detail{}, &ValidationError{Field: "option", Problem: fmt.Sprintf("%q is already an option", option)}
+	case errors.Is(err, ErrTooManyOptions):
+		return Detail{}, &ValidationError{Field: "option", Problem: fmt.Sprintf("a question can have at most %d options", maxOptions)}
+	case err != nil:
+		return Detail{}, fmt.Errorf("add survey option: %w", err)
+	}
+	return s.Get(ctx, rawSurveyID, nil)
 }
 
 func (s *Service) Responses(ctx context.Context, rawID string) ([]OfficerResponse, error) {
@@ -319,16 +355,25 @@ func buildQuestions(inputs []QuestionInput) ([]question, error) {
 	return questions, nil
 }
 
+func validateOption(raw, field string) (string, error) {
+	option := strings.TrimSpace(raw)
+	if option == "" {
+		return "", &ValidationError{Field: field, Problem: "options must not be blank"}
+	}
+	if utf8.RuneCountInString(option) > maxOptionLength {
+		return "", &ValidationError{Field: field, Problem: fmt.Sprintf("options must be at most %d characters each", maxOptionLength)}
+	}
+	return option, nil
+}
+
 func validateOptions(raw []string, field string) ([]string, error) {
 	options := make([]string, len(raw))
-	for i, option := range raw {
-		options[i] = strings.TrimSpace(option)
-		if options[i] == "" {
-			return nil, &ValidationError{Field: field, Problem: "options must not be blank"}
+	for i, rawOption := range raw {
+		option, err := validateOption(rawOption, field)
+		if err != nil {
+			return nil, err
 		}
-		if utf8.RuneCountInString(options[i]) > maxOptionLength {
-			return nil, &ValidationError{Field: field, Problem: fmt.Sprintf("options must be at most %d characters each", maxOptionLength)}
-		}
+		options[i] = option
 	}
 	if len(options) < 2 {
 		return nil, &ValidationError{Field: field, Problem: "at least two options are required"}
