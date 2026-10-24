@@ -6,6 +6,7 @@ import type { Raid } from '../types/raids'
 import type { ProfessionEntry } from '../types/professions'
 import type { Character } from '../types/roster'
 import type { Stream } from '../types/streams'
+import type { Survey, SurveyResults } from '../types/surveys'
 
 const newsPosts: NewsPost[] = [
   {
@@ -346,6 +347,66 @@ export const acceptedApplication: Application = {
 
 const applications = [pendingApplication, acceptedApplication]
 
+export const openSurvey: Survey = {
+  id: 'survey-1',
+  title: 'Spring roster',
+  description: 'Help us plan the raid teams',
+  closesAt: new Date(Date.now() + 5 * 86_400_000).toISOString(),
+  status: 'open',
+  questions: [
+    { id: 'q-class', prompt: 'Class', type: 'single', required: true, options: ['Mage', 'Priest', 'Warrior'] },
+    {
+      id: 'q-secondary',
+      prompt: 'Secondary class',
+      type: 'single',
+      required: false,
+      options: ['Mage', 'Priest', 'Warrior'],
+    },
+    {
+      id: 'q-nights',
+      prompt: 'Raid nights',
+      type: 'multi',
+      required: true,
+      options: ['Tuesday', 'Wednesday', 'Thursday'],
+    },
+  ],
+  myResponse: null,
+}
+
+export const closedSurvey: Survey = {
+  ...openSurvey,
+  closesAt: new Date(Date.now() - 86_400_000).toISOString(),
+  status: 'closed',
+}
+
+export const closedSurveyResults: SurveyResults = {
+  surveyId: 'survey-1',
+  title: 'Spring roster',
+  turnout: 3,
+  questions: [
+    {
+      id: 'q-class',
+      prompt: 'Class',
+      type: 'single',
+      options: [
+        { label: 'Mage', count: 2 },
+        { label: 'Priest', count: 0 },
+        { label: 'Warrior', count: 1 },
+      ],
+    },
+    {
+      id: 'q-nights',
+      prompt: 'Raid nights',
+      type: 'multi',
+      options: [
+        { label: 'Tuesday', count: 3 },
+        { label: 'Wednesday', count: 1 },
+        { label: 'Thursday', count: 0 },
+      ],
+    },
+  ],
+}
+
 export const handlers = [
   http.post('/api/applications', () => HttpResponse.json({ id: 'app-1' }, { status: 201 })),
   http.get('/api/applications', ({ request }) => {
@@ -402,4 +463,12 @@ export const handlers = [
   http.get('/api/streams/suggested-video', () =>
     HttpResponse.json({ id: 'vid-1', title: 'Queen Ansurek kill' }),
   ),
+  http.get('/api/surveys', () =>
+    HttpResponse.json([
+      { id: openSurvey.id, title: openSurvey.title, closesAt: openSurvey.closesAt, status: 'open' },
+    ]),
+  ),
+  http.get('/api/surveys/:id', () => HttpResponse.json(openSurvey)),
+  http.put('/api/surveys/:id/response', async ({ request }) => HttpResponse.json(await request.json())),
+  http.get('/api/surveys/:id/results', () => HttpResponse.json(closedSurveyResults)),
 ]

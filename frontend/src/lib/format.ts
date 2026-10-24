@@ -46,3 +46,13 @@ export function formatRaidDay(isoDate: string): string {
 export function formatRaidTime(isoDate: string): string {
   return new Date(isoDate).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
+
+export function formatDeadline(isoDate: string): string {
+  return new Date(isoDate).toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}

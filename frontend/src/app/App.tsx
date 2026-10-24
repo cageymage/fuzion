@@ -18,6 +18,8 @@ import { Professions } from '../pages/Professions/Professions'
 import { RaidProgress } from '../pages/RaidProgress/RaidProgress'
 import { Roster } from '../pages/Roster/Roster'
 import { Streams } from '../pages/Streams/Streams'
+import { Survey } from '../pages/Survey/Survey'
+import { Surveys } from '../pages/Surveys/Surveys'
 import styles from './App.module.css'
 import { navItems } from './navigation'
 
@@ -64,6 +66,8 @@ export function App() {
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/streams" element={<Streams />} />
             <Route path="/applications" element={<Applications />} />
+            <Route path="/surveys" element={<Surveys />} />
+            <Route path="/surveys/:id" element={<Survey />} />
             <Route path="/professions" element={<Professions />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/about" element={<About />} />

@@ -112,6 +112,14 @@ describe('Legal', () => {
     )
   })
 
+  it('should describe the survey data stored and who can see it when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'Survey responses: your answers, the guild name you optionally enter, and your Discord username at the time you respond. Officers can see these per person, and the public results show totals only.',
+    )
+  })
+
   it('should state the Blizzard disclaimer when the page renders', () => {
     renderWithProviders(<Legal />)
 
