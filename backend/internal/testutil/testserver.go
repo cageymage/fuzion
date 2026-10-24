@@ -71,6 +71,13 @@ type serverOptions struct {
 	announcementsWebhook bool
 	turnstile            bool
 	raidHelperWebhookKey string
+	discordGuildID       string
+}
+
+// WithoutDiscordGuild builds the server the way a deploy without
+// DISCORD_GUILD_ID runs: every logged-in user counts as a guild member.
+func WithoutDiscordGuild() ServerOption {
+	return func(o *serverOptions) { o.discordGuildID = "" }
 }
 
 // WithoutRaidHelperWebhook builds the server the way a deploy without
@@ -106,7 +113,7 @@ func WithoutYouTubePlaylist() ServerOption {
 func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	t.Helper()
 
-	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey}
+	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey, discordGuildID: DiscordGuildID}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -139,7 +146,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 		ClientSecret: DiscordClientSecret,
 		RedirectURL:  DiscordRedirectURL,
 		BaseURL:      discord.URL,
-		GuildID:      DiscordGuildID,
+		GuildID:      options.discordGuildID,
 	}, discord.Client())
 
 	fakeBattleNet := NewFakeBattleNet(t)
@@ -155,7 +162,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting, verifier, SiteBaseURL)),
-		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), auth.WithBattleNet(battleNet))),
+		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), auth.WithDiscordServerMembership(options.discordGuildID), auth.WithBattleNet(battleNet))),
 		Images:        images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL), shell),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
@@ -187,8 +194,9 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 type LoginOption func(*loginOptions)
 
 type loginOptions struct {
-	isOfficer bool
-	isAdmin   bool
+	isOfficer       bool
+	isAdmin         bool
+	inDiscordServer bool
 }
 
 // AsOfficer grants the logged-in user officer access.
@@ -196,6 +204,9 @@ func AsOfficer() LoginOption { return func(o *loginOptions) { o.isOfficer = true
 
 // AsAdmin grants the logged-in user admin (and therefore officer) access.
 func AsAdmin() LoginOption { return func(o *loginOptions) { o.isAdmin = true } }
+
+// InDiscordServer marks the logged-in user as a member of the guild's Discord server.
+func InDiscordServer() LoginOption { return func(o *loginOptions) { o.inDiscordServer = true } }
 
 // LoginAs inserts a user and a live session for them straight into the
 // database and puts the session cookie in the client's jar, so a test can act
@@ -210,10 +221,10 @@ func (s *Server) LoginAs(t *testing.T, discordID, username string, opts ...Login
 
 	var user auth.User
 	err := s.db.Get(&user, `
-		INSERT INTO users (id, discord_id, username, is_officer, is_admin)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, discord_id, username, avatar_url, is_officer, is_admin, created_at, last_seen_at`,
-		uuid.New(), discordID, username, options.isOfficer, options.isAdmin)
+		INSERT INTO users (id, discord_id, username, is_officer, is_admin, in_discord_server)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, discord_id, username, avatar_url, is_officer, is_admin, in_discord_server, created_at, last_seen_at`,
+		uuid.New(), discordID, username, options.isOfficer, options.isAdmin, options.inDiscordServer)
 	if err != nil {
 		t.Fatalf("insert user %q: %v", username, err)
 	}
@@ -240,7 +251,7 @@ func NewMiddlewareProbeServer(t *testing.T, db *sqlx.DB) *Server {
 		BaseURL:      discord.URL,
 		GuildID:      DiscordGuildID,
 	}, discord.Client())
-	authHandler := auth.NewHandler(auth.NewService(provider, auth.NewRepo(db)))
+	authHandler := auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), auth.WithDiscordServerMembership(DiscordGuildID)))
 
 	r := chi.NewRouter()
 	r.Use(authHandler.Middleware)

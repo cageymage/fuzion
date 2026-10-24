@@ -3,6 +3,7 @@ export interface AuthUser {
   username: string
   avatarUrl: string | null
   isOfficer: boolean
+  isGuildMember: boolean
   battlenetLinked: boolean
   battletag: string | null
 }

@@ -20,9 +20,18 @@ type Service struct {
 	provider  Provider
 	battleNet Provider
 	repo      *Repo
+
+	requireDiscordServer bool
 }
 
 type ServiceOption func(*Service)
+
+// WithDiscordServerMembership makes guild membership mean being in the Discord
+// server the provider checks at login. With an empty guildID there is no server
+// to check against, so every logged-in user counts as a guild member.
+func WithDiscordServerMembership(guildID string) ServiceOption {
+	return func(s *Service) { s.requireDiscordServer = guildID != "" }
+}
 
 // WithBattleNet enables account linking. Assign only a non-nil provider: a
 // typed-nil in the interface would read as configured.
@@ -104,6 +113,7 @@ func (s *Service) UserBySession(ctx context.Context, token string) (User, error)
 	if err != nil {
 		return User{}, fmt.Errorf("user by session: %w", err)
 	}
+	user.IsGuildMember = !s.requireDiscordServer || user.InDiscordServer
 	return user, nil
 }
 

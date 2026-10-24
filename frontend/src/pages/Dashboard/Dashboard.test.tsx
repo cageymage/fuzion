@@ -12,6 +12,7 @@ const unlinkedMember: AuthUser = {
   username: 'thundermane',
   avatarUrl: null,
   isOfficer: false,
+  isGuildMember: true,
   battlenetLinked: false,
   battletag: null,
 }

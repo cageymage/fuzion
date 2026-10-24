@@ -11,7 +11,7 @@ import { renderWithProviders } from '../../testUtils'
 import type { Survey as SurveyData } from '../../types/surveys'
 import { Survey } from './Survey'
 
-const member = { id: 'user-2', username: 'Member', avatarUrl: null, isOfficer: false }
+const member = { id: 'user-2', username: 'Member', avatarUrl: null, isOfficer: false, isGuildMember: true }
 
 function signInAsMember() {
   server.use(http.get('/api/auth/me', () => HttpResponse.json(member)))
@@ -50,6 +50,19 @@ describe('Survey', () => {
     renderSurveyPage()
 
     expect(await screen.findByRole('link', { name: 'Log in with Discord' })).toHaveAttribute('href', loginUrl)
+    expect(screen.queryByRole('button', { name: 'Submit response' })).not.toBeInTheDocument()
+  })
+
+  it('should show a members-only notice instead of the form when the user is not a guild member', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ ...member, isGuildMember: false })))
+
+    renderSurveyPage()
+
+    expect(
+      await screen.findByText(
+        'Only members of the guild Discord server can respond. If you have just joined, log out and back in to refresh your membership.',
+      ),
+    ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Submit response' })).not.toBeInTheDocument()
   })
 

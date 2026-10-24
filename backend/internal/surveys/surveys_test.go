@@ -112,7 +112,7 @@ func TestGetSurvey_IncludesMyResponse_WhenCallerHasAlreadyResponded(t *testing.T
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
 	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
-	srv.LoginAs(t, "80351110224678912", "thundermane")
+	srv.LoginAs(t, "80351110224678912", "thundermane", testutil.InDiscordServer())
 	srv.Put(t, "/api/surveys/"+openSurveyID+"/response", map[string]any{
 		"guildName": "Thunder",
 		"answers": []map[string]any{
@@ -184,13 +184,69 @@ func TestSubmitResponse_ReturnsUnauthorized_WhenCallerIsNotLoggedIn(t *testing.T
 	resp.RequireStatus(t, 401)
 }
 
+func TestSubmitResponse_ReturnsForbidden_WhenCallerIsNotInTheDiscordServer(t *testing.T) {
+	// given an open survey and a logged-in user who is not in the guild's Discord server
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
+	srv.LoginAs(t, "80351110224678912", "thundermane")
+
+	// when I submit valid answers
+	resp := srv.Put(t, "/api/surveys/"+openSurveyID+"/response", map[string]any{
+		"answers": []map[string]any{
+			{"questionId": openQuestions.class, "values": []string{"Mage"}},
+			{"questionId": openQuestions.nights, "values": []string{"Tuesday"}},
+		},
+	})
+
+	// then I expect a 403 and nothing saved
+	resp.RequireStatus(t, 403)
+	var body map[string]string
+	resp.DecodeJSON(t, &body)
+	if diff := cmp.Diff(map[string]string{"error": "guild discord server membership required"}, body); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+	var count int
+	if err := db.Get(&count, `SELECT count(*) FROM survey_responses`); err != nil {
+		t.Fatalf("count responses: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected no responses saved, got %d", count)
+	}
+}
+
+func TestSubmitResponse_SavesResponse_WhenNoDiscordGuildIsConfigured(t *testing.T) {
+	// given a deploy without DISCORD_GUILD_ID and a logged-in user with no server membership recorded
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db, testutil.WithoutDiscordGuild())
+	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
+	srv.LoginAs(t, "80351110224678912", "thundermane")
+
+	// when I submit valid answers
+	resp := srv.Put(t, "/api/surveys/"+openSurveyID+"/response", map[string]any{
+		"answers": []map[string]any{
+			{"questionId": openQuestions.class, "values": []string{"Mage"}},
+			{"questionId": openQuestions.nights, "values": []string{"Tuesday"}},
+		},
+	})
+
+	// then I expect the response saved
+	resp.RequireStatus(t, 200)
+	var count int
+	if err := db.Get(&count, `SELECT count(*) FROM survey_responses`); err != nil {
+		t.Fatalf("count responses: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 response saved, got %d", count)
+	}
+}
+
 func TestSubmitResponse_SavesResponseWithDiscordSnapshot_WhenAnswersAreValid(t *testing.T) {
 	// given a logged-in member who is in the Discord server and an open survey
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
 	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
-	user := srv.LoginAs(t, "80351110224678912", "thundermane")
-	db.MustExec(`UPDATE users SET in_discord_server = true WHERE id = $1`, user.ID)
+	srv.LoginAs(t, "80351110224678912", "thundermane", testutil.InDiscordServer())
 
 	// when I submit answers and a guild name
 	resp := srv.Put(t, "/api/surveys/"+openSurveyID+"/response", map[string]any{
@@ -246,7 +302,7 @@ func TestSubmitResponse_StoresNoAnswer_WhenOptionalQuestionIsLeftOut(t *testing.
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
 	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
-	srv.LoginAs(t, "80351110224678912", "thundermane")
+	srv.LoginAs(t, "80351110224678912", "thundermane", testutil.InDiscordServer())
 
 	// when I answer only the required questions
 	resp := srv.Put(t, "/api/surveys/"+openSurveyID+"/response", map[string]any{
@@ -273,7 +329,7 @@ func TestSubmitResponse_ReplacesEarlierAnswers_WhenCallerSubmitsAgainBeforeTheDe
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
 	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
-	srv.LoginAs(t, "80351110224678912", "thundermane")
+	srv.LoginAs(t, "80351110224678912", "thundermane", testutil.InDiscordServer())
 	srv.Put(t, "/api/surveys/"+openSurveyID+"/response", map[string]any{
 		"guildName": "Thunder",
 		"answers": []map[string]any{
@@ -316,7 +372,7 @@ func TestSubmitResponse_ClearsVoid_WhenVoidedMemberSubmitsAgain(t *testing.T) {
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
 	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
-	user := srv.LoginAs(t, "80351110224678912", "thundermane")
+	user := srv.LoginAs(t, "80351110224678912", "thundermane", testutil.InDiscordServer())
 	srv.Put(t, "/api/surveys/"+openSurveyID+"/response", map[string]any{
 		"answers": []map[string]any{
 			{"questionId": openQuestions.class, "values": []string{"Mage"}},
@@ -349,7 +405,7 @@ func TestSubmitResponse_ReturnsConflict_WhenSurveyHasClosed(t *testing.T) {
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
 	insertSurvey(t, db, closedSurveyID, "Winter plans", closedInThePast)
-	srv.LoginAs(t, "80351110224678912", "thundermane")
+	srv.LoginAs(t, "80351110224678912", "thundermane", testutil.InDiscordServer())
 
 	// when I submit a response
 	resp := srv.Put(t, "/api/surveys/"+closedSurveyID+"/response", map[string]any{
@@ -379,7 +435,7 @@ func TestSubmitResponse_ReturnsNotFound_WhenSurveyDoesNotExist(t *testing.T) {
 	// given a logged-in member and no surveys
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
-	srv.LoginAs(t, "80351110224678912", "thundermane")
+	srv.LoginAs(t, "80351110224678912", "thundermane", testutil.InDiscordServer())
 
 	// when I submit a response to a survey nobody created
 	resp := srv.Put(t, "/api/surveys/"+openSurveyID+"/response", map[string]any{"answers": []any{}})
@@ -458,7 +514,7 @@ func TestSubmitResponse_ReturnsBadRequest_WhenRequestIsRejected(t *testing.T) {
 			db := testutil.DB(t)
 			srv := testutil.NewServer(t, db)
 			insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
-			srv.LoginAs(t, "80351110224678912", "thundermane")
+			srv.LoginAs(t, "80351110224678912", "thundermane", testutil.InDiscordServer())
 
 			// when I submit the response
 			resp := srv.Put(t, "/api/surveys/"+openSurveyID+"/response", map[string]any{"guildName": tt.guildName, "answers": tt.answers})

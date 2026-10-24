@@ -12,6 +12,7 @@ const thundermane: AuthUser = {
   username: 'thundermane',
   avatarUrl: 'https://cdn.discordapp.com/avatars/80351110224678912/abc.png',
   isOfficer: false,
+  isGuildMember: true,
   battlenetLinked: false,
   battletag: null,
 }
@@ -29,7 +30,7 @@ describe('AppHeader', () => {
     expect(brand.querySelector('img')).toHaveAttribute('alt', '')
   })
 
-  it('should render a link for every navigation item', () => {
+  it('should render a link for every public navigation item', () => {
     renderWithProviders(<AppHeader />)
 
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/')
@@ -93,6 +94,39 @@ describe('AppHeader', () => {
       'http://localhost:3000/api/auth/login',
     )
     expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument()
+  })
+
+  it('should hide the surveys link when nobody is logged in', async () => {
+    renderWithProviders(<AppHeader />)
+
+    await screen.findByRole('link', { name: 'Log in with Discord' })
+    expect(screen.queryByRole('link', { name: 'Surveys' })).not.toBeInTheDocument()
+  })
+
+  it('should hide the surveys link while the current user is still loading', () => {
+    server.use(http.get('/api/auth/me', () => new Promise<never>(() => {})))
+
+    renderWithProviders(<AppHeader />)
+
+    expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Surveys' })).not.toBeInTheDocument()
+  })
+
+  it('should show the surveys link when a guild member is logged in', async () => {
+    loggedInAs(thundermane)
+
+    renderWithProviders(<AppHeader />)
+
+    expect(await screen.findByRole('link', { name: 'Surveys' })).toHaveAttribute('href', '/surveys')
+  })
+
+  it('should hide the surveys link when the logged-in user is not in the guild Discord server', async () => {
+    loggedInAs({ ...thundermane, isGuildMember: false })
+
+    renderWithProviders(<AppHeader />)
+
+    await screen.findByText('thundermane')
+    expect(screen.queryByRole('link', { name: 'Surveys' })).not.toBeInTheDocument()
   })
 
   it('should show the username when a member is logged in', async () => {

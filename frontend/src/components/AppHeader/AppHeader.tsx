@@ -13,6 +13,8 @@ export function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const navId = useId()
+  const isGuildMember = useCurrentUser().data?.isGuildMember ?? false
+  const visibleNavItems = navItems.filter((item) => !item.guildMembersOnly || isGuildMember)
 
   function closeMenuOnEscape(event: KeyboardEvent) {
     if (event.key === 'Escape' && menuOpen) {
@@ -49,7 +51,7 @@ export function AppHeader() {
         className={menuOpen ? `${styles.nav} ${styles.navOpen}` : styles.nav}
         aria-label="Main"
       >
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}

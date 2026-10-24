@@ -28,7 +28,7 @@ export function Legal() {
           <li>
             Discord server check: when you log in, we also ask Discord which servers you are in,
             only to record whether you are in the guild&apos;s Discord server. We store that yes or
-            no, not the list.
+            no, not the list, and use it to decide who can answer guild surveys.
           </li>
           <li>
             Battle.net link: if you choose to link Battle.net on your dashboard, your Battle.net ID

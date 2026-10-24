@@ -20,7 +20,8 @@ func TestMain(m *testing.M) {
 type meJSON struct {
 	ID        string  `json:"id"`
 	Username  string  `json:"username"`
-	AvatarURL *string `json:"avatarUrl"`
+	AvatarURL     *string `json:"avatarUrl"`
+	IsGuildMember bool    `json:"isGuildMember"`
 }
 
 type userRow struct {
@@ -253,6 +254,63 @@ func TestAuthMe_ReturnsCurrentUser_WhenSessionCookieIsValid(t *testing.T) {
 	var me meJSON
 	resp.DecodeJSON(t, &me)
 	want := meJSON{ID: user.ID.String(), Username: "thundermane", AvatarURL: nil}
+	if diff := cmp.Diff(want, me); diff != "" {
+		t.Errorf("unexpected /me response (-want +got):\n%s", diff)
+	}
+}
+
+func TestAuthMe_ReportsGuildMember_WhenUserIsInTheDiscordServer(t *testing.T) {
+	// given a logged-in user who is in the guild's Discord server
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	user := srv.LoginAs(t, "80351110224678912", "thundermane", testutil.InDiscordServer())
+
+	// when I ask who I am
+	resp := srv.Get(t, "/api/auth/me")
+
+	// then I expect to be reported as a guild member
+	resp.RequireStatus(t, 200)
+	var me meJSON
+	resp.DecodeJSON(t, &me)
+	want := meJSON{ID: user.ID.String(), Username: "thundermane", AvatarURL: nil, IsGuildMember: true}
+	if diff := cmp.Diff(want, me); diff != "" {
+		t.Errorf("unexpected /me response (-want +got):\n%s", diff)
+	}
+}
+
+func TestAuthMe_ReportsNotGuildMember_WhenUserIsNotInTheDiscordServer(t *testing.T) {
+	// given a logged-in user who is not in the guild's Discord server
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	user := srv.LoginAs(t, "80351110224678912", "thundermane")
+
+	// when I ask who I am
+	resp := srv.Get(t, "/api/auth/me")
+
+	// then I expect not to be reported as a guild member
+	resp.RequireStatus(t, 200)
+	var me meJSON
+	resp.DecodeJSON(t, &me)
+	want := meJSON{ID: user.ID.String(), Username: "thundermane", AvatarURL: nil, IsGuildMember: false}
+	if diff := cmp.Diff(want, me); diff != "" {
+		t.Errorf("unexpected /me response (-want +got):\n%s", diff)
+	}
+}
+
+func TestAuthMe_ReportsGuildMember_WhenNoDiscordGuildIsConfigured(t *testing.T) {
+	// given a deploy without DISCORD_GUILD_ID and a logged-in user with no server membership recorded
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db, testutil.WithoutDiscordGuild())
+	user := srv.LoginAs(t, "80351110224678912", "thundermane")
+
+	// when I ask who I am
+	resp := srv.Get(t, "/api/auth/me")
+
+	// then I expect to be reported as a guild member
+	resp.RequireStatus(t, 200)
+	var me meJSON
+	resp.DecodeJSON(t, &me)
+	want := meJSON{ID: user.ID.String(), Username: "thundermane", AvatarURL: nil, IsGuildMember: true}
 	if diff := cmp.Diff(want, me); diff != "" {
 		t.Errorf("unexpected /me response (-want +got):\n%s", diff)
 	}

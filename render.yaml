@@ -87,8 +87,9 @@ services:
         sync: false
       # Optional: the guild's Discord server ID (Developer Mode, right-click the
       # server, Copy Server ID). When it is set, login also asks Discord which servers
-      # the user is in (the guilds scope) and records whether one is this server, which
-      # survey officers can filter on. Without it that flag is false for everyone.
+      # the user is in (the guilds scope) and records whether one is this server. Only
+      # members of the server see Surveys or can answer them. Without it every
+      # logged-in user counts as a member.
       - key: DISCORD_GUILD_ID
         sync: false
       # Optional: without BATTLENET_REDIRECT_URL, members cannot link a Battle.net
