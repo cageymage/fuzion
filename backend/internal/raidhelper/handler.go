@@ -18,6 +18,13 @@ const eventTypeHeader = "X-Raidhelper-Event"
 // A real event body is about 21 KB; the limit leaves room for large signup lists.
 const maxBodyBytes = 1 << 20
 
+// Raid-Helper's webhook settings cover the whole Discord server, with no way to pick
+// a channel, so every event arrives here and the channel decides what happens to it.
+const (
+	foreverRaidPlanningChannelID = "1270113143124660246"
+	retailRaidPlanningChannelID  = "1281325821813985391"
+)
+
 type Handler struct {
 	service    *Service
 	webhookKey string
@@ -60,6 +67,19 @@ func (h *Handler) receive(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body is not a raid-helper event"})
 		return
 	}
+
+	// Ignored events still get a 200 so Raid-Helper does not retry them.
+	switch event.ChannelID {
+	case foreverRaidPlanningChannelID:
+	case retailRaidPlanningChannelID:
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ignored"})
+		return
+	default:
+		slog.InfoContext(r.Context(), "raid-helper webhook from unknown channel ignored", "channelId", event.ChannelID, "channelName", event.ChannelName)
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ignored"})
+		return
+	}
+
 	if err := apply(r.Context(), event); err != nil {
 		if errors.Is(err, ErrInvalidEvent) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
