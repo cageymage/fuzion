@@ -1,14 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createSurvey, fetchSurveyResponses, updateSurvey, voidSurveyResponse } from '../api/surveys'
+import {
+  createSurvey,
+  fetchLiveSurveyResults,
+  fetchSurveyResponses,
+  updateSurvey,
+  voidSurveyResponse,
+} from '../api/surveys'
 import { surveyQueryKey } from '../pages/Survey/useSurvey'
 import type { CreateSurveyRequest, UpdateSurveyRequest, VoidSurveyResponseRequest } from '../types/surveys'
 
 const responsesQueryKey = (id: string) => ['survey-responses', id] as const
+const liveResultsQueryKey = (id: string) => ['survey-live-results', id] as const
 
-export function useSurveyResponses(id: string) {
+const openSurveyRefreshMs = 30_000
+
+export function useLiveSurveyResults(id: string) {
+  return useQuery({
+    queryKey: liveResultsQueryKey(id),
+    queryFn: () => fetchLiveSurveyResults(id),
+    refetchInterval: openSurveyRefreshMs,
+  })
+}
+
+export function useSurveyResponses(id: string, { refresh }: { refresh: boolean }) {
   return useQuery({
     queryKey: responsesQueryKey(id),
     queryFn: () => fetchSurveyResponses(id),
+    refetchInterval: refresh ? openSurveyRefreshMs : false,
   })
 }
 
@@ -46,6 +64,7 @@ export function useVoidSurveyResponse(surveyId: string) {
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: responsesQueryKey(surveyId) }),
+        queryClient.invalidateQueries({ queryKey: liveResultsQueryKey(surveyId) }),
         queryClient.invalidateQueries({ queryKey: ['survey-results', surveyId] }),
       ]),
   })

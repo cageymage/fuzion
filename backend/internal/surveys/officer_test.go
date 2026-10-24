@@ -695,3 +695,77 @@ func TestExportResponses_ReturnsNotFound_WhenSurveyDoesNotExist(t *testing.T) {
 	// then I expect a 404
 	resp.RequireStatus(t, 404)
 }
+
+func TestGetLiveResults_ReturnsForbidden_WhenCallerIsOnlyAMember(t *testing.T) {
+	// given an open survey and a logged-in member
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
+	srv.LoginAs(t, memberDiscordID, "member")
+
+	// when I ask for the live results
+	resp := srv.Get(t, "/api/surveys/"+openSurveyID+"/live-results")
+
+	// then I expect a 403
+	resp.RequireStatus(t, 403)
+}
+
+func TestGetLiveResults_ReturnsNotFound_WhenSurveyDoesNotExist(t *testing.T) {
+	// given a logged-in officer and no surveys
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, officerDiscordID, "officer1", testutil.AsOfficer())
+
+	// when I ask for the live results of a survey nobody created
+	resp := srv.Get(t, "/api/surveys/"+openSurveyID+"/live-results")
+
+	// then I expect a 404 saying the survey was not found
+	resp.RequireStatus(t, 404)
+	var got map[string]string
+	resp.DecodeJSON(t, &got)
+	if diff := cmp.Diff(map[string]string{"error": "survey not found"}, got); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+}
+
+func TestGetLiveResults_ReturnsCountsWithoutVoidedResponses_WhenSurveyIsStillOpen(t *testing.T) {
+	// given an open survey with one ordinary response and one voided response
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	insertSurvey(t, db, openSurveyID, "Spring roster", closesInTheFuture)
+	officer := srv.LoginAs(t, officerDiscordID, "officer1", testutil.AsOfficer())
+	seedTwoResponses(t, db, officer.ID.String())
+
+	// when I ask for the live results
+	resp := srv.Get(t, "/api/surveys/"+openSurveyID+"/live-results")
+
+	// then I expect the turnout and counts of the ordinary response only
+	resp.RequireStatus(t, 200)
+	var got map[string]any
+	resp.DecodeJSON(t, &got)
+	want := map[string]any{
+		"surveyId": openSurveyID,
+		"title":    "Spring roster",
+		"turnout":  float64(1),
+		"questions": []any{
+			map[string]any{"id": openQuestions.class, "prompt": "Class", "type": "single", "options": []any{
+				map[string]any{"label": "Mage", "count": float64(1)},
+				map[string]any{"label": "Priest", "count": float64(0)},
+				map[string]any{"label": "Warrior", "count": float64(0)},
+			}},
+			map[string]any{"id": openQuestions.secondary, "prompt": "Secondary class", "type": "single", "options": []any{
+				map[string]any{"label": "Mage", "count": float64(0)},
+				map[string]any{"label": "Priest", "count": float64(0)},
+				map[string]any{"label": "Warrior", "count": float64(0)},
+			}},
+			map[string]any{"id": openQuestions.nights, "prompt": "Raid nights", "type": "multi", "options": []any{
+				map[string]any{"label": "Tuesday", "count": float64(1)},
+				map[string]any{"label": "Wednesday", "count": float64(0)},
+				map[string]any{"label": "Thursday", "count": float64(1)},
+			}},
+		},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected live results (-want +got):\n%s", diff)
+	}
+}

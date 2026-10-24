@@ -2,11 +2,11 @@ import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { Route, Routes } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { surveyExportUrl } from '../../api/surveys'
 import { toLocalInput } from '../../components/SurveyEditorForm/surveyDraft'
 import { ToastProvider } from '../../components/Toast/Toast'
-import { closedSurvey, openSurvey } from '../../mocks/handlers'
+import { closedSurvey, liveSurveyResults, officerSurveyResponses, openSurvey } from '../../mocks/handlers'
 import { server } from '../../mocks/server'
 import { renderWithProviders } from '../../testUtils'
 import { OfficerSurveyManage } from './OfficerSurveyManage'
@@ -338,6 +338,106 @@ describe('OfficerSurveyManage', () => {
 
     await screen.findByText('2 responses, 1 voided')
     expect(patch.body).toEqual({ voided: false })
+  })
+
+  it('should show the live turnout and counts per option when the survey is open', async () => {
+    await renderForOfficer()
+
+    const results = await screen.findByRole('region', { name: 'Results' })
+    expect(within(results).getByText('2 responses')).toBeInTheDocument()
+    const classQuestion = within(results).getByRole('heading', { name: 'Class' }).closest('section') as HTMLElement
+    expect(within(classQuestion).getByText('Mage')).toBeInTheDocument()
+    expect(within(classQuestion).getAllByText('1 (50%)')).toHaveLength(2)
+    expect(within(classQuestion).getByText('0 (0%)')).toBeInTheDocument()
+  })
+
+  it('should say the live results are provisional when the survey is open', async () => {
+    await renderForOfficer()
+
+    expect(
+      await screen.findByText('This survey is still open, so these results are provisional and refresh automatically.'),
+    ).toBeInTheDocument()
+  })
+
+  it('should not show live results when the survey has closed', async () => {
+    signInAs(officer)
+    server.use(http.get('/api/surveys/:id', () => HttpResponse.json(closedSurvey)))
+
+    renderPage()
+    await screen.findByRole('heading', { name: 'Responses' })
+
+    expect(screen.queryByRole('heading', { name: 'Live results' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Results' })).not.toBeInTheDocument()
+  })
+
+  it('should refresh the live results when the officer restores a voided response', async () => {
+    const user = userEvent.setup()
+    let restored = false
+    server.use(
+      http.patch('/api/surveys/:id/responses/:responseId', () => {
+        restored = true
+        return HttpResponse.json({})
+      }),
+      http.get('/api/surveys/:id/live-results', () =>
+        HttpResponse.json({ ...liveSurveyResults, turnout: restored ? 3 : liveSurveyResults.turnout }),
+      ),
+    )
+    await renderForOfficer()
+    await screen.findByText('2 responses')
+
+    await user.click(await screen.findByRole('button', { name: 'Restore ben' }))
+
+    expect(await screen.findByText('3 responses')).toBeInTheDocument()
+  })
+
+  describe('when 30 seconds pass on an open survey', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('should add people who have responded since to the responses table', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      const newcomer = {
+        ...officerSurveyResponses[0],
+        id: 'response-3',
+        discordUsername: 'cy',
+        voidedAt: null,
+        voidedBy: null,
+        voidReason: '',
+      }
+      let responses = officerSurveyResponses
+      server.use(http.get('/api/surveys/:id/responses', () => HttpResponse.json(responses)))
+      await renderForOfficer()
+      await screen.findByRole('cell', { name: 'ana' })
+      expect(screen.queryByRole('cell', { name: 'cy' })).not.toBeInTheDocument()
+
+      responses = [...officerSurveyResponses, newcomer]
+      await vi.advanceTimersByTimeAsync(30_000)
+
+      expect(await screen.findByRole('cell', { name: 'cy' })).toBeInTheDocument()
+      expect(screen.getByText('3 responses, 1 voided')).toBeInTheDocument()
+    })
+
+    it('should update the live results with the latest turnout', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      let turnout = liveSurveyResults.turnout
+      server.use(http.get('/api/surveys/:id/live-results', () => HttpResponse.json({ ...liveSurveyResults, turnout })))
+      await renderForOfficer()
+      await screen.findByText('2 responses')
+
+      turnout = 3
+      await vi.advanceTimersByTimeAsync(30_000)
+
+      expect(await screen.findByText('3 responses')).toBeInTheDocument()
+    })
+  })
+
+  it('should show an error when the live results fail to load', async () => {
+    server.use(http.get('/api/surveys/:id/live-results', () => new HttpResponse(null, { status: 500 })))
+
+    await renderForOfficer()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The results could not be loaded.')
   })
 
   it('should show an error when the survey fails to load', async () => {
