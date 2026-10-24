@@ -1,0 +1,66 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 640px;
+}
+
+.notice {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 160px;
+  font-size: var(--text-meta);
+  color: var(--muted);
+}
+
+.field input,
+.field select {
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.button {
+  padding: 8px 14px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--gold);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--gold-soft);
+  color: var(--gold-hover);
+}
+
+.button:disabled {
+  border-color: var(--border-strong);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-meta);
+}

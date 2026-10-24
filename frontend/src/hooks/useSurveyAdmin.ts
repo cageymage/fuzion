@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  addSurveyOption,
   createSurvey,
   fetchLiveSurveyResults,
   fetchSurveyResponses,
@@ -48,6 +49,21 @@ export function useUpdateSurvey(id: string) {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: surveyQueryKey(id) }),
         queryClient.invalidateQueries({ queryKey: ['surveys'] }),
+        queryClient.invalidateQueries({ queryKey: ['survey-results', id] }),
+      ]),
+  })
+}
+
+export function useAddSurveyOption(id: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (variables: { questionId: string; option: string }) =>
+      addSurveyOption(id, variables.questionId, variables.option),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: surveyQueryKey(id) }),
+        queryClient.invalidateQueries({ queryKey: liveResultsQueryKey(id) }),
         queryClient.invalidateQueries({ queryKey: ['survey-results', id] }),
       ]),
   })

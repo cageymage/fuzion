@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { surveyExportUrl } from '../../api/surveys'
 import { Dialog } from '../../components/Dialog/Dialog'
 import { OfficerOnly } from '../../components/OfficerOnly/OfficerOnly'
+import { SurveyAddOption } from '../../components/SurveyAddOption/SurveyAddOption'
 import { SurveyEditorForm } from '../../components/SurveyEditorForm/SurveyEditorForm'
 import {
   draftFromSurvey,
@@ -11,7 +12,7 @@ import {
   type SurveyDraft,
 } from '../../components/SurveyEditorForm/surveyDraft'
 import { useToast } from '../../components/Toast/Toast'
-import { useSurveyResponses, useUpdateSurvey } from '../../hooks/useSurveyAdmin'
+import { useAddSurveyOption, useSurveyResponses, useUpdateSurvey } from '../../hooks/useSurveyAdmin'
 import { useSurvey } from '../Survey/useSurvey'
 import { LiveResults } from './LiveResults'
 import styles from './OfficerSurveyManage.module.css'
@@ -22,6 +23,7 @@ function ManageSurvey() {
   const survey = useSurvey(id)
   const responses = useSurveyResponses(id, { refresh: survey.data?.status === 'open' })
   const update = useUpdateSurvey(id)
+  const addOption = useAddSurveyOption(id)
   const { showToast } = useToast()
   const [confirmingClose, setConfirmingClose] = useState(false)
   const [missingDeadline, setMissingDeadline] = useState(false)
@@ -65,6 +67,11 @@ function ManageSurvey() {
       },
       { onSuccess: () => showToast('Survey saved') },
     )
+  }
+
+  const handleAddOption = async (questionId: string, option: string) => {
+    await addOption.mutateAsync({ questionId, option })
+    showToast('Option added')
   }
 
   const closeNow = () => {
@@ -112,6 +119,18 @@ function ManageSurvey() {
         error={saveError}
         onSubmit={handleSave}
       />
+
+      {questionsLocked && data.status === 'open' && (
+        <>
+          <h2 className={styles.heading}>Add an option</h2>
+          <SurveyAddOption
+            questions={data.questions}
+            pending={addOption.isPending}
+            error={addOption.error?.message ?? null}
+            onSubmit={handleAddOption}
+          />
+        </>
+      )}
 
       <h2 className={styles.heading}>Responses</h2>
       {responses.isPending && <p className={styles.notice}>Loading responses…</p>}

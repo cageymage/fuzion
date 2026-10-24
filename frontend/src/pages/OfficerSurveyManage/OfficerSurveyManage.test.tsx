@@ -191,6 +191,104 @@ describe('OfficerSurveyManage', () => {
     })
   })
 
+  it('should offer to add an option when the survey is open and has responses', async () => {
+    await renderForOfficer()
+
+    expect(await screen.findByRole('heading', { name: 'Add an option' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Question')).toBeInTheDocument()
+  })
+
+  it('should not offer to add an option when nobody has responded and the questions are editable', async () => {
+    server.use(http.get('/api/surveys/:id/responses', () => HttpResponse.json([])))
+
+    await renderForOfficer()
+    await screen.findByRole('button', { name: 'Add question' })
+
+    expect(screen.queryByRole('heading', { name: 'Add an option' })).not.toBeInTheDocument()
+  })
+
+  it('should not offer to add an option when the survey has closed', async () => {
+    signInAs(officer)
+    server.use(http.get('/api/surveys/:id', () => HttpResponse.json(closedSurvey)))
+
+    renderPage()
+    await screen.findByRole('heading', { name: 'Responses' })
+
+    expect(screen.queryByRole('heading', { name: 'Add an option' })).not.toBeInTheDocument()
+  })
+
+  it('should post the option to the chosen question and confirm when the officer adds it', async () => {
+    const user = userEvent.setup()
+    const captured: { url: string; body: unknown } = { url: '', body: null }
+    server.use(
+      http.post('/api/surveys/:id/questions/:questionId/options', async ({ request }) => {
+        captured.url = new URL(request.url).pathname
+        captured.body = await request.json()
+        return HttpResponse.json(openSurvey)
+      }),
+    )
+    await renderForOfficer()
+    await screen.findByRole('heading', { name: 'Add an option' })
+
+    await user.selectOptions(screen.getByLabelText('Question'), 'Raid nights')
+    await user.type(screen.getByLabelText('New option'), 'Friday')
+    await user.click(screen.getByRole('button', { name: 'Add option' }))
+
+    expect(await screen.findByText('Option added')).toBeInTheDocument()
+    expect(captured).toEqual({ url: '/api/surveys/survey-1/questions/q-nights/options', body: { option: 'Friday' } })
+  })
+
+  it('should list the new option with its question when the officer adds it', async () => {
+    const user = userEvent.setup()
+    let added = false
+    server.use(
+      http.get('/api/surveys/:id', () =>
+        HttpResponse.json(
+          added
+            ? {
+                ...openSurvey,
+                questions: openSurvey.questions.map((question) =>
+                  question.id === 'q-class' ? { ...question, options: [...question.options, 'Druid'] } : question,
+                ),
+              }
+            : openSurvey,
+        ),
+      ),
+      http.post('/api/surveys/:id/questions/:questionId/options', () => {
+        added = true
+        return HttpResponse.json(openSurvey)
+      }),
+    )
+    await renderForOfficer()
+    await screen.findByRole('heading', { name: 'Add an option' })
+
+    await user.type(screen.getByLabelText('New option'), 'Druid')
+    await user.click(screen.getByRole('button', { name: 'Add option' }))
+
+    expect(
+      await screen.findByText(
+        (_, element) =>
+          element?.tagName === 'LI' && element.textContent === 'Class (single choice, required): Mage, Priest, Warrior, Druid',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("should show the server's message when adding an option is rejected", async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.post('/api/surveys/:id/questions/:questionId/options', () =>
+        HttpResponse.json({ error: 'option: "Mage" is already an option' }, { status: 400 }),
+      ),
+    )
+    await renderForOfficer()
+    await screen.findByRole('heading', { name: 'Add an option' })
+
+    await user.type(screen.getByLabelText('New option'), 'Mage')
+    await user.click(screen.getByRole('button', { name: 'Add option' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('option: "Mage" is already an option')
+  })
+
   it('should ask for a closing time and send nothing when the officer clears the deadline', async () => {
     const user = userEvent.setup()
     const patch = captureSurveyPatch()
