@@ -26,6 +26,14 @@ func (h *Handler) Register(r chi.Router) {
 	r.Get("/surveys/{id}", h.get)
 	r.Get("/surveys/{id}/results", h.results)
 	r.With(auth.RequireUser).Put("/surveys/{id}/response", h.submit)
+	r.Group(func(officer chi.Router) {
+		officer.Use(auth.RequireOfficer)
+		officer.Post("/surveys", h.create)
+		officer.Patch("/surveys/{id}", h.update)
+		officer.Get("/surveys/{id}/responses", h.listResponses)
+		officer.Get("/surveys/{id}/responses.csv", h.exportResponses)
+		officer.Patch("/surveys/{id}/responses/{responseId}", h.voidResponse)
+	})
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -84,6 +92,10 @@ func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, action stri
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": validationErr.Error()})
 	case errors.Is(err, ErrNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "survey not found"})
+	case errors.Is(err, ErrResponseNotFound):
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrResponseNotFound.Error()})
+	case errors.Is(err, ErrQuestionsLocked):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrQuestionsLocked.Error()})
 	case errors.Is(err, ErrClosed):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrClosed.Error()})
 	case errors.Is(err, ErrResultsNotAvailable):

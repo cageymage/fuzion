@@ -177,6 +177,11 @@ func (r *Repo) SaveResponse(ctx context.Context, in responseInput) (err error) {
 		}
 	}()
 
+	// Conflicts with UpdateSurvey's FOR UPDATE, so questions cannot be replaced between validating these answers and storing them.
+	if _, err := tx.ExecContext(ctx, `SELECT 1 FROM surveys WHERE id = $1 FOR SHARE`, in.SurveyID); err != nil {
+		return fmt.Errorf("lock survey: %w", err)
+	}
+
 	const upsert = `
 		INSERT INTO survey_responses (survey_id, user_id, guild_name, discord_username, in_discord_server)
 		VALUES ($1, $2, $3, $4, $5)
