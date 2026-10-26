@@ -20,6 +20,9 @@ type DiscordConfig struct {
 	ClientSecret string
 	RedirectURL  string
 	BaseURL      string
+
+	// GuildID is the Discord server whose membership is reported on login; empty skips the lookup and the extra scope.
+	GuildID string
 }
 
 var _ Provider = (*Discord)(nil)
@@ -41,9 +44,16 @@ func (d *Discord) AuthURL(state string) string {
 	q.Set("client_id", d.cfg.ClientID)
 	q.Set("redirect_uri", d.cfg.RedirectURL)
 	q.Set("response_type", "code")
-	q.Set("scope", "identify")
+	q.Set("scope", d.scope())
 	q.Set("state", state)
 	return d.cfg.BaseURL + "/oauth2/authorize?" + q.Encode()
+}
+
+func (d *Discord) scope() string {
+	if d.cfg.GuildID == "" {
+		return "identify"
+	}
+	return "identify guilds"
 }
 
 func (d *Discord) Exchange(ctx context.Context, code string) (Identity, error) {
@@ -55,11 +65,53 @@ func (d *Discord) Exchange(ctx context.Context, code string) (Identity, error) {
 	if err != nil {
 		return Identity{}, fmt.Errorf("fetch discord user: %w", err)
 	}
-	return Identity{
+	identity := Identity{
 		ProviderUserID: user.ID,
 		Username:       user.Username,
 		AvatarURL:      avatarURL(user),
-	}, nil
+	}
+	if d.cfg.GuildID != "" {
+		identity.InDiscordServer, err = d.isInGuild(ctx, token, d.cfg.GuildID)
+		if err != nil {
+			return Identity{}, fmt.Errorf("fetch discord guilds: %w", err)
+		}
+	}
+	return identity, nil
+}
+
+const guildsPageSize = 200
+
+// Discord pages the list by guild ID, so a user in more servers than one page holds needs the follow-up requests.
+func (d *Discord) isInGuild(ctx context.Context, token, guildID string) (bool, error) {
+	after := ""
+	for {
+		q := url.Values{}
+		q.Set("limit", fmt.Sprint(guildsPageSize))
+		if after != "" {
+			q.Set("after", after)
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, d.cfg.BaseURL+"/users/@me/guilds?"+q.Encode(), nil)
+		if err != nil {
+			return false, err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		var guilds []struct {
+			ID string `json:"id"`
+		}
+		if err := d.do(req, &guilds); err != nil {
+			return false, err
+		}
+		for _, guild := range guilds {
+			if guild.ID == guildID {
+				return true, nil
+			}
+		}
+		if len(guilds) < guildsPageSize {
+			return false, nil
+		}
+		after = guilds[len(guilds)-1].ID
+	}
 }
 
 func (d *Discord) exchangeCode(ctx context.Context, code string) (string, error) {

@@ -132,6 +132,12 @@
   font-size: var(--text-meta);
 }
 
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 .thanks {
   max-width: 560px;
   font-size: var(--text-ui);
@@ -143,8 +149,33 @@
   font-size: var(--text-meta);
 }
 
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-meta);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.checkbox input {
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: var(--gold);
+}
+
+.checkbox a,
 .notice a {
   text-decoration: underline;
   text-decoration-color: rgba(211, 162, 77, 0.5);
   text-underline-offset: 4px;
+}
+
+.errorLead {
+  margin: 0;
+}
+
+.errorList {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
 }

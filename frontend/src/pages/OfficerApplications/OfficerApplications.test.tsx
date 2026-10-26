@@ -67,6 +67,30 @@ describe('OfficerApplications', () => {
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument()
   })
 
+  it('should show the expected playstyle when the officer opens a row', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<OfficerApplications />, '/officer/applications')
+
+    await user.click(await screen.findByRole('button', { name: /Mira/ }))
+
+    expect(screen.getByText('Playstyle')).toBeInTheDocument()
+    expect(screen.getByText('Raider')).toBeInTheDocument()
+  })
+
+  it('should show playstyle as not given when the application predates the playstyle field', async () => {
+    server.use(
+      http.get('/api/applications', () =>
+        HttpResponse.json([{ ...pendingApplication, playstyle: '' }]),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<OfficerApplications />, '/officer/applications')
+
+    await user.click(await screen.findByRole('button', { name: /Mira/ }))
+
+    expect(screen.getByText('Not given')).toBeInTheDocument()
+  })
+
   it('should show the earlier review note when the officer opens an already reviewed application', async () => {
     const user = userEvent.setup()
     server.use(http.get('/api/applications', () => HttpResponse.json([acceptedApplication])))
@@ -151,7 +175,7 @@ describe('OfficerApplications', () => {
     expect(await screen.findByText('Only officers can review applications.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Log in with Discord' })).toHaveAttribute(
       'href',
-      'http://localhost:3000/api/auth/login',
+      'http://localhost:3000/api/auth/login?returnTo=%2Fofficer%2Fapplications',
     )
   })
 

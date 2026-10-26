@@ -26,11 +26,13 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/images"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/professions"
+	"github.com/cageymage/fuzion/backend/internal/raidhelper"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
 	"github.com/cageymage/fuzion/backend/internal/raids"
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/surveys"
 	"github.com/cageymage/fuzion/backend/internal/turnstile"
 	"github.com/cageymage/fuzion/backend/internal/youtube"
 )
@@ -40,6 +42,10 @@ var FixedNow = time.Date(2026, 3, 14, 20, 0, 0, 0, time.UTC)
 
 // SiteBaseURL is the public site address that Discord announcements and notifications link to.
 const SiteBaseURL = "https://fuzion.example"
+
+// RaidHelperWebhookKey is the fake webhook key from plans/integrations/raid-helper-samples:
+// 30 mixed-case alphanumerics, the same shape as a real one.
+const RaidHelperWebhookKey = "aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bC1"
 
 type Server struct {
 	*httptest.Server
@@ -64,6 +70,20 @@ type serverOptions struct {
 	recruitingWebhook    bool
 	announcementsWebhook bool
 	turnstile            bool
+	raidHelperWebhookKey string
+	discordGuildID       string
+}
+
+// WithoutDiscordGuild builds the server the way a deploy without
+// DISCORD_GUILD_ID runs: every logged-in user counts as a guild member.
+func WithoutDiscordGuild() ServerOption {
+	return func(o *serverOptions) { o.discordGuildID = "" }
+}
+
+// WithoutRaidHelperWebhook builds the server the way a deploy without
+// RAID_HELPER_WEBHOOK_SECRET runs: the webhook endpoint is not registered.
+func WithoutRaidHelperWebhook() ServerOption {
+	return func(o *serverOptions) { o.raidHelperWebhookKey = "" }
 }
 
 // WithoutTurnstile builds the server the way a deploy without
@@ -93,7 +113,7 @@ func WithoutYouTubePlaylist() ServerOption {
 func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	t.Helper()
 
-	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true}
+	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey, discordGuildID: DiscordGuildID}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -126,6 +146,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 		ClientSecret: DiscordClientSecret,
 		RedirectURL:  DiscordRedirectURL,
 		BaseURL:      discord.URL,
+		GuildID:      options.discordGuildID,
 	}, discord.Client())
 
 	fakeBattleNet := NewFakeBattleNet(t)
@@ -141,14 +162,16 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting, verifier, SiteBaseURL)),
-		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), auth.WithBattleNet(battleNet))),
+		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), auth.WithDiscordServerMembership(options.discordGuildID), auth.WithBattleNet(battleNet))),
 		Images:        images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL), shell),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
+		RaidHelper:     raidhelper.NewHandler(raidhelper.NewService(raidhelper.NewRepo(db)), options.raidHelperWebhookKey),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.Fixed(FixedNow))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), suggestedVideos),
+		Surveys:        surveys.NewHandler(surveys.NewService(surveys.NewRepo(db), clock.Fixed(FixedNow))),
 		AllowedOrigins: []string{"http://localhost:5173"},
 	})
 
@@ -171,8 +194,9 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 type LoginOption func(*loginOptions)
 
 type loginOptions struct {
-	isOfficer bool
-	isAdmin   bool
+	isOfficer       bool
+	isAdmin         bool
+	inDiscordServer bool
 }
 
 // AsOfficer grants the logged-in user officer access.
@@ -180,6 +204,9 @@ func AsOfficer() LoginOption { return func(o *loginOptions) { o.isOfficer = true
 
 // AsAdmin grants the logged-in user admin (and therefore officer) access.
 func AsAdmin() LoginOption { return func(o *loginOptions) { o.isAdmin = true } }
+
+// InDiscordServer marks the logged-in user as a member of the guild's Discord server.
+func InDiscordServer() LoginOption { return func(o *loginOptions) { o.inDiscordServer = true } }
 
 // LoginAs inserts a user and a live session for them straight into the
 // database and puts the session cookie in the client's jar, so a test can act
@@ -194,10 +221,10 @@ func (s *Server) LoginAs(t *testing.T, discordID, username string, opts ...Login
 
 	var user auth.User
 	err := s.db.Get(&user, `
-		INSERT INTO users (id, discord_id, username, is_officer, is_admin)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, discord_id, username, avatar_url, is_officer, is_admin, created_at, last_seen_at`,
-		uuid.New(), discordID, username, options.isOfficer, options.isAdmin)
+		INSERT INTO users (id, discord_id, username, is_officer, is_admin, in_discord_server)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, discord_id, username, avatar_url, is_officer, is_admin, in_discord_server, created_at, last_seen_at`,
+		uuid.New(), discordID, username, options.isOfficer, options.isAdmin, options.inDiscordServer)
 	if err != nil {
 		t.Fatalf("insert user %q: %v", username, err)
 	}
@@ -222,8 +249,9 @@ func NewMiddlewareProbeServer(t *testing.T, db *sqlx.DB) *Server {
 		ClientSecret: DiscordClientSecret,
 		RedirectURL:  DiscordRedirectURL,
 		BaseURL:      discord.URL,
+		GuildID:      DiscordGuildID,
 	}, discord.Client())
-	authHandler := auth.NewHandler(auth.NewService(provider, auth.NewRepo(db)))
+	authHandler := auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), auth.WithDiscordServerMembership(DiscordGuildID)))
 
 	r := chi.NewRouter()
 	r.Use(authHandler.Middleware)
@@ -344,6 +372,21 @@ func (s *Server) PostRaw(t *testing.T, path, body string) Response {
 		t.Fatalf("build POST %s: %v", path, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	return s.do(t, req)
+}
+
+// PostRawWithHeaders sends body as-is with the given headers, the way a third-party
+// webhook sender would.
+func (s *Server) PostRawWithHeaders(t *testing.T, path string, body []byte, headers map[string]string) Response {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodPost, s.URL+path, bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("build POST %s: %v", path, err)
+	}
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
 	return s.do(t, req)
 }
 

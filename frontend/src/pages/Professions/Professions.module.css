@@ -70,10 +70,6 @@
   font-weight: 600;
 }
 
-.secondaryName {
-  color: var(--muted);
-}
-
 .skill {
   font-variant-numeric: tabular-nums;
 }

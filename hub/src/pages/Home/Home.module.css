@@ -1,0 +1,104 @@
+.hero {
+  padding: 48px var(--gutter) 12px;
+  max-width: 900px;
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: 52px;
+}
+
+@media (max-width: 720px) {
+  .title {
+    font-size: 38px;
+  }
+}
+
+.tagline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.375rem;
+  font-style: italic;
+}
+
+.section {
+  padding: 28px var(--gutter) 0;
+}
+
+.sectionTitle {
+  margin: 0 0 14px;
+  font-size: 1.625rem;
+}
+
+.guildCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 560px;
+  padding: 20px 22px;
+  color: var(--text);
+}
+
+.guildCard:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.guildName {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.75rem;
+  letter-spacing: 0.04em;
+}
+
+.guildBlurb {
+  color: var(--muted);
+  font-size: var(--text-ui);
+}
+
+.guildLink {
+  margin-top: 6px;
+  color: var(--gold);
+  font-size: var(--text-ui);
+}
+
+.socialLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.socialLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.socialLink:hover {
+  border-color: var(--gold);
+}
+
+.streamGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.video {
+  max-width: 640px;
+}
+
+.noticeText {
+  margin: 0;
+  color: var(--muted);
+}

@@ -6,6 +6,7 @@ import type { Raid } from '../types/raids'
 import type { ProfessionEntry } from '../types/professions'
 import type { Character } from '../types/roster'
 import type { Stream } from '../types/streams'
+import type { OfficerSurveyResponse, Survey, SurveyResults } from '../types/surveys'
 
 const newsPosts: NewsPost[] = [
   {
@@ -121,6 +122,7 @@ const liveStreams: Stream[] = [
     channelUrl: 'https://twitch.tv/thundermane',
     isLive: true,
     isLiveOtherGame: false,
+    platform: 'twitch',
   },
 ]
 
@@ -137,6 +139,7 @@ const allStreams: Stream[] = [
     channelUrl: 'https://twitch.tv/moonveil',
     isLive: false,
     isLiveOtherGame: false,
+    platform: 'twitch',
   },
   {
     id: 'stream-3',
@@ -149,6 +152,7 @@ const allStreams: Stream[] = [
     channelUrl: 'https://twitch.tv/aelith',
     isLive: false,
     isLiveOtherGame: false,
+    platform: 'twitch',
   },
 ]
 
@@ -315,6 +319,7 @@ export const pendingApplication: Application = {
   characterName: 'Thornleaf',
   class: 'Druid',
   role: 'healer',
+  playstyle: 'raider',
   availability: 'Tue/Thu 8-11pm ET',
   discordHandle: 'mira.heals',
   notes: 'Raided Karazhan on my old realm.\nHappy to reroll if needed.',
@@ -332,6 +337,7 @@ export const acceptedApplication: Application = {
   characterName: 'Ironhide',
   class: 'Warrior',
   role: 'tank',
+  playstyle: 'casual',
   status: 'accepted',
   submittedAt: '2026-10-04T12:00:00Z',
   reviewedBy: '33333333-3333-4333-8333-333333333333',
@@ -340,6 +346,127 @@ export const acceptedApplication: Application = {
 }
 
 const applications = [pendingApplication, acceptedApplication]
+
+export const openSurvey: Survey = {
+  id: 'survey-1',
+  title: 'Spring roster',
+  description: 'Help us plan the raid teams',
+  closesAt: new Date(Date.now() + 5 * 86_400_000).toISOString(),
+  status: 'open',
+  questions: [
+    { id: 'q-class', prompt: 'Class', type: 'single', required: true, options: ['Mage', 'Priest', 'Warrior'] },
+    {
+      id: 'q-secondary',
+      prompt: 'Secondary class',
+      type: 'single',
+      required: false,
+      options: ['Mage', 'Priest', 'Warrior'],
+    },
+    {
+      id: 'q-nights',
+      prompt: 'Raid nights',
+      type: 'multi',
+      required: true,
+      options: ['Tuesday', 'Wednesday', 'Thursday'],
+    },
+  ],
+  myResponse: null,
+}
+
+export const closedSurvey: Survey = {
+  ...openSurvey,
+  closesAt: new Date(Date.now() - 86_400_000).toISOString(),
+  status: 'closed',
+}
+
+export const closedSurveyResults: SurveyResults = {
+  surveyId: 'survey-1',
+  title: 'Spring roster',
+  turnout: 3,
+  questions: [
+    {
+      id: 'q-class',
+      prompt: 'Class',
+      type: 'single',
+      options: [
+        { label: 'Mage', count: 2 },
+        { label: 'Priest', count: 0 },
+        { label: 'Warrior', count: 1 },
+      ],
+    },
+    {
+      id: 'q-nights',
+      prompt: 'Raid nights',
+      type: 'multi',
+      options: [
+        { label: 'Tuesday', count: 3 },
+        { label: 'Wednesday', count: 1 },
+        { label: 'Thursday', count: 0 },
+      ],
+    },
+  ],
+}
+
+export const liveSurveyResults: SurveyResults = {
+  surveyId: 'survey-1',
+  title: 'Spring roster',
+  turnout: 2,
+  questions: [
+    {
+      id: 'q-class',
+      prompt: 'Class',
+      type: 'single',
+      options: [
+        { label: 'Mage', count: 1 },
+        { label: 'Priest', count: 1 },
+        { label: 'Warrior', count: 0 },
+      ],
+    },
+    {
+      id: 'q-nights',
+      prompt: 'Raid nights',
+      type: 'multi',
+      options: [
+        { label: 'Tuesday', count: 2 },
+        { label: 'Wednesday', count: 0 },
+        { label: 'Thursday', count: 1 },
+      ],
+    },
+  ],
+}
+
+export const officerSurveyResponses: OfficerSurveyResponse[] = [
+  {
+    id: 'response-1',
+    discordUsername: 'ana',
+    guildName: 'Anaria',
+    inDiscordServer: true,
+    submittedAt: '2026-03-10T12:00:00Z',
+    updatedAt: '2026-03-10T12:00:00Z',
+    voidedAt: null,
+    voidedBy: null,
+    voidReason: '',
+    answers: [
+      { questionId: 'q-class', values: ['Mage'] },
+      { questionId: 'q-nights', values: ['Tuesday', 'Thursday'] },
+    ],
+  },
+  {
+    id: 'response-2',
+    discordUsername: 'ben',
+    guildName: '',
+    inDiscordServer: false,
+    submittedAt: '2026-03-10T13:00:00Z',
+    updatedAt: '2026-03-10T13:00:00Z',
+    voidedAt: '2026-03-11T09:00:00Z',
+    voidedBy: 'Officer',
+    voidReason: 'joke answers',
+    answers: [
+      { questionId: 'q-class', values: ['Priest'] },
+      { questionId: 'q-nights', values: ['Wednesday'] },
+    ],
+  },
+]
 
 export const handlers = [
   http.post('/api/applications', () => HttpResponse.json({ id: 'app-1' }, { status: 201 })),
@@ -397,4 +524,18 @@ export const handlers = [
   http.get('/api/streams/suggested-video', () =>
     HttpResponse.json({ id: 'vid-1', title: 'Queen Ansurek kill' }),
   ),
+  http.get('/api/surveys', () =>
+    HttpResponse.json([
+      { id: openSurvey.id, title: openSurvey.title, closesAt: openSurvey.closesAt, status: 'open' },
+    ]),
+  ),
+  http.get('/api/surveys/:id', () => HttpResponse.json(openSurvey)),
+  http.put('/api/surveys/:id/response', async ({ request }) => HttpResponse.json(await request.json())),
+  http.get('/api/surveys/:id/results', () => HttpResponse.json(closedSurveyResults)),
+  http.post('/api/surveys', () => HttpResponse.json(openSurvey, { status: 201 })),
+  http.patch('/api/surveys/:id', () => HttpResponse.json(openSurvey)),
+  http.post('/api/surveys/:id/questions/:questionId/options', () => HttpResponse.json(openSurvey)),
+  http.get('/api/surveys/:id/live-results', () => HttpResponse.json(liveSurveyResults)),
+  http.get('/api/surveys/:id/responses', () => HttpResponse.json(officerSurveyResponses)),
+  http.patch('/api/surveys/:id/responses/:responseId', () => HttpResponse.json(officerSurveyResponses[0])),
 ]

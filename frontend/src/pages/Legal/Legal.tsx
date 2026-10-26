@@ -12,19 +12,34 @@ export function Legal() {
         <h2 id="privacy-heading" className={styles.sectionTitle}>
           Privacy policy
         </h2>
-        <p>The Fuzion site collects only what it needs to run the guild:</p>
+        <p>
+          This policy covers the Fuzion guild site, forever.fuziongaming.gg. It collects only what
+          it needs to run the guild:
+        </p>
         <ul>
           <li>
-            Application fields: your name, character name, class, role, availability, Discord
-            handle and notes.
+            Application fields: your name, character name, class, role, expected playstyle,
+            availability, Discord handle and notes.
           </li>
           <li>
             Discord identity: when you log in with Discord, your Discord ID and username, plus a
-            session cookie that keeps you logged in.
+            session cookie that keeps you logged in and a short-lived cookie that remembers which
+            page you were on so we can send you back to it after you log in, deleted when login
+            finishes.
+          </li>
+          <li>
+            Discord server check: when you log in, we also ask Discord which servers you are in,
+            only to record whether you are in the guild&apos;s Discord server. We store that yes or
+            no, not the list, and use it to decide who can answer guild surveys.
           </li>
           <li>
             Battle.net link: if you choose to link Battle.net on your dashboard, your Battle.net ID
             and BattleTag. Unlinking deletes both.
+          </li>
+          <li>
+            Survey responses: your answers, the guild name you optionally enter, and your Discord
+            username at the time you respond. Officers can see these per person, and the public
+            results show totals only.
           </li>
           <li>Images uploaded by officers, such as news post images.</li>
         </ul>
@@ -38,6 +53,10 @@ export function Legal() {
         <p>
           We do not sell your data. To have your application or other data removed, ask an officer
           on Discord.
+        </p>
+        <p>
+          fuziongaming.gg and other fuziongaming.gg sites are run by the same people and have their
+          own notices. Logging in with Discord on one of them does not log you in on another.
         </p>
       </section>
 
@@ -73,11 +92,16 @@ export function Legal() {
         <ul>
           <li>World of Warcraft game content and class names: Blizzard Entertainment, Inc.</li>
           <li>Live status, channel avatars and embedded streams: Twitch Interactive, Inc.</li>
-          <li>Embedded videos: YouTube, a Google LLC service.</li>
+          <li>Embedded videos, live status and channel avatars: YouTube, a Google LLC service.</li>
           <li>Bot protection: Cloudflare, Inc.</li>
           <li>Hosting: Render Services, Inc.</li>
           <li>Home page artwork: generated with Midjourney.</li>
           <li>News card background artwork: generated with Midjourney.</li>
+          <li>About page artwork: generated with Midjourney.</li>
+          <li>
+            GitHub and the GitHub logo: trademarks of GitHub, Inc., shown only to link to this
+            site&apos;s source code. Icon shape from Simple Icons (CC0).
+          </li>
         </ul>
       </section>
     </article>

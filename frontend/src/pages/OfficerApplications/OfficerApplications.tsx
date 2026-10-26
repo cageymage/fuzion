@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { loginUrl } from '../../api/auth'
+import { useLoginUrl } from '../../hooks/useLoginUrl'
 import { ApiError } from '../../api/client'
 import type {
   Application,
+  ApplicationPlaystyle,
   ApplicationStatus,
   ApplicationStatusFilter,
   ReviewDecision,
@@ -27,6 +28,7 @@ const statusLabels: Record<ApplicationStatus, string> = {
 }
 
 const roleLabels: Record<Application['role'], string> = { tank: 'Tank', healer: 'Healer', dps: 'DPS' }
+const playstyleLabels: Record<ApplicationPlaystyle, string> = { casual: 'Casual', raider: 'Raider' }
 
 const emptyMessages: Record<ApplicationStatusFilter, string> = {
   pending: 'No pending applications.',
@@ -126,6 +128,8 @@ function ApplicationRow({ application, expanded, onToggle, onReviewed }: Applica
       {expanded && (
         <div id={detailsId} className={styles.details}>
           <dl className={styles.detailList}>
+            <dt>Playstyle</dt>
+            <dd>{application.playstyle === '' ? 'Not given' : playstyleLabels[application.playstyle]}</dd>
             <dt>Availability</dt>
             <dd>{application.availability}</dd>
             <dt>Discord</dt>
@@ -141,6 +145,7 @@ function ApplicationRow({ application, expanded, onToggle, onReviewed }: Applica
 }
 
 function AccessDenied({ anonymous }: { anonymous: boolean }) {
+  const loginUrl = useLoginUrl()
   return (
     <div className={styles.noticeText}>
       <p>Only officers can review applications.</p>

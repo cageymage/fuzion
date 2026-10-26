@@ -37,6 +37,7 @@ This is a deliberate tradeoff, not an oversight: it's what makes "automated test
 All three pieces live on **Render**, under one dashboard/account, deployed from the same GitHub repo and declared in [render.yaml](../render.yaml) (a Render Blueprint):
 
 - **Frontend** — Render Static Site, built from `frontend/` (`npm run build`, publish `dist/`). Auto-deploys on push to `main`, PR previews available. A rewrite rule proxies `/api/*` to the backend service, so the browser only ever talks to the frontend's origin — the same shape as the Vite dev proxy. A second rewrite sends `/news/:id` to `/api/news/:id/page`, where the API fetches the deployed `index.html` (cached 5 minutes) and swaps the block between its `<!--og:start-->` and `<!--og:end-->` markers for that post's link-preview tags (falling back to the site image and description), because Discord and Bluesky read raw HTML. No CORS in prod, and no cross-subdomain cookie handling (see decision 5).
+- **Hub** — a second Render Static Site (`fuzion-hub`), built from `hub/`, serving `fuziongaming.gg`. No API or database of its own: it rewrites only the public endpoints it uses (`/api/streams/*` today) to the backend service, so the guild's auth callbacks and officer endpoints are not reachable on the hub host. The guild site lives on `forever.fuziongaming.gg`. See [fuziongaming-hub-and-guild-subdomain.md](fuziongaming-hub-and-guild-subdomain.md) for why, and for when the hub would get site-keyed data.
 - **Backend** — Render Web Service, built from `backend/`'s Dockerfile. Auto-deploys on push to `main`. Binds to Render's injected `PORT`.
 - **Database** — Render managed Postgres instance, connected to the backend service via an internal connection string (env var). It also stores uploaded news images as WebP (see [product-spec.md](product-spec.md) §4 and issue #7), so budget storage for image growth (images are lossless WebP, so expect roughly 1 to 3 MB per screenshot including the thumbnail) and revisit if the images table nears ~1 GB. The free tier expires after 30 days, after which it needs a paid instance (~$6/mo) — worth budgeting for up front so nothing breaks unexpectedly later. The free web service also spins down after 15 minutes idle (~30–60s cold start), so a paid Starter instance (~$7/mo) is the realistic floor once people are actually using it.
 
@@ -50,7 +51,8 @@ Local dev still uses `docker-compose.yml` (Postgres + backend + Vite dev server)
 
 ```
 fuzion/
-├── frontend/                # React app
+├── frontend/                # React app (guild site, forever.fuziongaming.gg)
+├── hub/                     # React app (fuziongaming.gg hub), same layout and test conventions as frontend/
 ├── backend/                 # Go app
 ├── e2e/                     # Playwright, cross-cutting FE+BE tests
 ├── plans/                   # planning docs (this file)
@@ -166,7 +168,7 @@ Runs against the full stack via `docker-compose.yml` (real Postgres, real Go bac
 2. **Auth: Discord OAuth first, Battle.net OAuth added later if wanted.** The `internal/auth` package should define a small provider-agnostic interface (exchange code → get user identity) so a second provider is a new implementation, not a rewrite. Only Discord ships in the initial scaffold.
 3. **MSW usage clarified:** MSW's Node server (`mocks/server.ts`) is used only inside the Vitest suite to intercept HTTP in sociable page tests. Local development (`npm run dev` / debugging) always talks to the real Go backend via `docker-compose.yml`, matching prod behavior — no browser-mode MSW mock server is scaffolded.
 4. **DB access: `sqlx`.** Closest Go equivalent to Dapper — raw SQL, results scanned onto structs via `db:"..."` tags at runtime, no ORM query builder and no code-generation build step. Chosen over `sqlc` (build-time codegen, more type-safe but an extra tooling step) and `GORM` (full ORM, more magic, less idiomatic Go).
-5. **Single origin via proxy; custom domain is optional.** The Render static site rewrites `/api/*` to the backend service, so the browser never sees a second origin. The session cookie is a plain `httpOnly; SameSite=Lax` cookie on the site's own host — no `Domain=` attribute, no CORS credentials dance. A custom domain (e.g. `fuzion.gg`) is still planned for vanity, but it's a DNS change, not a prerequisite for auth; the original cross-subdomain plan (`app.` / `api.` with `Domain=.fuzion.gg`) was dropped in favour of this because it removes a whole class of cookie/CORS problems for the cost of one proxy hop.
+5. **Single origin via proxy; custom domain is optional.** The Render static site rewrites `/api/*` to the backend service, so the browser never sees a second origin. The session cookie is a plain `httpOnly; SameSite=Lax` cookie on the site's own host — no `Domain=` attribute, no CORS credentials dance. The guild site's custom domain is `forever.fuziongaming.gg` (see [fuziongaming-hub-and-guild-subdomain.md](fuziongaming-hub-and-guild-subdomain.md)), but it's a DNS change, not a prerequisite for auth; the original cross-subdomain plan (`app.` / `api.` with `Domain=.fuzion.gg`) was dropped in favour of this because it removes a whole class of cookie/CORS problems for the cost of one proxy hop.
 6. **GitHub repo: private.**
 
 ## Auth (Discord OAuth)

@@ -15,6 +15,38 @@ describe('Legal', () => {
     expect(screen.getByRole('heading', { level: 2, name: heading })).toBeInTheDocument()
   })
 
+  it('should name forever.fuziongaming.gg as the site the privacy policy covers when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'This policy covers the Fuzion guild site, forever.fuziongaming.gg.',
+    )
+  })
+
+  it('should say other fuziongaming.gg sites have their own notices when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'fuziongaming.gg and other fuziongaming.gg sites are run by the same people and have their own notices.',
+    )
+  })
+
+  it('should say a Discord login on one fuziongaming.gg site does not log you in on another when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'Logging in with Discord on one of them does not log you in on another.',
+    )
+  })
+
+  it('should describe the short-lived cookie that remembers your page during login when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'a short-lived cookie that remembers which page you were on so we can send you back to it after you log in, deleted when login finishes',
+    )
+  })
+
   it('should name the third parties that handle data when the page renders', () => {
     renderWithProviders(<Legal />)
 
@@ -22,6 +54,14 @@ describe('Legal', () => {
     for (const party of ['Cloudflare Turnstile', 'Twitch', 'YouTube', 'Render']) {
       expect(privacy).toHaveTextContent(party)
     }
+  })
+
+  it('should list the expected playstyle among the application fields when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'role, expected playstyle, availability',
+    )
   })
 
   it('should describe the data stored when a member links Battle.net when the page renders', () => {
@@ -53,6 +93,46 @@ describe('Legal', () => {
 
     expect(screen.getByRole('region', { name: 'Attributions' })).toHaveTextContent(
       'News card background artwork: generated with Midjourney.',
+    )
+  })
+
+  it('should credit Midjourney for the about page artwork when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Attributions' })).toHaveTextContent(
+      'About page artwork: generated with Midjourney.',
+    )
+  })
+
+  it('should credit YouTube for live status and channel avatars when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Attributions' })).toHaveTextContent(
+      'Embedded videos, live status and channel avatars: YouTube, a Google LLC service.',
+    )
+  })
+
+  it('should credit the GitHub logo to GitHub when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Attributions' })).toHaveTextContent(
+      'GitHub and the GitHub logo: trademarks of GitHub, Inc.',
+    )
+  })
+
+  it('should describe the survey data stored and who can see it when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'Survey responses: your answers, the guild name you optionally enter, and your Discord username at the time you respond. Officers can see these per person, and the public results show totals only.',
+    )
+  })
+
+  it('should explain the Discord server check at login and what is kept when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      "Discord server check: when you log in, we also ask Discord which servers you are in, only to record whether you are in the guild's Discord server. We store that yes or no, not the list, and use it to decide who can answer guild surveys.",
     )
   })
 

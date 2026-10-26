@@ -29,7 +29,7 @@ describe('OfficerRaidProgress', () => {
     expect(await screen.findByText('Only officers can manage raid progress.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Log in with Discord' })).toHaveAttribute(
       'href',
-      'http://localhost:3000/api/auth/login',
+      'http://localhost:3000/api/auth/login?returnTo=%2Fofficer%2Fraid-progress',
     )
     expect(screen.queryByRole('button', { name: 'Create raid' })).not.toBeInTheDocument()
   })

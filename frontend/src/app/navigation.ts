@@ -1,6 +1,7 @@
 export interface NavItem {
   label: string
   path: string
+  guildMembersOnly?: boolean
 }
 
 export const navItems: NavItem[] = [
@@ -12,4 +13,5 @@ export const navItems: NavItem[] = [
   { label: 'Applications', path: '/applications' },
   { label: 'Professions', path: '/professions' },
   { label: 'Streams', path: '/streams' },
+  { label: 'Surveys', path: '/surveys', guildMembersOnly: true },
 ]

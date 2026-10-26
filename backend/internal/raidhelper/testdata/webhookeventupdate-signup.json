@@ -1,0 +1,856 @@
+{
+  "id": "1100000000000000001",
+  "date": "12-10-2026",
+  "time": "18:00",
+  "color": "113,54,138",
+  "roles": [
+    {
+      "name": "Dps",
+      "cName": "Dps",
+      "limit": 999,
+      "emoteId": "592440132129521664"
+    }
+  ],
+  "title": "Test Raid Event (edited)",
+  "classes": [
+    {
+      "name": "Tank",
+      "type": "primary",
+      "cName": "Tank",
+      "limit": 999,
+      "specs": [
+        {
+          "name": "Protection",
+          "cName": "Protection",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Tanks",
+              "cName": "Tanks",
+              "emoteId": "598989638098747403"
+            }
+          ],
+          "emoteId": "637564444834136065",
+          "roleName": "Tanks",
+          "roleNames": [
+            "Tanks"
+          ],
+          "roleEmoteId": "598989638098747403",
+          "roleEmoteIds": [
+            "598989638098747403"
+          ]
+        },
+        {
+          "name": "Protection1",
+          "cName": "Protection1",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Tanks",
+              "cName": "Tanks",
+              "emoteId": "598989638098747403"
+            }
+          ],
+          "emoteId": "637564297647489034",
+          "roleName": "Tanks",
+          "roleNames": [
+            "Tanks"
+          ],
+          "roleEmoteId": "598989638098747403",
+          "roleEmoteIds": [
+            "598989638098747403"
+          ]
+        },
+        {
+          "name": "Guardian",
+          "cName": "Guardian",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Tanks",
+              "cName": "Tanks",
+              "emoteId": "598989638098747403"
+            }
+          ],
+          "emoteId": "637564171696734209",
+          "roleName": "Tanks",
+          "roleNames": [
+            "Tanks"
+          ],
+          "roleEmoteId": "598989638098747403",
+          "roleEmoteIds": [
+            "598989638098747403"
+          ]
+        }
+      ],
+      "emoteId": "878310168289505301"
+    },
+    {
+      "name": "Melee",
+      "type": "primary",
+      "cName": "Melee",
+      "limit": 999,
+      "specs": [
+        {
+          "name": "Arms",
+          "cName": "Arms",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564445031399474",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Fury",
+          "cName": "Fury",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564445215948810",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Retribution",
+          "cName": "Retribution",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564297953673216",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Shockadin",
+          "cName": "Shockadin",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564297622454272",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Feral",
+          "cName": "Feral",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564172061900820",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Assassination",
+          "cName": "Assassination",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564351707873324",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Combat",
+          "cName": "Combat",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564352333086720",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Subtlety",
+          "cName": "Subtlety",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564352169508892",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Survival",
+          "cName": "Survival",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564202130866186",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Enhancement",
+          "cName": "Enhancement",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "936357056951222322",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        }
+      ],
+      "emoteId": "734439523328720913"
+    },
+    {
+      "name": "Ranged",
+      "type": "primary",
+      "cName": "Ranged",
+      "limit": 999,
+      "specs": [
+        {
+          "name": "Arcane",
+          "cName": "Arcane",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564231545389056",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Fire",
+          "cName": "Fire",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564231239073802",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Frost",
+          "cName": "Frost",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564231469891594",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Affliction",
+          "cName": "Affliction",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564406984867861",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Demonology",
+          "cName": "Demonology",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564407001513984",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Destruction",
+          "cName": "Destruction",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564406682877964",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Beastmastery",
+          "cName": "Beastmastery",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564202021814277",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Marksmanship",
+          "cName": "Marksmanship",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564202084466708",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Balance",
+          "cName": "Balance",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564171994529798",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Shadow",
+          "cName": "Shadow",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564323291725825",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Smite",
+          "cName": "Smite",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "887257034066653184",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        },
+        {
+          "name": "Elemental",
+          "cName": "Elemental",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Dps",
+              "cName": "Dps",
+              "emoteId": "592440132129521664"
+            }
+          ],
+          "emoteId": "637564379595931649",
+          "roleName": "Dps",
+          "roleNames": [
+            "Dps"
+          ],
+          "roleEmoteId": "592440132129521664",
+          "roleEmoteIds": [
+            "592440132129521664"
+          ]
+        }
+      ],
+      "emoteId": "592446395596931072"
+    },
+    {
+      "name": "Healer",
+      "type": "primary",
+      "cName": "Healer",
+      "limit": 999,
+      "specs": [
+        {
+          "name": "Discipline",
+          "cName": "Discipline",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Healers",
+              "cName": "Healers",
+              "emoteId": "592438128057253898"
+            }
+          ],
+          "emoteId": "637564323442720768",
+          "roleName": "Healers",
+          "roleNames": [
+            "Healers"
+          ],
+          "roleEmoteId": "592438128057253898",
+          "roleEmoteIds": [
+            "592438128057253898"
+          ]
+        },
+        {
+          "name": "Holy",
+          "cName": "Holy",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Healers",
+              "cName": "Healers",
+              "emoteId": "592438128057253898"
+            }
+          ],
+          "emoteId": "637564323530539019",
+          "roleName": "Healers",
+          "roleNames": [
+            "Healers"
+          ],
+          "roleEmoteId": "592438128057253898",
+          "roleEmoteIds": [
+            "592438128057253898"
+          ]
+        },
+        {
+          "name": "Holy1",
+          "cName": "Holy1",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Healers",
+              "cName": "Healers",
+              "emoteId": "592438128057253898"
+            }
+          ],
+          "emoteId": "637564297622454272",
+          "roleName": "Healers",
+          "roleNames": [
+            "Healers"
+          ],
+          "roleEmoteId": "592438128057253898",
+          "roleEmoteIds": [
+            "592438128057253898"
+          ]
+        },
+        {
+          "name": "Restoration",
+          "cName": "Restoration",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Healers",
+              "cName": "Healers",
+              "emoteId": "592438128057253898"
+            }
+          ],
+          "emoteId": "637564172007112723",
+          "roleName": "Healers",
+          "roleNames": [
+            "Healers"
+          ],
+          "roleEmoteId": "592438128057253898",
+          "roleEmoteIds": [
+            "592438128057253898"
+          ]
+        },
+        {
+          "name": "Restoration1",
+          "cName": "Restoration1",
+          "limit": 999,
+          "roles": [
+            {
+              "name": "Healers",
+              "cName": "Healers",
+              "emoteId": "592438128057253898"
+            }
+          ],
+          "emoteId": "637564379847458846",
+          "roleName": "Healers",
+          "roleNames": [
+            "Healers"
+          ],
+          "roleEmoteId": "592438128057253898",
+          "roleEmoteIds": [
+            "592438128057253898"
+          ]
+        }
+      ],
+      "emoteId": "898011741735235645"
+    },
+    {
+      "name": "Late",
+      "type": "default",
+      "cName": "Late",
+      "limit": 999,
+      "specs": [],
+      "emoteId": "1551909947820998698",
+      "effectiveName": "Late"
+    },
+    {
+      "name": "Bench",
+      "type": "default",
+      "cName": "Bench",
+      "limit": 999,
+      "specs": [],
+      "emoteId": "1551909915155767378",
+      "effectiveName": "Bench"
+    },
+    {
+      "name": "Tentative",
+      "type": "default",
+      "cName": "Tentative",
+      "limit": 999,
+      "specs": [],
+      "emoteId": "1551909992901378171",
+      "effectiveName": "Tentative"
+    },
+    {
+      "name": "Absence",
+      "type": "default",
+      "cName": "Absence",
+      "limit": 999,
+      "specs": [],
+      "emoteId": "1551910028926124052",
+      "effectiveName": "Absence"
+    }
+  ],
+  "creator": {
+    "id": "1400000000000000001",
+    "name": "Raid Leader"
+  },
+  "endTime": 1791849600,
+  "signUps": [
+    {
+      "id": 385438159,
+      "name": "Raid Leader",
+      "status": "primary",
+      "userId": "1400000000000000001",
+      "position": 1,
+      "roleName": "Healers",
+      "specName": "Holy1",
+      "cRoleName": "Healers",
+      "cSpecName": "Holy1",
+      "className": "Healer",
+      "entryTime": 1791781505,
+      "cClassName": "Healer",
+      "roleEmoteId": "592438128057253898",
+      "specEmoteId": "637564297622454272",
+      "classEmoteId": "898011741735235645"
+    }
+  ],
+  "leaderId": "1400000000000000001",
+  "serverId": "1200000000000000001",
+  "channelId": "1270113143124660246",
+  "coLeaders": [],
+  "startTime": 1791849600,
+  "leaderName": "Raid Leader",
+  "templateId": "wowforever",
+  "channelName": "raid-planning",
+  "channelType": "text",
+  "closingTime": 1791849600,
+  "description": "",
+  "lastUpdated": 1791781505,
+  "displayTitle": "Test Raid Event (edited)",
+  "announcements": [],
+  "advancedSettings": {
+    "color": "none",
+    "image": "none",
+    "limit": 9999,
+    "custom": "none",
+    "text_1": "default",
+    "text_2": "default",
+    "vacuum": false,
+    "opt_out": "none",
+    "bold_all": true,
+    "deadline": "0",
+    "deletion": "false",
+    "duration": 0,
+    "mentions": "none",
+    "poll_add": false,
+    "reminder": "false",
+    "response": "none",
+    "alt_names": false,
+    "dkp_delay": "24",
+    "hide_comp": false,
+    "show_info": true,
+    "temp_role": "false",
+    "temp_time": 24,
+    "thumbnail": "none",
+    "12h_format": false,
+    "attendance": "true",
+    "dkp_amount": 0,
+    "event_type": "interaction",
+    "font_style": "3",
+    "forum_tags": "Event",
+    "late_emote": "1551909947820998698",
+    "poll_order": "sorted",
+    "show_roles": true,
+    "show_title": true,
+    "tp_profile": "none",
+    "tp_win_min": 1,
+    "tr_include": "signed",
+    "bench_emote": "1551909915155767378",
+    "date1_emote": "1124529967611523272",
+    "date2_emote": "593930359985405983",
+    "dkp_include": "signed",
+    "lower_limit": 0,
+    "pin_message": false,
+    "queue_bench": false,
+    "show_banned": false,
+    "show_emotes": true,
+    "show_footer": true,
+    "show_leader": true,
+    "spec_saving": true,
+    "time1_emote": "1124529972883767398",
+    "time2_emote": "593930235658108939",
+    "tp_deletion": "1",
+    "banned_roles": "none",
+    "date_variant": "local",
+    "info_variant": "short",
+    "leader_emote": "1546282731271491706",
+    "mention_mode": false,
+    "poll_add_req": "none",
+    "show_allowed": false,
+    "show_classes": false,
+    "show_content": true,
+    "show_counter": true,
+    "absence_emote": "1551910028926124052",
+    "allowed_roles": "none",
+    "create_thread": "false",
+    "delete_thread": false,
+    "embed_profile": "false",
+    "lock_at_limit": true,
+    "notes_enabled": true,
+    "twelve_format": false,
+    "use_nicknames": true,
+    "voice_channel": "none",
+    "bench_overflow": true,
+    "disable_reason": false,
+    "limit_per_user": 1,
+    "mention_leader": false,
+    "preserve_order": "false",
+    "show_countdown": true,
+    "show_numbering": true,
+    "signups1_emote": "1124529971428339752",
+    "signups2_emote": "593930418932285440",
+    "thread_logging": false,
+    "allow_duplicate": false,
+    "apply_specreset": true,
+    "horizontal_mode": false,
+    "specreset_emote": "761163891144130560",
+    "tentative_emote": "1551909992901378171",
+    "apply_unregister": false,
+    "countdown1_emote": "1124530049329139772",
+    "countdown2_emote": "858794526176444467",
+    "defaults_pre_req": true,
+    "show_extra_specs": true,
+    "show_on_overview": true,
+    "specs_per_signup": 1,
+    "unregister_emote": "579506704518217739",
+    "disable_archiving": false,
+    "temp_voicechannel": "false",
+    "create_discordevent": true
+  }
+}

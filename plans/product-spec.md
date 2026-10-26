@@ -45,8 +45,8 @@ Guild name used throughout this spec: **Fuzion**, realm `Emberreach`, region `us
 | **Roster**                 | Full guild roster synced from the Blizzard API; filter by class, role, main/alt, raid team — class/level/rank sync day one via the app token, role/main-alt/raid-team need Battle.net linking (fast-follow, §5), officer-entered until then | Public                                             |
 | **Raid Progress**          | Current tier progress bar, boss kill order, linked WarcraftLogs parses                                                                                                                 | Public                                             |
 | **Calendar & Events**      | Mirrors Raid-Helper events & signups from Discord in real time; resolves signups to characters for raid comp view                                                                      | Public (view) · created via Raid-Helper in Discord |
-| **Applications**           | Recruiting form (class/role/availability); submission posts a notification to a Discord recruiting channel; officer review queue                                                     | Public form / Officer review                       |
-| **Professions & Crafting** | Searchable directory: who crafts what, at what skill level — synced per character via the Blizzard Profile API (§5) for linked characters, officer-entered otherwise                  | Public                                             |
+| **Applications**           | Recruiting form (class/role/playstyle/availability), with a required charter-agreement checkbox linking to the Charter page; submission posts a notification to a Discord recruiting channel; officer review queue                                                     | Public form / Officer review                       |
+| **Professions & Crafting** | Searchable directory: who crafts what, at what skill level — officer-entered at launch; synced from the Blizzard Profile API with the app token (§5) only if Forever's API exposes professions (#101) | Public                                             |
 | **PvP**                    | Rated BG ratings pulled from the Blizzard API, guild leaderboard. Optional: may not be included, depending on guild interest                                                           | Public                                             |
 | **Streams**                | Grid of member Twitch/YouTube channels; featured "who's live" widget                                                                                                                   | Public                                             |
 | **Member Dashboard**       | Manage linked characters/alts, notification prefs, stream channel                                                                                                                      | Members                                            |
@@ -63,7 +63,7 @@ Auth goes through the backend's `internal/auth` package ([project-structure.md](
 - **Discord** (launch) — the only provider at launch ([project-structure.md](project-structure.md) decision 2); matches how the guild already communicates day to day, and lets the site gate access on guild-server membership at the session layer.
 - **Battle.net** (fast-follow) — added later as a second `Provider` implementation. Once it lands, it proves character ownership: the returned profile token lets the app call the member's own `/profile/user/wow` endpoints for their character list on the guild's realm. This is also what unlocks self-service character claiming — after Battle.net login, the app lists a member's characters on `Emberreach` and lets them tag one as **main**, the rest as **alts**, and assign a raid team.
 
-A member will eventually be able to link both to one account. This project needs its own admin-level Blizzard app credentials for the background guild-roster sync (§5) — membership only (name, class, level, rank). Gear, spec, and professions aren't part of that roster call at all; Blizzard only exposes those through the per-character Profile API, authorized by that character's own linked OAuth token — the same token granted during character claiming, not the app-level credential. So gear/spec/professions can only ever be synced for characters whose owner has linked Battle.net; there's no guild-wide equivalent.
+A member will eventually be able to link both to one account. This project needs its own app-level Blizzard credentials (client credentials) for the background syncs (§5). The guild-roster call returns membership only (name, class, level, rank), but the same app token also reads a public character's Profile API endpoints: on retail, `/professions` answers an app token with no owner authorization. So gear, spec and professions don't depend on the owner linking Battle.net. Linking is only needed for what the app token can't see: the member's own character list (`/profile/user/wow`), which is what proves ownership. Whether Forever exposes `/profile/user/wow` is unconfirmed (#101); if it doesn't, ownership needs another path, such as officers assigning owners.
 
 > **Fallback:** officers can hand-add or correct any character in the Officer Console without requiring the owner to link Battle.net. This is the *only* path for character data at launch, since Battle.net linking is fast-follow, and it remains available afterward for members who'd rather not link at all.
 
@@ -104,9 +104,9 @@ Each external source is polled on its own schedule and cached in Postgres, so a 
 | Source                    | Feeds                                 | Example call                                                                   | Cadence                               | Launch risk |
 | ------------------------- | ------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------- | ----------- |
 | Battle.net OAuth          | Login, character ownership            | `oauth.battle.net/authorize`                                                   | On login                              | RARE        |
-| Raid-Helper (Discord bot) | Event calendar, signups & attendance  | Webhook: `event.created`/`updated`/`deleted`, plus API fetch for signup detail | Real-time (webhook) + on-demand fetch | RARE        |
+| Raid-Helper (Discord bot) | Event calendar, signups & attendance  | Webhook: `event.create`/`update`/`delete` (Premium; [details](integrations/raid-helper.md)), plus API fetch for signup detail | Real-time (webhook) + on-demand fetch | RARE        |
 | Blizzard Game Data API (app token)     | Guild roster membership: name, class, level, rank        | `GET /data/wow/guild/{realm}/{guild}/roster`                                            | Hourly cron                    | LEGENDARY   |
-| Blizzard Profile API (per-character OAuth token) | Gear, spec, professions & skill level — linked characters only | `GET /profile/wow/character/{realm}/{name}/equipment` · `/specializations` · `/professions` | On link + periodic refresh     | LEGENDARY   |
+| Blizzard Profile API (app token, public characters) | Gear, spec, professions & skill level — any public roster character | `GET /profile/wow/character/{realm}/{name}/equipment` · `/specializations` · `/professions` | Periodic refresh               | LEGENDARY   |
 | WarcraftLogs API v2       | Raid parses, kill logs                | `POST /api/v2/client` (GraphQL)                                                | Hourly / on new report                | LEGENDARY   |
 | Twitch Helix API          | Live channel detection                | `GET /helix/streams?game_id={retail_id}`                                       | Poll every 60s                        | RARE        |
 | YouTube                   | Live badge (manual)                   | No reliable "live in category" filter — member self-toggles "I'm live" instead | —                                     | UNCOMMON    |
@@ -115,9 +115,9 @@ The LEGENDARY risk above is purely whether Blizzard and WarcraftLogs expose matc
 
 > **Raider.io is not used.** It was considered for dungeon score and PvP rating, but it is no longer needed: there will be no dungeon score to track, and PvP rating can be acquired from Blizzard (see the PvP page in §2).
 
-**Professions & Crafting is a Profile API feed, not a Game Data API one.** Assuming Forever's Blizzard API surface matches retail and classic (both already expose `GET /profile/wow/character/{realm}/{name}/professions`), profession/skill-level data is available — but, like gear and spec, only per character and only once that character's owner has authorized the app via Battle.net (the same per-character OAuth token used for claiming, §3). There's no app-level "give me professions for the whole guild" call the way there is for guild roster membership. So the **Professions & Crafting** page (§2) is populated the same way Roster's self-service side is: automatically for linked characters, with officers able to hand-enter a character's professions in the Officer Console as the day-one fallback before Battle.net linking exists (mirroring the Roster fallback in §3).
+**Professions & Crafting is a Profile API feed, and the app token is enough where the endpoint exists.** On retail (`profile-us`), `GET /profile/wow/character/{realm}/{name}/professions` returns primaries, secondaries, per-expansion tiers with `skill_points`/`max_skill_points`, and `known_recipes`, called with the app token (client credentials) and no owner authorization. There's no guild-wide professions call, but the sync can walk the roster and fetch each public character. Classic Era (`profile-classic1x-us`) has no professions endpoint: the same path returns 404, and the character profile has no professions link. Forever's profession system is expected to be closer to Classic than retail, so the working assumption is a 404 until #101 checks a live Forever character. Officers hand-enter professions in the Officer Console at launch, and that stays the permanent source if Forever has no endpoint.
 
-The **Calendar** page is a mirror, not a second source of truth: officers create and edit raid events with the Raid-Helper bot in Discord as they already do, a webhook pushes each create/update/delete to the site instantly, and a follow-up API fetch resolves attendee Discord IDs (from each member's linked Discord account) to the site's characters for a proper raid comp view.
+The **Calendar** page is a mirror, not a second source of truth: officers create and edit raid events with the Raid-Helper bot in Discord as they already do, a webhook pushes each create/update/delete to the site instantly (a delete leaves a tombstone so a late update cannot bring the raid back), and a follow-up API fetch resolves attendee Discord IDs (from each member's linked Discord account) to the site's characters for a proper raid comp view.
 
 The **Streams** page's "featured live guildie" widget: streamers are expected to tag Forever content under the existing [`world-of-warcraft`](https://www.twitch.tv/directory/category/world-of-warcraft) (retail) category, since Twitch has no separate Forever category. A scheduled job resolves that game ID once (via Twitch's Get Games endpoint, cached), then polls Twitch Helix for the guild's known channel IDs (from each member's linked `StreamChannel`, §8) filtered to that category ID and `type=live`. The job caches the live list, and the featured-widget component picks one at random on each page load/refresh.
 
@@ -134,7 +134,7 @@ flowchart TB
     BE -.->|"OAuth login · fast-follow"| BattleNet["Battle.net<br/>OAuth provider"]
     BE <-->|webhook + fetch| RaidHelper["Raid-Helper<br/>Discord bot · event mirror"]
     Sync["Sync jobs<br/>proposed, see below"] -->|"hourly · app token"| BlizzardRoster["Blizzard Game Data API<br/>guild roster"]
-    Sync -->|"on link + periodic · per-character token"| BlizzardProfile["Blizzard Profile API<br/>gear, spec, professions"]
+    Sync -->|"periodic · app token"| BlizzardProfile["Blizzard Profile API<br/>gear, spec, professions"]
     Sync -->|"hourly / on new report"| WCL["WarcraftLogs<br/>raid parses"]
     Sync -->|"poll · every 60s"| Twitch["Twitch Helix<br/>live channel check"]
     Sync -->|writes| PG
@@ -146,7 +146,7 @@ _The React frontend only ever talks to its own origin; Render's static-site rewr
 
 Not yet a confirmed decision — flagged in Open Questions. Proposed default: each polled source in §5 runs as its own **Render Cron Job service**, built from `backend/` (e.g. `cmd/sync/main.go` invoking the same `internal/blizzard`-style packages the API uses), on that source's own cadence, writing results into Postgres for the API to read back. This is favored over an in-process scheduler goroutine inside the web service so a hung or slow sync run can't affect API request handling, and so each source's cadence is independently configurable in `render.yaml`.
 
-The Blizzard **Profile API** sync (gear/spec/professions) doesn't fit that shape as cleanly, since it's per-character rather than a single guild-wide pull: an immediate sync fires when a character is first linked (a request-triggered call, not a cron job), and a periodic Cron Job separately re-syncs already-linked characters on a longer interval to catch gear/spec/profession changes.
+The Blizzard **Profile API** sync (gear/spec/professions) is per-character rather than a single guild-wide pull, but it uses the same app token, so it fits the same shape: a periodic Cron Job walks the synced roster and fetches each public character's profile. It doesn't wait on Battle.net linking. It only applies once #101 confirms Forever exposes these endpoints.
 
 ## 7. Roadmap & risk
 
@@ -161,7 +161,7 @@ You asked for full-featured at launch, so that's the target below — but a bran
 - RARE — News post publish → Discord announcements cross-post
 - RARE — Application submit → Discord recruiting-channel cross-post
 - UNCOMMON — Manual roster entry by officers (day-one safety net; only path for character data until Battle.net linking lands)
-- UNCOMMON — Manual profession entry by officers (same day-one safety net, same reason — see §5)
+- UNCOMMON — Manual profession entry by officers (day-one safety net, and the permanent source if Forever's API has no professions endpoint — see §5)
 - RARE — Twitch "who's live" widget (filtered to the retail `world-of-warcraft` category — see §5)
 - LEGENDARY — Attempt: Blizzard guild-roster sync (app token), WarcraftLogs widgets
 
@@ -169,7 +169,7 @@ You asked for full-featured at launch, so that's the target below — but a bran
 
 - RARE — Battle.net OAuth + alt/character claiming ([project-structure.md](project-structure.md) decision 2)
 - LEGENDARY — Automatic Blizzard guild-roster sync goes live
-- LEGENDARY — Automatic Blizzard Profile API sync (gear, spec, professions) goes live per linked character — blocked on Battle.net OAuth shipping first (the RARE item above), not just on Blizzard API availability, so this can't be attempted at launch the way guild-roster/WarcraftLogs can
+- LEGENDARY — Automatic Blizzard Profile API sync (gear, spec, professions) goes live for public roster characters via the app token — depends only on Forever's API exposing these endpoints (#101), not on Battle.net OAuth. Classic Era has no professions endpoint, so professions may never sync
 - LEGENDARY — Raid Progress page switches from manual entry to live WarcraftLogs data
 - LEGENDARY — PvP leaderboard and tracking switch to live Blizzard data (may not be included, depending on guild interest)
 - POOR — YouTube live auto-detection (deferred indefinitely; manual toggle stays)
@@ -185,7 +185,7 @@ Core entities, kept deliberately simple for v1 and built fresh in this project's
 - **RaidTeam** — id, name, raid_night_schedule
 - **Event** — id, raid_helper_event_id, type, starts_at, raid_team_id — created/updated by the Raid-Helper webhook
 - **EventSignup** — id, event_id, discord_user_id, character_id (resolved via linked Discord account), status
-- **Application** — id, user_id (nullable — applicant likely has no account yet), character_id (nullable, same reason), applicant_name, class, role, availability, notes, status, submitted_at
+- **Application** — id, user_id (nullable — applicant likely has no account yet), character_id (nullable, same reason), applicant_name, class, role, playstyle, availability, notes, status, submitted_at
 - **Post** — id, author_user_id, title, body (Markdown, may embed uploaded images by `/api/images/{id}` URL), pinned, published_at
 - **Image** — id, content_type, width, height, full_bytes, thumb_bytes, created_at — WebP variants stored in Postgres and served by the backend; referenced from Post bodies by `/api/images/{id}` (issue #7)
 - **Topic** — id, name — many-to-many with Post; doubles as the News category system
@@ -195,9 +195,9 @@ Core entities, kept deliberately simple for v1 and built fresh in this project's
 
 ## 9. Open questions
 
-- Will Blizzard expose both the Game Data API (guild roster) and the Profile API (gear/spec/professions) for Forever at or near launch, and will realm/region slugs match retail conventions? Assumed to mirror retail/classic in shape (§5); timing for a day-one game is still unconfirmed.
+- Will Blizzard expose both the Game Data API (guild roster) and the Profile API (gear/spec/professions) for Forever at or near launch, and will realm/region slugs match retail conventions? Retail and Classic Era already differ: Classic Era has no professions endpoint (§5), and Forever is expected to resemble Classic. Realm slugs are expected to follow retail's lowercase, hyphenated format (e.g. `dragonmaw`), based on the predicted Forever Armory URL. The Forever namespace and timing for a day-one game are unconfirmed. Tracked in #101.
 - Will WarcraftLogs add Forever support on day one, in the first weeks, or not at all?
-- Raid-Helper's docs site renders via JS and couldn't be fully verified by automated fetch — confirm the exact webhook payload shape and signing scheme (and whether event creation via API exists on a paid tier) directly in a browser before building the integration.
+- Raid-Helper's webhook payload and auth were verified against real captures in [integrations/raid-helper.md](integrations/raid-helper.md) (#8): bodies are the full event object, the type comes in the `X-Raidhelper-Event` header, and auth is the bare webhook key in `Authorization` (no signature). Still open, in section 6 there: retry behaviour on a non-200, whether a recurring event gets a new `id`, and whether events can be created via the API.
 - Should admin changes to `is_officer` / `is_admin` be logged/audited? Deferred for now, not blocking launch.
 - Sync job scheduling mechanism: §6 proposes Render Cron Job services per source; not yet confirmed.
 - Discord webhook URL(s) for the Applications recruiting-channel cross-post (§2): same channel/webhook as the News cross-post, or a separate one? Needs a webhook URL created in the target Discord server either way, stored as an env var (never committed).
@@ -206,7 +206,7 @@ Core entities, kept deliberately simple for v1 and built fresh in this project's
 
 1. Scaffold the repo per [project-structure.md](project-structure.md)'s layout (`frontend/`, `backend/`, `e2e/`, `docker-compose.yml`, `render.yaml`); ship manual-entry Roster and Calendar first, since those don't depend on any external API.
 2. Wire up Discord OAuth (`internal/auth`) and the guild-membership session gate.
-3. Register a Raid-Helper webhook endpoint (verify signatures) and map Discord user IDs to site accounts so signups resolve to characters.
+3. Register a Raid-Helper webhook endpoint (checks the webhook key; built in #31) and map Discord user IDs to site accounts so signups resolve to characters.
 4. Stand up the three Render services from `render.yaml` (static site, web service, managed Postgres) and confirm the `/api/*` proxy and the GitHub Actions test gate are green before the first real deploy.
 5. Build each sync job (Blizzard, WarcraftLogs, Twitch) behind a feature flag that no-ops gracefully until that source confirms Forever support.
 6. Add Battle.net OAuth + character claiming once scoped (fast-follow, [project-structure.md](project-structure.md) decision 2).

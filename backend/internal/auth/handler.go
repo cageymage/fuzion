@@ -6,10 +6,14 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
+
+const maxReturnToLength = 2048
 
 type Handler struct {
 	service *Service
@@ -44,6 +48,7 @@ type meResponse struct {
 	AvatarURL       *string   `json:"avatarUrl"`
 	IsOfficer       bool      `json:"isOfficer"`
 	IsAdmin         bool      `json:"isAdmin"`
+	IsGuildMember   bool      `json:"isGuildMember"`
 	BattleNetLinked bool      `json:"battlenetLinked"`
 	BattleTag       *string   `json:"battletag"`
 }
@@ -68,11 +73,48 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, stateCookie(r, state))
+	if returnTo, ok := sameSitePath(r.URL.Query().Get("returnTo")); ok {
+		http.SetCookie(w, returnToCookie(r, returnTo))
+	}
 	http.Redirect(w, r, h.service.AuthURL(state), http.StatusFound)
+}
+
+// sameSitePath accepts only a path on this site, so a login link cannot be turned into an open redirect.
+func sameSitePath(raw string) (string, bool) {
+	if len(raw) == 0 || len(raw) > maxReturnToLength || raw[0] != '/' || strings.HasPrefix(raw, "//") {
+		return "", false
+	}
+	for _, c := range raw {
+		if c == '\\' || c < 0x20 || c == 0x7f {
+			return "", false
+		}
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme != "" || parsed.Host != "" {
+		return "", false
+	}
+	return raw, true
+}
+
+// returnPath is where a finished login sends the browser: the page it started from, or home.
+func returnPath(r *http.Request) string {
+	cookie, err := r.Cookie(returnToCookieName)
+	if err != nil {
+		return "/"
+	}
+	raw, err := url.QueryUnescape(cookie.Value)
+	if err != nil {
+		return "/"
+	}
+	if path, ok := sameSitePath(raw); ok {
+		return path
+	}
+	return "/"
 }
 
 func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, expiredCookie(r, stateCookieName))
+	http.SetCookie(w, expiredCookie(r, returnToCookieName))
 
 	stateCookie, err := r.Cookie(stateCookieName)
 	if err != nil {
@@ -86,9 +128,9 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The user pressed Cancel on the consent screen; send them home logged out.
+	// The user pressed Cancel on the consent screen; send them back logged out.
 	if r.URL.Query().Get("error") != "" {
-		http.Redirect(w, r, "/", http.StatusFound)
+		http.Redirect(w, r, returnPath(r), http.StatusFound)
 		return
 	}
 
@@ -100,7 +142,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.InfoContext(r.Context(), "user logged in", "user_id", user.ID, "username", user.Username)
 	http.SetCookie(w, sessionCookie(r, token))
-	http.Redirect(w, r, "/", http.StatusFound)
+	http.Redirect(w, r, returnPath(r), http.StatusFound)
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
@@ -122,11 +164,12 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, meResponse{
-		ID:        user.ID,
-		Username:  user.Username,
-		AvatarURL: user.AvatarURL,
-		IsOfficer: user.HasOfficerAccess(),
-		IsAdmin:   user.IsAdmin,
+		ID:            user.ID,
+		Username:      user.Username,
+		AvatarURL:     user.AvatarURL,
+		IsOfficer:     user.HasOfficerAccess(),
+		IsAdmin:       user.IsAdmin,
+		IsGuildMember: user.IsGuildMember,
 
 		BattleNetLinked: user.BattleNetID != nil,
 		BattleTag:       user.BattleNetTag,

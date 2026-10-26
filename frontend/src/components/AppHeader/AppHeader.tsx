@@ -1,18 +1,21 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { loginUrl, logout } from '../../api/auth'
+import { logout } from '../../api/auth'
 import { navItems } from '../../app/navigation'
 import logo144 from '../../assets/logo-144.webp'
 import logo48 from '../../assets/logo-48.webp'
 import logo96 from '../../assets/logo-96.webp'
 import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
+import { useLoginUrl } from '../../hooks/useLoginUrl'
 import styles from './AppHeader.module.css'
 
 export function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const navId = useId()
+  const isGuildMember = useCurrentUser().data?.isGuildMember ?? false
+  const visibleNavItems = navItems.filter((item) => !item.guildMembersOnly || isGuildMember)
 
   function closeMenuOnEscape(event: KeyboardEvent) {
     if (event.key === 'Escape' && menuOpen) {
@@ -49,7 +52,7 @@ export function AppHeader() {
         className={menuOpen ? `${styles.nav} ${styles.navOpen}` : styles.nav}
         aria-label="Main"
       >
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
@@ -70,6 +73,7 @@ export function AppHeader() {
 
 function AccountMenu() {
   const currentUser = useCurrentUser()
+  const loginUrl = useLoginUrl()
   const queryClient = useQueryClient()
   const logoutMutation = useMutation({
     mutationFn: logout,

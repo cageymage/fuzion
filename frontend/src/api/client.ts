@@ -56,7 +56,11 @@ export async function apiPut(path: string, body: unknown): Promise<void> {
   }
 }
 
-export async function apiSend<T>(method: 'POST' | 'PATCH', path: string, body: unknown): Promise<T> {
+export async function apiSend<T>(
+  method: 'POST' | 'PUT' | 'PATCH',
+  path: string,
+  body: unknown,
+): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
     credentials: 'include',

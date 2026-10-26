@@ -137,3 +137,90 @@ func TestDiscordExchange_ReturnsError_WhenUserEndpointFails(t *testing.T) {
 		t.Errorf("expected empty identity, got %+v", got)
 	}
 }
+
+func newDiscordInGuild(baseURL string) *auth.Discord {
+	return auth.NewDiscord(auth.DiscordConfig{
+		ClientID:     testutil.DiscordClientID,
+		ClientSecret: testutil.DiscordClientSecret,
+		RedirectURL:  testutil.DiscordRedirectURL,
+		BaseURL:      baseURL,
+		GuildID:      testutil.DiscordGuildID,
+	}, http.DefaultClient)
+}
+
+func TestDiscordAuthURL_RequestsGuildsScope_WhenGuildIDIsConfigured(t *testing.T) {
+	// given a Discord provider that knows which server to look for
+	discord := newDiscordInGuild("https://discord.com/api")
+
+	// when I build the authorize URL
+	got := discord.AuthURL("random-state-123")
+
+	// then I expect the scope to ask for the user's server list as well as their identity
+	parsed, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("parse auth url %q: %v", got, err)
+	}
+	if scope := parsed.Query().Get("scope"); scope != "identify guilds" {
+		t.Errorf("expected scope %q, got %q", "identify guilds", scope)
+	}
+}
+
+func TestDiscordExchange_ReportsServerMembership_WhenUserIsInTheConfiguredGuild(t *testing.T) {
+	// given a user who is in the guild's Discord server and one other
+	fake := testutil.NewFakeDiscord(t)
+	fake.GrantCode("abc123", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane", Guilds: []string{"111111111111111111", testutil.DiscordGuildID}})
+	discord := newDiscordInGuild(fake.URL)
+
+	// when I exchange the code
+	got, err := discord.Exchange(context.Background(), "abc123")
+
+	// then I expect the identity to say they are in the server
+	if err != nil {
+		t.Fatalf("exchange: %v", err)
+	}
+	want := auth.Identity{ProviderUserID: "80351110224678912", Username: "thundermane", InDiscordServer: true}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected identity (-want +got):\n%s", diff)
+	}
+}
+
+func TestDiscordExchange_ReportsNoServerMembership_WhenUserIsNotInTheConfiguredGuild(t *testing.T) {
+	// given a user who is only in other servers
+	fake := testutil.NewFakeDiscord(t)
+	fake.GrantCode("abc123", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane", Guilds: []string{"111111111111111111"}})
+	discord := newDiscordInGuild(fake.URL)
+
+	// when I exchange the code
+	got, err := discord.Exchange(context.Background(), "abc123")
+
+	// then I expect the identity to say they are not in the server
+	if err != nil {
+		t.Fatalf("exchange: %v", err)
+	}
+	want := auth.Identity{ProviderUserID: "80351110224678912", Username: "thundermane", InDiscordServer: false}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected identity (-want +got):\n%s", diff)
+	}
+}
+
+func TestDiscordExchange_ReturnsError_WhenGuildsEndpointFails(t *testing.T) {
+	// given a fake Discord that fails the server list lookup
+	fake := testutil.NewFakeDiscord(t)
+	fake.GrantCode("abc123", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane"})
+	fake.GuildsEndpointStatus = http.StatusInternalServerError
+	discord := newDiscordInGuild(fake.URL)
+
+	// when I exchange the code
+	got, err := discord.Exchange(context.Background(), "abc123")
+
+	// then I expect a wrapped error naming the guilds step and an empty identity
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	if !strings.Contains(err.Error(), "fetch discord guilds") || !strings.Contains(err.Error(), "500") {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if got != (auth.Identity{}) {
+		t.Errorf("expected empty identity, got %+v", got)
+	}
+}

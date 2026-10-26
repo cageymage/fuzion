@@ -20,7 +20,8 @@ func TestMain(m *testing.M) {
 type meJSON struct {
 	ID        string  `json:"id"`
 	Username  string  `json:"username"`
-	AvatarURL *string `json:"avatarUrl"`
+	AvatarURL     *string `json:"avatarUrl"`
+	IsGuildMember bool    `json:"isGuildMember"`
 }
 
 type userRow struct {
@@ -258,6 +259,63 @@ func TestAuthMe_ReturnsCurrentUser_WhenSessionCookieIsValid(t *testing.T) {
 	}
 }
 
+func TestAuthMe_ReportsGuildMember_WhenUserIsInTheDiscordServer(t *testing.T) {
+	// given a logged-in user who is in the guild's Discord server
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	user := srv.LoginAs(t, "80351110224678912", "thundermane", testutil.InDiscordServer())
+
+	// when I ask who I am
+	resp := srv.Get(t, "/api/auth/me")
+
+	// then I expect to be reported as a guild member
+	resp.RequireStatus(t, 200)
+	var me meJSON
+	resp.DecodeJSON(t, &me)
+	want := meJSON{ID: user.ID.String(), Username: "thundermane", AvatarURL: nil, IsGuildMember: true}
+	if diff := cmp.Diff(want, me); diff != "" {
+		t.Errorf("unexpected /me response (-want +got):\n%s", diff)
+	}
+}
+
+func TestAuthMe_ReportsNotGuildMember_WhenUserIsNotInTheDiscordServer(t *testing.T) {
+	// given a logged-in user who is not in the guild's Discord server
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	user := srv.LoginAs(t, "80351110224678912", "thundermane")
+
+	// when I ask who I am
+	resp := srv.Get(t, "/api/auth/me")
+
+	// then I expect not to be reported as a guild member
+	resp.RequireStatus(t, 200)
+	var me meJSON
+	resp.DecodeJSON(t, &me)
+	want := meJSON{ID: user.ID.String(), Username: "thundermane", AvatarURL: nil, IsGuildMember: false}
+	if diff := cmp.Diff(want, me); diff != "" {
+		t.Errorf("unexpected /me response (-want +got):\n%s", diff)
+	}
+}
+
+func TestAuthMe_ReportsGuildMember_WhenNoDiscordGuildIsConfigured(t *testing.T) {
+	// given a deploy without DISCORD_GUILD_ID and a logged-in user with no server membership recorded
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db, testutil.WithoutDiscordGuild())
+	user := srv.LoginAs(t, "80351110224678912", "thundermane")
+
+	// when I ask who I am
+	resp := srv.Get(t, "/api/auth/me")
+
+	// then I expect to be reported as a guild member
+	resp.RequireStatus(t, 200)
+	var me meJSON
+	resp.DecodeJSON(t, &me)
+	want := meJSON{ID: user.ID.String(), Username: "thundermane", AvatarURL: nil, IsGuildMember: true}
+	if diff := cmp.Diff(want, me); diff != "" {
+		t.Errorf("unexpected /me response (-want +got):\n%s", diff)
+	}
+}
+
 func TestAuthMe_ReturnsUnauthorized_WhenNoSessionCookie(t *testing.T) {
 	// given nobody is logged in
 	db := testutil.DB(t)
@@ -330,4 +388,133 @@ func TestAuthLogout_ReturnsNoContent_WhenNobodyIsLoggedIn(t *testing.T) {
 
 	// then I expect a 204
 	resp.RequireStatus(t, 204)
+}
+
+func TestAuthCallback_StoresServerMembership_WhenUserIsInTheGuildServer(t *testing.T) {
+	// given a login by someone who is in the guild's Discord server
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	state := startLogin(t, srv)
+	srv.Discord.GrantCode("code-1", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane", Guilds: []string{testutil.DiscordGuildID}})
+
+	// when Discord sends the browser back with the code
+	resp := srv.Get(t, "/api/auth/callback?code=code-1&state="+state)
+
+	// then I expect the user row to be flagged as in the server
+	resp.RequireStatus(t, 302)
+	var inServer bool
+	if err := db.Get(&inServer, `SELECT in_discord_server FROM users WHERE discord_id = '80351110224678912'`); err != nil {
+		t.Fatalf("select in_discord_server: %v", err)
+	}
+	if !inServer {
+		t.Error("expected in_discord_server to be true")
+	}
+}
+
+func TestAuthCallback_ClearsServerMembership_WhenReturningUserHasLeftTheGuildServer(t *testing.T) {
+	// given a user flagged as in the server who has since left it
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO users (id, discord_id, username, in_discord_server)
+		VALUES ('11111111-1111-1111-1111-111111111111', '80351110224678912', 'thundermane', true)`)
+	state := startLogin(t, srv)
+	srv.Discord.GrantCode("code-1", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane", Guilds: []string{"111111111111111111"}})
+
+	// when they log in again
+	resp := srv.Get(t, "/api/auth/callback?code=code-1&state="+state)
+
+	// then I expect the flag to be cleared
+	resp.RequireStatus(t, 302)
+	var inServer bool
+	if err := db.Get(&inServer, `SELECT in_discord_server FROM users WHERE discord_id = '80351110224678912'`); err != nil {
+		t.Fatalf("select in_discord_server: %v", err)
+	}
+	if inServer {
+		t.Error("expected in_discord_server to be false")
+	}
+}
+
+// startLoginFrom walks the /login step from a page and returns the state Discord will be asked to echo back.
+func startLoginFrom(t *testing.T, srv *testutil.Server, returnTo string) string {
+	t.Helper()
+	resp := srv.Get(t, "/api/auth/login?returnTo="+url.QueryEscape(returnTo))
+	resp.RequireStatus(t, 302)
+	location, err := url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatalf("parse login redirect: %v", err)
+	}
+	return location.Query().Get("state")
+}
+
+func TestAuthCallback_RedirectsBackToTheStartingPage_WhenLoginWasStartedFromAPage(t *testing.T) {
+	// given a login started from a survey page, with a query string
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	state := startLoginFrom(t, srv, "/surveys/80121ea3-bd78-4b60-b524-7d5de4f470a1?tab=results")
+	srv.Discord.GrantCode("code-1", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane"})
+
+	// when Discord sends the browser back with the code and matching state
+	resp := srv.Get(t, "/api/auth/callback?code=code-1&state="+state)
+
+	// then I expect a redirect to that survey page and the return cookie cleared
+	resp.RequireStatus(t, 302)
+	if got := resp.Header.Get("Location"); got != "/surveys/80121ea3-bd78-4b60-b524-7d5de4f470a1?tab=results" {
+		t.Errorf("expected redirect back to the survey page, got %q", got)
+	}
+	if cookie := setCookie(t, resp, "fuzion_return_to"); cookie.MaxAge >= 0 {
+		t.Errorf("expected the return cookie to be expired, got %s", cookie.String())
+	}
+}
+
+func TestAuthCallback_RedirectsHome_WhenReturnToIsNotASameSitePath(t *testing.T) {
+	tests := []struct {
+		name     string
+		returnTo string
+	}{
+		{"absolute URL on another site", "https://evil.example/phish"},
+		{"protocol-relative URL", "//evil.example/phish"},
+		{"backslash that browsers read as a slash", "/\\evil.example"},
+		{"path without a leading slash", "surveys/abc"},
+		{"javascript scheme", "javascript:alert(1)"},
+		{"control character in the path", "/surveys\r\nSet-Cookie: x=1"},
+		{"empty value", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// given a login started with a return target that is not a same-site path
+			db := testutil.DB(t)
+			srv := testutil.NewServer(t, db)
+			state := startLoginFrom(t, srv, tt.returnTo)
+			srv.Discord.GrantCode("code-1", testutil.DiscordUser{ID: "80351110224678912", Username: "thundermane"})
+
+			// when Discord sends the browser back with the code and matching state
+			resp := srv.Get(t, "/api/auth/callback?code=code-1&state="+state)
+
+			// then I expect a redirect home instead
+			resp.RequireStatus(t, 302)
+			if got := resp.Header.Get("Location"); got != "/" {
+				t.Errorf("expected redirect to /, got %q", got)
+			}
+		})
+	}
+}
+
+func TestAuthCallback_RedirectsBackToTheStartingPageLoggedOut_WhenUserDeniesConsent(t *testing.T) {
+	// given a login started from the officer applications page
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	state := startLoginFrom(t, srv, "/officer/applications")
+
+	// when Discord sends the browser back with an error instead of a code
+	resp := srv.Get(t, "/api/auth/callback?error=access_denied&state="+state)
+
+	// then I expect a redirect to that page with no session cookie
+	resp.RequireStatus(t, 302)
+	if got := resp.Header.Get("Location"); got != "/officer/applications" {
+		t.Errorf("expected redirect to /officer/applications, got %q", got)
+	}
+	if _, ok := srv.Cookie(t, "fuzion_session"); ok {
+		t.Error("expected no session cookie after a denied login")
+	}
 }

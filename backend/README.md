@@ -27,8 +27,11 @@ Environment:
 | `DISCORD_CLIENT_ID`     | required | from the Discord developer portal (OAuth2 tab) |
 | `DISCORD_CLIENT_SECRET` | required | same place; never commit it        |
 | `DISCORD_REDIRECT_URL`  | required | must be registered on the Discord app; `http://localhost:5173/api/auth/callback` in dev |
+| `DISCORD_GUILD_ID`      | optional | the guild Discord server's ID (Developer Mode, right-click the server, Copy Server ID). When set, login also asks for the `guilds` scope and records whether the user is in that server. Only users in the server count as guild members (`isGuildMember` on `/api/auth/me`), and only guild members can answer surveys; responses also carry the flag for officers. It is read at login and kept on the account, so it is as old as the person's last login (up to 30 days for someone who stays logged in; logging out and in refreshes it). Without it every logged-in user counts as a guild member, the stored flag is false for everyone, and the officer "only people in our Discord server" filter hides every response |
+| `RAID_HELPER_WEBHOOK_SECRET` | optional | Raid-Helper's webhook key from `/webhooks show`; without it `POST /api/webhooks/raid-helper` is not registered (404) |
 | `TWITCH_CLIENT_ID`      | optional | `cmd/sync` only; from a dev.twitch.tv app. The Twitch job skips itself unless both are set |
 | `TWITCH_CLIENT_SECRET`  | optional | same place; never commit it        |
+| `YOUTUBE_API_KEY`       | optional | YouTube Data API v3 key. The API uses it for the suggested video; `cmd/sync youtube` skips itself without it |
 | `SYNC_BLIZZARD_ROSTER_ENABLED` | `false` | `cmd/sync` only; the Blizzard roster job does nothing unless this is `true` |
 | `BLIZZARD_CLIENT_ID`    | when enabled | from a develop.battle.net client |
 | `BLIZZARD_CLIENT_SECRET` | when enabled | same place; never commit it |
@@ -39,7 +42,7 @@ Environment:
 | `BATTLENET_REDIRECT_URL` | optional | enables Battle.net account linking on `/dashboard`; must be registered on the Blizzard client, `http://localhost:5173/api/auth/battlenet/callback` in dev. Needs `BLIZZARD_CLIENT_ID` and `BLIZZARD_CLIENT_SECRET` on the API too |
 
 Background jobs run from `cmd/sync`, one job per invocation, once and exit
-(Render runs `/sync twitch` every minute). Locally, with the API already run
+(Render runs `/sync twitch` every minute and `/sync youtube` every 5 minutes). Locally, with the API already run
 once so migrations are applied:
 
 ```
@@ -52,6 +55,26 @@ game: a guildie live in retail WoW (game id 18122) is `isLive`, one live in
 another game is `isLiveOtherGame` (never shown on the home page), and anyone
 else has both flags false. It also stores each live stream's title and a
 thumbnail URL with a fixed 440x248 size.
+
+`sync youtube` does the same for rows with a `youtube_channel_id` (the `UC...`
+ID, not the `@handle`). A row has a Twitch login or a YouTube channel ID, never
+both, so a member who streams on both gets two rows and each job only touches
+its own. YouTube has no game category, so any live stream counts as `isLive`.
+For each channel it reads the 10 most recent uploads from the channel's uploads
+playlist and looks them up with `videos.list`: a live stream is one of the
+uploads, though Shorts posted during it can push it below the newest. A channel
+with no uploads playlist is skipped. Each run costs about one quota unit per
+channel plus two; quota errors (`quotaExceeded`) land in `sync_log` like any
+other failure.
+
+To try it locally, add a row for a channel that is live now:
+
+```
+INSERT INTO streams (streamer_name, game_name, channel_url, youtube_channel_id)
+VALUES ('Lofi Girl', '', 'https://www.youtube.com/@LofiGirl', 'UCSJ4gkVC6NrvII8umztf0Ow');
+```
+
+then run `npx dotenv -e .env -e .env.example -- go run -C backend ./cmd/sync youtube`.
 
 `sync blizzard-roster` pulls the guild roster from Blizzard once an hour and
 is off until `SYNC_BLIZZARD_ROSTER_ENABLED=true`. For each member it adds the
@@ -69,6 +92,18 @@ Monk, Demon Hunter, Evoker exist on retail only) are skipped and counted in
 the `sync_log` message, and an empty or failed Blizzard response changes
 nothing.
 
+Raid-Helper events reach the `raids` table through its webhook (Premium only).
+Point `/webhooks set` for `event.create`, `event.update` and `event.delete` at
+`https://<site>/api/webhooks/raid-helper` (one URL serves all three: the type is
+in the `X-Raidhelper-Event` header) and leave `comp.update` unset. The title
+becomes `instance_name`, `startTime` becomes `starts_at`, and the difficulty is
+`Normal`, `Heroic` or `Mythic` when the title names one, else `Unknown`. An
+update whose `lastUpdated` is strictly older than the stored one is skipped. A
+delete keeps the row with `deleted_at` set, which hides it from `/api/raids` and
+stops a late create or update from bringing it back. Hand-entered raids (no
+`raid_helper_event_id`) are never touched. Payload details and the captures the
+tests use are in [plans/integrations/raid-helper.md](../plans/integrations/raid-helper.md).
+
 Migrations under `migrations/` are embedded and applied on startup, so there
 is no separate migrate step.
 
@@ -83,6 +118,7 @@ is no separate migrate step.
 | DELETE | `/api/professions/{id}` | officer only: 204; 404 for an unknown or malformed id |
 | GET    | `/api/news`         | one page of news posts as HAL: `{total, _links: {self, first, last, prev?, next?}, _embedded: {news: [...]}}`, newest first (`news` is `[]` when none); `?limit=` 1 to 50 (default 10), `?offset=` 0 or more (default 0), `?category=raid-progress\|recruitment\|guild-news`, else 400; `total` counts the category matches, ignoring limit and offset; links keep the filters and leave out defaults (`offset=0` never appears, `limit` only when you sent it) |
 | GET    | `/api/raids/next`   | soonest upcoming raid, or `null` when none scheduled |
+| POST   | `/api/webhooks/raid-helper` | Raid-Helper only: needs `Authorization: <webhook key>`, else 401. `X-Raidhelper-Event: webhookeventcreate\|webhookeventupdate` upserts the raid by event id, `webhookeventdelete` tombstones it; any other type is a 200 that writes nothing. 400 when the body has no `id` or `startTime` |
 | GET    | `/api/streams`      | every channel, live ones first, then offline by name; each has `title` (empty when offline), `isLive` (WoW) and `isLiveOtherGame` |
 | GET    | `/api/streams/live` | live streamers, most viewers first (`[]` when none); each has `title` |
 | GET    | `/api/applications`  | officer only: applications newest first, `?status=pending\|accepted\|declined` optional (400 on unknown) |
@@ -92,6 +128,15 @@ is no separate migrate step.
 | GET    | `/api/auth/callback` | Discord lands here; verifies state, upserts the user, sets `fuzion_session`, 302 to `/` |
 | POST   | `/api/auth/logout`   | deletes the session server-side, clears the cookie, 204 |
 | GET    | `/api/auth/me`       | `{id, username, avatarUrl}` for the cookie's user, or 401 |
+| GET    | `/api/surveys`       | every survey, latest deadline first: `[{id, title, closesAt, status}]`, `status` being `open` or `closed` |
+| GET    | `/api/surveys/{id}`  | the survey with its questions in order (`{id, prompt, type: "single"\|"multi", required, options}`) and `myResponse: {guildName, answers: [{questionId, values}]}` for a logged-in caller who has answered, else `null`; 404 for an unknown or malformed id |
+| PUT    | `/api/surveys/{id}/response` | login required: `{guildName?, answers: [{questionId, values}]}` creates or replaces the caller's response, 200 with what was saved; 400 for an unanswered required question, a value that is not an option, two values on a single-choice question, a question from another survey or a guild name over 64 characters; 409 after the deadline; 404 for an unknown survey. Saving over a voided response clears the void |
+| GET    | `/api/surveys/{id}/results` | 403 until the deadline passes, then public: `{surveyId, title, turnout, questions: [{id, prompt, type, options: [{label, count}]}]}` with voided responses left out and unchosen options at 0 |
+| POST   | `/api/surveys`       | officer only: `{title, description?, closesAt, questions: [{prompt, type, required, options \| preset}]}`, where `preset` is `wow-classes`, `wow-roles` or `weekdays`; 201 with the survey as respondents see it; 400 for a blank or over-long title, a deadline that is missing or not in the future, no questions, a bad `type`, an unknown preset, both `options` and `preset`, or fewer than two distinct options |
+| PATCH  | `/api/surveys/{id}`  | officer only: any of `title`, `description`, `closesAt`, `questions`; a `closesAt` of now closes the survey; 409 when `questions` is sent after any response exists; 404 for an unknown survey |
+| GET    | `/api/surveys/{id}/responses` | officer only: every response, oldest first, voided ones included, no paging: `{id, discordUsername, guildName, inDiscordServer, submittedAt, updatedAt, voidedAt, voidedBy, voidReason, answers}` |
+| PATCH  | `/api/surveys/{id}/responses/{responseId}` | officer only: `{voided, reason?}` with a reason of at most 500 characters; voiding stamps the officer and time, unvoiding clears them and the reason; 404 when the response is not in that survey |
+| GET    | `/api/surveys/{id}/responses.csv` | officer only: a CSV attachment with one column per question and multiple values joined by `; `; cells starting with `=`, `+`, `-`, `@`, tab or CR get a leading quote so spreadsheets do not run them as formulas |
 
 These are exactly what the frontend's `src/api/` modules call.
 

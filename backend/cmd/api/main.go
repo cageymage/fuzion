@@ -21,11 +21,13 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/images"
 	"github.com/cageymage/fuzion/backend/internal/news"
 	"github.com/cageymage/fuzion/backend/internal/professions"
+	"github.com/cageymage/fuzion/backend/internal/raidhelper"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
 	"github.com/cageymage/fuzion/backend/internal/raids"
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/surveys"
 	"github.com/cageymage/fuzion/backend/internal/turnstile"
 	"github.com/cageymage/fuzion/backend/internal/youtube"
 	"github.com/cageymage/fuzion/backend/migrations"
@@ -59,15 +61,19 @@ func run() error {
 	}
 	defer db.Close()
 
+	if cfg.discord.guildID == "" {
+		slog.Warn("discord server membership check disabled, every logged-in user counts as a guild member: DISCORD_GUILD_ID is not set")
+	}
 	discord := auth.NewDiscord(auth.DiscordConfig{
 		ClientID:     cfg.discord.clientID,
 		ClientSecret: cfg.discord.clientSecret,
 		RedirectURL:  cfg.discord.redirectURL,
+		GuildID:      cfg.discord.guildID,
 		BaseURL:      auth.DiscordAPIBaseURL,
 	}, &http.Client{Timeout: 10 * time.Second})
 
+	authOptions := []auth.ServiceOption{auth.WithDiscordServerMembership(cfg.discord.guildID)}
 	// Assign only when configured: a typed-nil *BattleNet in the option would read as enabled.
-	var authOptions []auth.ServiceOption
 	if cfg.battleNet.enabled() {
 		authOptions = append(authOptions, auth.WithBattleNet(auth.NewBattleNet(auth.BattleNetConfig{
 			ClientID:     cfg.battleNet.clientID,
@@ -115,16 +121,22 @@ func run() error {
 		slog.Info("news announcements disabled: DISCORD_ANNOUNCEMENTS_WEBHOOK_URL is not set")
 	}
 
+	if cfg.raidHelperWebhookKey == "" {
+		slog.Info("raid-helper webhook disabled: RAID_HELPER_WEBHOOK_SECRET is not set")
+	}
+
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.System{}, recruiting, botCheck, cfg.siteBaseURL)),
 		Auth:           auth.NewHandler(auth.NewService(discord, auth.NewRepo(db), authOptions...)),
 		Images:         images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.System{}, announcements, cfg.siteBaseURL), news.NewShellFetcher(cfg.siteBaseURL+"/index.html", &http.Client{Timeout: 5 * time.Second}, clock.System{})),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
+		RaidHelper:     raidhelper.NewHandler(raidhelper.NewService(raidhelper.NewRepo(db)), cfg.raidHelperWebhookKey),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.System{})),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), streams.NewSuggestedVideos(youTube, playlistID, clock.System{})),
+		Surveys:        surveys.NewHandler(surveys.NewService(surveys.NewRepo(db), clock.System{})),
 		AllowedOrigins: cfg.allowedOrigins,
 	})
 

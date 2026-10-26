@@ -1,21 +1,28 @@
 import { lazy, Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, ScrollRestoration } from 'react-router-dom'
 import { AppFooter } from '../components/AppFooter/AppFooter'
 import { AppHeader } from '../components/AppHeader/AppHeader'
 import { ToastProvider } from '../components/Toast/Toast'
+import { About } from '../pages/About/About'
 import { Applications } from '../pages/Applications/Applications'
 import { Calendar } from '../pages/Calendar/Calendar'
 import { ComingSoon } from '../pages/ComingSoon/ComingSoon'
 import { Dashboard } from '../pages/Dashboard/Dashboard'
 import { Home } from '../pages/Home/Home'
+import { Charter } from '../pages/Charter/Charter'
 import { Legal } from '../pages/Legal/Legal'
 import { News } from '../pages/News/News'
 import { OfficerApplications } from '../pages/OfficerApplications/OfficerApplications'
 import { OfficerRaidProgress } from '../pages/OfficerRaidProgress/OfficerRaidProgress'
+import { OfficerSurveyManage } from '../pages/OfficerSurveyManage/OfficerSurveyManage'
+import { OfficerSurveyNew } from '../pages/OfficerSurveyNew/OfficerSurveyNew'
+import { OfficerSurveys } from '../pages/OfficerSurveys/OfficerSurveys'
 import { Professions } from '../pages/Professions/Professions'
 import { RaidProgress } from '../pages/RaidProgress/RaidProgress'
 import { Roster } from '../pages/Roster/Roster'
 import { Streams } from '../pages/Streams/Streams'
+import { Survey } from '../pages/Survey/Survey'
+import { Surveys } from '../pages/Surveys/Surveys'
 import styles from './App.module.css'
 import { navItems } from './navigation'
 
@@ -51,6 +58,9 @@ export function App() {
             <Route path="/raid-progress" element={<RaidProgress />} />
             <Route path="/officer/raid-progress" element={<OfficerRaidProgress />} />
             <Route path="/officer/applications" element={<OfficerApplications />} />
+            <Route path="/officer/surveys" element={<OfficerSurveys />} />
+            <Route path="/officer/surveys/new" element={<OfficerSurveyNew />} />
+            <Route path="/officer/surveys/:id" element={<OfficerSurveyManage />} />
             <Route
               path="/officer/news/:id"
               element={
@@ -62,8 +72,12 @@ export function App() {
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/streams" element={<Streams />} />
             <Route path="/applications" element={<Applications />} />
+            <Route path="/surveys" element={<Surveys />} />
+            <Route path="/surveys/:id" element={<Survey />} />
             <Route path="/professions" element={<Professions />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/charter" element={<Charter />} />
             <Route path="/legal" element={<Legal />} />
             {navItems
               .filter(
@@ -90,6 +104,7 @@ export function App() {
           </Routes>
         </main>
         <AppFooter />
+        <ScrollRestoration />
       </div>
     </ToastProvider>
   )

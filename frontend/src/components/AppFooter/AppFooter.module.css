@@ -16,3 +16,18 @@
   text-decoration-color: rgba(211, 162, 77, 0.5);
   text-underline-offset: 4px;
 }
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.iconLink {
+  display: inline-flex;
+}
+
+.icon {
+  width: 1.2em;
+  height: 1.2em;
+}

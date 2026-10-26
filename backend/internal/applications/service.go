@@ -26,6 +26,7 @@ type SubmitRequest struct {
 	CharacterName string `json:"characterName"`
 	Class         string `json:"class"`
 	Role          string `json:"role"`
+	Playstyle     string `json:"playstyle"`
 	Availability  string `json:"availability"`
 	DiscordHandle string `json:"discordHandle"`
 	Notes         string `json:"notes"`
@@ -98,6 +99,7 @@ func (s *Service) Submit(ctx context.Context, req SubmitRequest) (Submitted, err
 		CharacterName: strings.TrimSpace(req.CharacterName),
 		Class:         strings.TrimSpace(req.Class),
 		Role:          strings.TrimSpace(req.Role),
+		Playstyle:     strings.TrimSpace(req.Playstyle),
 		Availability:  strings.TrimSpace(req.Availability),
 		DiscordHandle: strings.TrimSpace(req.DiscordHandle),
 		Notes:         strings.TrimSpace(req.Notes),
@@ -162,6 +164,7 @@ func reviewedApplicationMessage(app Reviewable, siteBaseURL string) discord.Mess
 			CharacterName: app.CharacterName,
 			Class:         app.Class,
 			Role:          app.Role,
+			Playstyle:     app.Playstyle,
 			Availability:  app.Availability,
 			DiscordHandle: app.DiscordHandle,
 		}),
@@ -180,13 +183,19 @@ func reviewedApplicationMessage(app Reviewable, siteBaseURL string) discord.Mess
 }
 
 func applicationFields(app Application) []discord.EmbedField {
-	return []discord.EmbedField{
+	fields := []discord.EmbedField{
 		{Name: "Applicant", Value: app.ApplicantName},
 		{Name: "Character", Value: app.CharacterName},
 		{Name: "Class / Role", Value: app.Class + " / " + app.Role},
-		{Name: "Availability", Value: app.Availability},
-		{Name: "Discord", Value: app.DiscordHandle},
 	}
+	// Applications from before playstyle existed have none, and Discord rejects empty field values.
+	if app.Playstyle != "" {
+		fields = append(fields, discord.EmbedField{Name: "Playstyle", Value: app.Playstyle})
+	}
+	return append(fields,
+		discord.EmbedField{Name: "Availability", Value: app.Availability},
+		discord.EmbedField{Name: "Discord", Value: app.DiscordHandle},
+	)
 }
 
 func (s *Service) List(ctx context.Context, status string) ([]Reviewable, error) {
@@ -256,6 +265,7 @@ func validate(app Application) error {
 		{"characterName", app.CharacterName},
 		{"class", app.Class},
 		{"role", app.Role},
+		{"playstyle", app.Playstyle},
 		{"availability", app.Availability},
 		{"discordHandle", app.DiscordHandle},
 	}
@@ -269,6 +279,12 @@ func validate(app Application) error {
 	case "tank", "healer", "dps":
 	default:
 		return &ValidationError{Field: "role", Problem: "must be one of tank, healer, dps"}
+	}
+
+	switch app.Playstyle {
+	case "casual", "raider":
+	default:
+		return &ValidationError{Field: "playstyle", Problem: "must be one of casual, raider"}
 	}
 
 	if utf8.RuneCountInString(app.DiscordHandle) > maxDiscordHandleLength {

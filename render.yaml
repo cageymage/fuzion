@@ -1,9 +1,9 @@
-# Render Blueprint: one static site, one Docker web service, one Postgres.
+# Render Blueprint: two static sites (guild, hub), one Docker web service, one Postgres.
 # Deploy via Render dashboard -> New -> Blueprint, pointed at this repo.
 
 services:
   - type: web
-    name: fuzion-web
+    name: forever-fuzion-web
     runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build
@@ -13,6 +13,11 @@ services:
       # the bundle at build time, so changing it needs a redeploy.
       - key: VITE_TURNSTILE_SITE_KEY
         sync: false
+      # Public address of the guild site, filled into canonical and link-preview
+      # tags, robots.txt and sitemap.xml at build time, so changing it needs a
+      # redeploy. Same value as the API's SITE_BASE_URL.
+      - key: SITE_BASE_URL
+        value: https://forever.fuziongaming.gg
     # Order matters: /api is proxied to the API service so the browser only
     # ever talks to one origin (same as the Vite proxy in local dev); anything
     # else falls through to the SPA. If Render assigned the API a different
@@ -26,12 +31,38 @@ services:
       - type: rewrite
         source: /news/:id
         destination: https://fuzion-api.onrender.com/api/news/:id/page
+      # The About page has its own built HTML so its preview says "About Fuzion".
+      - type: rewrite
+        source: /about
+        destination: /about.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # The fuziongaming.gg hub. It has no backend of its own: it proxies only the
+  # public endpoints it uses to fuzion-api, so the auth callbacks and officer
+  # endpoints, which only work on the guild host, are not reachable here.
+  - type: web
+    name: fuzion-hub
+    runtime: static
+    rootDir: hub
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      # Public address of the hub, filled into canonical and link-preview tags at
+      # build time, so changing it needs a redeploy.
+      - key: SITE_BASE_URL
+        value: https://fuziongaming.gg
+    routes:
+      - type: rewrite
+        source: /api/streams/*
+        destination: https://fuzion-api.onrender.com/api/streams/*
       - type: rewrite
         source: /*
         destination: /index.html
 
   - type: web
-    name: fuzion-api
+    name: fuzion-api # may need to update this depending on if we split APIs for retail or the hub
     runtime: docker
     rootDir: backend
     dockerfilePath: ./Dockerfile
@@ -45,20 +76,27 @@ services:
       # Discord OAuth app credentials; Render prompts for these on first deploy.
       # DISCORD_REDIRECT_URL must be registered on the Discord application and
       # use the hostname people actually browse the site on (the custom domain,
-      # not fuzion-web.onrender.com and not the API): the OAuth state cookie is
+      # not the static site's onrender.com host and not the API): the OAuth state cookie is
       # per-host, so a callback on any other host fails with "state mismatch".
-      # e.g. https://fuziongaming.gg/api/auth/callback
+      # e.g. https://forever.fuziongaming.gg/api/auth/callback
       - key: DISCORD_CLIENT_ID
         sync: false
       - key: DISCORD_CLIENT_SECRET
         sync: false
       - key: DISCORD_REDIRECT_URL
         sync: false
+      # Optional: the guild's Discord server ID (Developer Mode, right-click the
+      # server, Copy Server ID). When it is set, login also asks Discord which servers
+      # the user is in (the guilds scope) and records whether one is this server. Only
+      # members of the server see Surveys or can answer them. Without it every
+      # logged-in user counts as a member.
+      - key: DISCORD_GUILD_ID
+        sync: false
       # Optional: without BATTLENET_REDIRECT_URL, members cannot link a Battle.net
       # account. When it is set, BLIZZARD_CLIENT_ID and BLIZZARD_CLIENT_SECRET are
       # required too (the same Blizzard client as the roster sync). The redirect URL
       # must be registered on that client and use the host people actually browse,
-      # e.g. https://fuziongaming.gg/api/auth/battlenet/callback
+      # e.g. https://forever.fuziongaming.gg/api/auth/battlenet/callback
       - key: BATTLENET_REDIRECT_URL
         sync: false
       - key: BLIZZARD_CLIENT_ID
@@ -82,8 +120,14 @@ services:
         sync: false
       # Public address of the site, used for the post link in announcements. Use
       # the host people actually browse (the custom domain, not onrender.com),
-      # e.g. https://fuziongaming.gg
+      # e.g. https://forever.fuziongaming.gg
       - key: SITE_BASE_URL
+        sync: false
+      # Optional: without it, POST /api/webhooks/raid-helper is not registered and
+      # Raid-Helper events are not mirrored onto the Calendar. It is the server's
+      # webhook key from `/webhooks show` in Discord (needs Raid-Helper Premium);
+      # treat it as a secret and rotate with `/webhooks refresh-key` if it leaks.
+      - key: RAID_HELPER_WEBHOOK_SECRET
         sync: false
       # Optional: without both, the Home page has no suggested video when nobody
       # is live. The playlist must be Public or Unlisted.
@@ -110,6 +154,25 @@ services:
       - key: TWITCH_CLIENT_ID
         sync: false
       - key: TWITCH_CLIENT_SECRET
+        sync: false
+
+  # Marks streams rows with a youtube_channel_id live or offline. Every 5 minutes
+  # rather than every minute: each run costs about one quota unit per channel plus
+  # two, against the YouTube Data API's default 10,000 units a day, which the
+  # API's suggested video shares. Without the key the job logs and exits 0.
+  - type: cron
+    name: fuzion-sync-youtube
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerCommand: /sync youtube
+    schedule: "*/5 * * * *"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fuzion-db
+          property: connectionString
+      - key: YOUTUBE_API_KEY
         sync: false
 
   # Pulls the guild roster from Blizzard. Off until SYNC_BLIZZARD_ROSTER_ENABLED is

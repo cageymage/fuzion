@@ -7,6 +7,8 @@ const publicPaths = [
   '/streams',
   '/applications',
   '/professions',
+  '/about',
+  '/charter',
   '/legal',
 ]
 
