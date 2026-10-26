@@ -4,6 +4,7 @@ import { battlenetLinkUrl, unlinkBattlenet } from '../../api/auth'
 import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
 import { useLoginUrl } from '../../hooks/useLoginUrl'
 import styles from './Dashboard.module.css'
+import { MyCharacters, myCharactersQueryKey } from './MyCharacters'
 
 export function Dashboard() {
   const currentUser = useCurrentUser()
@@ -12,7 +13,11 @@ export function Dashboard() {
   const [searchParams] = useSearchParams()
   const unlink = useMutation({
     mutationFn: unlinkBattlenet,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: currentUserQueryKey }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: currentUserQueryKey }),
+        queryClient.invalidateQueries({ queryKey: myCharactersQueryKey }),
+      ]),
   })
 
   if (currentUser.isPending) {
@@ -83,6 +88,8 @@ export function Dashboard() {
           </>
         )}
       </section>
+
+      {user.battlenetLinked && <MyCharacters />}
     </article>
   )
 }

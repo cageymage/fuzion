@@ -21,6 +21,11 @@ export type UpdateCharacterRequest = Partial<Omit<CreateCharacterRequest, 'role2
   role2?: Role | ''
 }
 
+// A member may change only main/alt on their own characters.
+export interface UpdateMyCharacterRequest {
+  isMain: boolean
+}
+
 export interface CharacterProfession {
   profession: string
   skillLevel: number

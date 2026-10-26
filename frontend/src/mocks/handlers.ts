@@ -156,6 +156,45 @@ const allStreams: Stream[] = [
   },
 ]
 
+const myCharacters: Character[] = [
+  {
+    id: 'mine-1',
+    name: 'Thundermane',
+    secondaryName: 'Stormcaller',
+    realm: 'Emberreach',
+    class: 'Warrior',
+    spec: 'Protection',
+    role: 'tank',
+    spec2: null,
+    role2: null,
+    isMain: true,
+    raidTeam: 'Team Alpha',
+    race: 'Orc',
+    level: 60,
+    faction: 'Horde',
+    createdAt: '2026-10-01T12:00:00Z',
+    professions: [],
+  },
+  {
+    id: 'mine-2',
+    name: 'Thundermend',
+    secondaryName: 'Lightward',
+    realm: 'Emberreach',
+    class: 'Priest',
+    spec: 'Holy',
+    role: 'healer',
+    spec2: null,
+    role2: null,
+    isMain: false,
+    raidTeam: null,
+    race: 'Undead',
+    level: 52,
+    faction: 'Horde',
+    createdAt: '2026-10-01T12:00:00Z',
+    professions: [],
+  },
+]
+
 const rosterCharacters: Character[] = [
   {
     id: 'char-1',
@@ -515,6 +554,12 @@ export const handlers = [
   http.delete('/api/raid-bosses/:id', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/raids', () => HttpResponse.json(upcomingRaids)),
   http.get('/api/raids/next', () => HttpResponse.json(nextRaid)),
+  http.get('/api/me/characters', () => HttpResponse.json(myCharacters)),
+  http.patch('/api/me/characters/:id', async ({ params, request }) => {
+    const body = (await request.json()) as { isMain: boolean }
+    const character = myCharacters.find((candidate) => candidate.id === params.id)
+    return HttpResponse.json({ ...character, isMain: body.isMain })
+  }),
   http.get('/api/roster', () => HttpResponse.json(rosterCharacters)),
   http.post('/api/roster', () => HttpResponse.json(rosterCharacters[0], { status: 201 })),
   http.patch('/api/roster/:id', () => HttpResponse.json(rosterCharacters[0])),
