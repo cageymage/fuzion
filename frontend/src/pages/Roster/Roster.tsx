@@ -4,7 +4,7 @@ import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { classColor } from '../../lib/classColor'
 import { primaryProfessionIcons } from '../../lib/professionIcon'
 import { raceIcon } from '../../lib/raceIcon'
-import { armoryUrl } from '../../lib/wowProfileLinks'
+import { armoryUrl, warcraftLogsUrl } from '../../lib/wowProfileLinks'
 import { CharacterDialog } from './CharacterDialog'
 import { DeleteCharacterDialog } from './DeleteCharacterDialog'
 import { filterRoster, sortRoster, type RoleFilter, type RosterSort, type SortKey } from './filterRoster'
@@ -126,6 +126,22 @@ function ArmoryLink({ character, children }: { character: Character; children: s
       style={{ color: classColor(character.class) }}
     >
       {children}
+    </a>
+  )
+}
+
+function WarcraftLogsLink({ character }: { character: Character }) {
+  const fullName = `${character.name} ${character.secondaryName}`.trim()
+  return (
+    <a
+      className={styles.logsLink}
+      href={warcraftLogsUrl(character.realm, character.name, character.secondaryName)}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`Warcraft Logs profile for ${fullName}`}
+      title="Warcraft Logs"
+    >
+      Logs
     </a>
   )
 }
@@ -270,7 +286,10 @@ export function Roster() {
                         <RaceCell race={character.race} />
                       </td>
                       <td>
-                        <ArmoryLink character={character}>{character.name}</ArmoryLink>
+                        <span className={styles.nameCell}>
+                          <ArmoryLink character={character}>{character.name}</ArmoryLink>
+                          <WarcraftLogsLink character={character} />
+                        </span>
                       </td>
                       <td>
                         <ArmoryLink character={character}>{character.secondaryName}</ArmoryLink>
