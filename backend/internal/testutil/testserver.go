@@ -32,6 +32,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/submissions"
 	"github.com/cageymage/fuzion/backend/internal/surveys"
 	"github.com/cageymage/fuzion/backend/internal/turnstile"
 	"github.com/cageymage/fuzion/backend/internal/youtube"
@@ -72,6 +73,23 @@ type serverOptions struct {
 	turnstile            bool
 	raidHelperWebhookKey string
 	discordGuildID       string
+	submissionsDisabled  bool
+	submissionStorage    int64
+}
+
+// SubmissionStorageLimit is the storage ceiling NewServer gives submissions unless a
+// test sets its own with WithSubmissionStorageLimit.
+const SubmissionStorageLimit = 512 << 20
+
+// WithSubmissionsDisabled builds the server the way a deploy runs with
+// SUBMISSIONS_ENABLED=false: uploads are refused, officer review still works.
+func WithSubmissionsDisabled() ServerOption {
+	return func(o *serverOptions) { o.submissionsDisabled = true }
+}
+
+// WithSubmissionStorageLimit sets the total bytes all submissions may hold.
+func WithSubmissionStorageLimit(bytes int64) ServerOption {
+	return func(o *serverOptions) { o.submissionStorage = bytes }
 }
 
 // WithoutDiscordGuild builds the server the way a deploy without
@@ -113,7 +131,7 @@ func WithoutYouTubePlaylist() ServerOption {
 func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	t.Helper()
 
-	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey, discordGuildID: DiscordGuildID}
+	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey, discordGuildID: DiscordGuildID, submissionStorage: SubmissionStorageLimit}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -173,6 +191,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), suggestedVideos),
+		Submissions:    submissions.NewHandler(submissions.NewService(submissions.NewRepo(db), clock.Fixed(FixedNow), !options.submissionsDisabled, options.submissionStorage)),
 		Surveys:        surveys.NewHandler(surveys.NewService(surveys.NewRepo(db), clock.Fixed(FixedNow))),
 		AllowedOrigins: []string{"http://localhost:5173"},
 	})
@@ -353,6 +372,51 @@ func (s *Server) PostFile(t *testing.T, path, field, filename, contentType strin
 	}
 	if _, err := part.Write(data); err != nil {
 		t.Fatalf("write multipart part for POST %s: %v", path, err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart body for POST %s: %v", path, err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, s.URL+path, &body)
+	if err != nil {
+		t.Fatalf("build POST %s: %v", path, err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return s.do(t, req)
+}
+
+// MultipartPart is one part of a PostMultipart body: a file when Filename is set,
+// otherwise a plain field.
+type MultipartPart struct {
+	Field       string
+	Filename    string
+	ContentType string
+	Data        []byte
+}
+
+// PostMultipart sends the parts in order, as a browser's FormData does.
+func (s *Server) PostMultipart(t *testing.T, path string, parts ...MultipartPart) Response {
+	t.Helper()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for _, p := range parts {
+		header := textproto.MIMEHeader{}
+		if p.Filename != "" {
+			header.Set("Content-Disposition", fmt.Sprintf(`form-data; name=%q; filename=%q`, p.Field, p.Filename))
+		} else {
+			header.Set("Content-Disposition", fmt.Sprintf(`form-data; name=%q`, p.Field))
+		}
+		if p.ContentType != "" {
+			header.Set("Content-Type", p.ContentType)
+		}
+		part, err := writer.CreatePart(header)
+		if err != nil {
+			t.Fatalf("create multipart part for POST %s: %v", path, err)
+		}
+		if _, err := part.Write(p.Data); err != nil {
+			t.Fatalf("write multipart part for POST %s: %v", path, err)
+		}
 	}
 	if err := writer.Close(); err != nil {
 		t.Fatalf("close multipart body for POST %s: %v", path, err)

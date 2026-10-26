@@ -45,6 +45,16 @@ export function Legal() {
             results show totals only.
           </li>
           <li>Images uploaded by officers, such as news post images.</li>
+          <li>
+            Art and screenshot submissions: when a guild member submits images, we keep each exact
+            original file, a small preview, its file name, the optional description, who submitted
+            it, and when they accepted the license and which version of its wording. Originals keep
+            any data the file carries, such as EXIF details and, for some phone photos, the GPS
+            location where it was taken. Only officers can see submissions; they are never public.
+            An image picked for a news post is copied through the site&apos;s image pipeline, which
+            re-encodes it and drops that data. Officers can delete a submission at any time, which
+            removes the original and the preview.
+          </li>
         </ul>
         <p>Other services are involved in running the site:</p>
         <ul>
@@ -75,6 +85,11 @@ export function Legal() {
           confirm they have the right to share them. Guild news, names and branding belong to
           Fuzion. If you believe something on this site infringes your rights, ask an officer on
           Discord and it will be reviewed and removed where appropriate.
+        </p>
+        <p>
+          When you submit art or screenshots, you confirm that you created each image or bought the
+          rights to it (game screenshots are fine), and you grant the guild an unrestricted license
+          to use it on this site and in related social media posts. You keep your copyright.
         </p>
       </section>
 
