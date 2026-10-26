@@ -124,5 +124,5 @@ func runBlizzardRoster(ctx context.Context, cfg config) error {
 		Namespace:    cfg.blizzard.namespace,
 	}, &http.Client{Timeout: 30 * time.Second})
 
-	return roster.NewSyncBlizzardRoster(roster.NewRepo(db), client, synclog.NewRepo(db), cfg.blizzard.realmSlug, cfg.blizzard.guildSlug).Run(ctx)
+	return roster.NewSyncBlizzardRoster(roster.NewRepo(db), client, synclog.NewRepo(db), cfg.blizzard.realmSlug, cfg.blizzard.guildSlug, cfg.blizzard.altRanks).Run(ctx)
 }

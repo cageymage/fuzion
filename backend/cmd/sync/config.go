@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -39,6 +40,7 @@ type blizzardConfig struct {
 	namespace    string
 	realmSlug    string
 	guildSlug    string
+	altRanks     []int
 }
 
 // The job is flagged off until Blizzard's API is known to serve Forever. Once it is
@@ -68,6 +70,11 @@ func loadConfig() (config, error) {
 		return config{}, errors.New("DATABASE_URL is required")
 	}
 
+	altRanks, err := parseRanks(os.Getenv("BLIZZARD_ALT_RANKS"))
+	if err != nil {
+		return config{}, fmt.Errorf("BLIZZARD_ALT_RANKS: %w", err)
+	}
+
 	region := envOr("BLIZZARD_REGION", "us")
 	return config{
 		databaseURL: databaseURL,
@@ -86,8 +93,26 @@ func loadConfig() (config, error) {
 			namespace:    envOr("BLIZZARD_NAMESPACE", "profile-"+region),
 			realmSlug:    os.Getenv("GUILD_REALM_SLUG"),
 			guildSlug:    os.Getenv("GUILD_NAME_SLUG"),
+			altRanks:     altRanks,
 		},
 	}, nil
+}
+
+// "4, 5" becomes [4 5]; an empty value means no alt ranks.
+func parseRanks(value string) ([]int, error) {
+	var ranks []int
+	for _, field := range strings.Split(value, ",") {
+		field = strings.TrimSpace(field)
+		if field == "" {
+			continue
+		}
+		rank, err := strconv.Atoi(field)
+		if err != nil || rank < 0 {
+			return nil, fmt.Errorf("%q is not a guild rank number", field)
+		}
+		ranks = append(ranks, rank)
+	}
+	return ranks, nil
 }
 
 func envOr(key, fallback string) string {
