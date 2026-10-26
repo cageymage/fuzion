@@ -140,7 +140,7 @@ describe('Roster', () => {
     renderWithProviders(<Roster />)
 
     const table = within(await screen.findByRole('table'))
-    expect(table.getAllByRole('link').map((link) => link.textContent)).toEqual(['Ragnok'])
+    expect(table.getAllByRole('link').map((link) => link.textContent)).toEqual(['Ragnok', 'Logs'])
   })
 
   it('should open the armory link in a new tab', async () => {
@@ -151,6 +151,27 @@ describe('Roster', () => {
     const link = within(await screen.findByRole('table')).getByRole('link', { name: 'Ragnok' })
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noreferrer')
+  })
+
+  it('should render a Warcraft Logs link next to the character name', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, secondaryName: 'Ironhide' }])))
+
+    renderWithProviders(<Roster />)
+
+    const table = within(await screen.findByRole('table'))
+    const logs = table.getByRole('link', { name: 'Warcraft Logs profile for Ragnok Ironhide' })
+    expect(logs).toHaveAttribute('href', 'https://www.warcraftlogs.com/character/us/emberreach/ragnok-ironhide')
+    expect(logs.closest('td')).toBe(table.getByRole('link', { name: 'Ragnok' }).closest('td'))
+  })
+
+  it('should open the Warcraft Logs link in a new tab', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
+
+    renderWithProviders(<Roster />)
+
+    const logs = within(await screen.findByRole('table')).getByRole('link', { name: 'Warcraft Logs profile for Ragnok' })
+    expect(logs).toHaveAttribute('target', '_blank')
+    expect(logs).toHaveAttribute('rel', 'noreferrer')
   })
 
   it('should show both specs joined by a slash when the character has a second spec', async () => {
@@ -353,7 +374,7 @@ describe('Roster sorting and search', () => {
     return screen
       .getAllByRole('row')
       .slice(1)
-      .map((row) => within(row).getAllByRole('cell')[1].textContent)
+      .map((row) => within(within(row).getAllByRole('cell')[1]).getAllByRole('link')[0].textContent)
   }
 
   it('should sort the table by level when the Level header is clicked', async () => {
