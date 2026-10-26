@@ -1,0 +1,163 @@
+.page {
+  padding: 28px var(--gutter) 40px;
+  font-size: var(--text-ui);
+}
+
+.title {
+  margin: 0 0 12px;
+  font-size: 38px;
+}
+
+.links {
+  margin-bottom: 16px;
+}
+
+.notice,
+.hint,
+.meta {
+  color: var(--muted);
+}
+
+.hint,
+.meta {
+  font-size: var(--text-meta);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.toolbar,
+.actions,
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.button,
+.danger {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: var(--text-meta);
+  cursor: pointer;
+}
+
+.button[aria-pressed='true'] {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold-hover);
+}
+
+.button:disabled,
+.danger:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+}
+
+.check {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 20px;
+  height: 20px;
+}
+
+.thumbButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-chip);
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.submitter {
+  color: var(--gold);
+}
+
+.description {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stage {
+  max-width: min(90vw, 1400px);
+  max-height: 70vh;
+  overflow: auto;
+  border-radius: var(--radius-chip);
+  background: #000;
+}
+
+.fit {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+}
+
+.actual {
+  display: block;
+  max-width: none;
+}

@@ -5,6 +5,7 @@ import type { RaidProgress, RaidTier } from '../types/raidProgress'
 import type { Raid } from '../types/raids'
 import type { ProfessionEntry } from '../types/professions'
 import type { Character, MyCharacter } from '../types/roster'
+import type { Submission } from '../types/submissions'
 import type { Stream } from '../types/streams'
 import type { OfficerSurveyResponse, Survey, SurveyResults } from '../types/surveys'
 
@@ -153,6 +154,37 @@ const allStreams: Stream[] = [
     isLive: false,
     isLiveOtherGame: false,
     platform: 'twitch',
+  },
+]
+
+const submissions: Submission[] = [
+  {
+    id: 'sub-1',
+    submitter: { id: 'user-1', username: 'thundermane' },
+    description: 'Onyxia down!',
+    originalFilename: 'onyxia.png',
+    contentType: 'image/png',
+    width: 1920,
+    height: 1080,
+    byteSize: 2_400_000,
+    createdAt: '2026-10-26T12:00:00Z',
+    thumbUrl: '/api/submissions/sub-1/thumb',
+    fullUrl: '/api/submissions/sub-1/full',
+    downloadUrl: '/api/submissions/sub-1/download',
+  },
+  {
+    id: 'sub-2',
+    submitter: { id: 'user-2', username: 'mendwell' },
+    description: '',
+    originalFilename: 'fanart.jpg',
+    contentType: 'image/jpeg',
+    width: 800,
+    height: 1200,
+    byteSize: 900_000,
+    createdAt: '2026-10-26T11:00:00Z',
+    thumbUrl: '/api/submissions/sub-2/thumb',
+    fullUrl: '/api/submissions/sub-2/full',
+    downloadUrl: '/api/submissions/sub-2/download',
   },
 ]
 
@@ -582,6 +614,18 @@ export const handlers = [
   http.get('/api/streams/suggested-video', () =>
     HttpResponse.json({ id: 'vid-1', title: 'Queen Ansurek kill' }),
   ),
+  http.get('/api/submissions/status', () => HttpResponse.json({ open: true, attestationVersion: '2026-10-26' })),
+  http.post('/api/submissions', () =>
+    HttpResponse.json({ results: [{ filename: 'shot.png', submission: submissions[0] }] }, { status: 201 }),
+  ),
+  http.get('/api/submissions', () =>
+    HttpResponse.json({ total: submissions.length, limit: 48, offset: 0, items: submissions }),
+  ),
+  http.delete('/api/submissions/:id', () => new HttpResponse(null, { status: 204 })),
+  http.post('/api/submissions/bulk-delete', async ({ request }) => {
+    const body = (await request.json()) as { ids: string[] }
+    return HttpResponse.json({ deleted: body.ids })
+  }),
   http.get('/api/surveys', () =>
     HttpResponse.json([
       { id: openSurvey.id, title: openSurvey.title, closesAt: openSurvey.closesAt, status: 'open' },
