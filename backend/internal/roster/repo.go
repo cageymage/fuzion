@@ -45,14 +45,22 @@ func NewRepo(db *sqlx.DB) *Repo {
 }
 
 func (r *Repo) List(ctx context.Context) ([]Character, error) {
+	return r.list(ctx, nil)
+}
+
+func (r *Repo) ListOwnedBy(ctx context.Context, userID uuid.UUID) ([]Character, error) {
+	return r.list(ctx, &userID)
+}
+
+func (r *Repo) list(ctx context.Context, owner *uuid.UUID) ([]Character, error) {
 	const query = `
 		SELECT id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, created_at
 		FROM characters
-		WHERE left_guild_at IS NULL
+		WHERE left_guild_at IS NULL AND ($1::uuid IS NULL OR user_id = $1)
 		ORDER BY is_main DESC, name ASC, secondary_name ASC`
 
 	characters := []Character{}
-	if err := r.db.SelectContext(ctx, &characters, query); err != nil {
+	if err := r.db.SelectContext(ctx, &characters, query, owner); err != nil {
 		return nil, fmt.Errorf("select characters: %w", err)
 	}
 	// pgx hands back timestamptz in the process-local zone; the API always emits UTC.
@@ -129,6 +137,65 @@ func (r *Repo) Create(ctx context.Context, c Character, professions []string) (C
 	}
 	created.Professions = append([]CharacterProfession{}, stored[created.ID]...)
 	return created, nil
+}
+
+// SetOwnMain changes main/alt on a character the user owns. Making it a main turns
+// the user's other mains into alts, so a member has at most one. Both count as set by
+// hand, so the roster sync's rank mapping leaves them alone.
+func (r *Repo) SetOwnMain(ctx context.Context, userID, id uuid.UUID, isMain bool) (Character, error) {
+	// Locking all of the user's characters keeps two concurrent "make main" requests
+	// from each clearing the other's old main and leaving two.
+	const lock = `SELECT id FROM characters WHERE user_id = $1 OR id = $2 FOR UPDATE`
+
+	const owner = `SELECT user_id FROM characters WHERE id = $1`
+
+	const clearOtherMains = `
+		UPDATE characters SET is_main = false, is_main_set_by_hand = true
+		WHERE user_id = $1 AND id <> $2 AND is_main`
+
+	const update = `
+		UPDATE characters SET is_main = $2, is_main_set_by_hand = true
+		WHERE id = $1
+		RETURNING ` + returningColumns
+
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return Character{}, fmt.Errorf("begin set own main: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // no-op once committed
+
+	if _, err := tx.ExecContext(ctx, lock, userID, id); err != nil {
+		return Character{}, fmt.Errorf("lock characters: %w", err)
+	}
+	var ownerID *uuid.UUID
+	if err := tx.GetContext(ctx, &ownerID, owner, id); errors.Is(err, sql.ErrNoRows) {
+		return Character{}, ErrNotFound
+	} else if err != nil {
+		return Character{}, fmt.Errorf("select character owner: %w", err)
+	}
+	if ownerID == nil || *ownerID != userID {
+		return Character{}, ErrNotOwner
+	}
+	if isMain {
+		if _, err := tx.ExecContext(ctx, clearOtherMains, userID, id); err != nil {
+			return Character{}, fmt.Errorf("clear other mains: %w", err)
+		}
+	}
+	var updated Character
+	if err := tx.GetContext(ctx, &updated, update, id, isMain); err != nil {
+		return Character{}, fmt.Errorf("update main: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return Character{}, fmt.Errorf("commit set own main: %w", err)
+	}
+
+	updated.CreatedAt = updated.CreatedAt.UTC()
+	stored, err := r.professionsByCharacter(ctx, &updated.ID)
+	if err != nil {
+		return Character{}, err
+	}
+	updated.Professions = append([]CharacterProfession{}, stored[updated.ID]...)
+	return updated, nil
 }
 
 // secondSpec carries the resolved second spec and role for a PATCH, where nil

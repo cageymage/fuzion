@@ -72,6 +72,15 @@ describe('Legal', () => {
     expect(privacy).toHaveTextContent('Unlinking deletes both')
   })
 
+  it('should say linking Battle.net records which roster characters are yours when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    const privacy = screen.getByRole('region', { name: 'Privacy policy' })
+    expect(privacy).toHaveTextContent('to record which guild roster characters are yours')
+    expect(privacy).toHaveTextContent("not the list or Battle.net's access token")
+    expect(privacy).toHaveTextContent('removes you as the owner of those characters')
+  })
+
   it('should say removal is requested through an officer on Discord when the page renders', () => {
     renderWithProviders(<Legal />)
 

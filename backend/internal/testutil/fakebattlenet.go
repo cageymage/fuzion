@@ -15,16 +15,25 @@ const (
 	BattleNetClientID     = "battlenet-client-id"
 	BattleNetClientSecret = "battlenet-client-secret"
 	BattleNetRedirectURL  = "http://localhost:5173/api/auth/battlenet/callback"
+	BattleNetNamespace    = "profile-us"
 )
 
 type BattleNetUser struct {
 	ID        int64  `json:"id"`
 	BattleTag string `json:"battletag"`
+	// Characters are served by /profile/user/wow, not /userinfo.
+	Characters []BattleNetCharacter `json:"-"`
+}
+
+type BattleNetCharacter struct {
+	Name      string
+	RealmSlug string
 }
 
 // FakeBattleNet stands in for oauth.battle.net. Codes handed to GrantCode are
 // accepted by /token (which, like Blizzard, wants the client credentials as HTTP
-// Basic auth) and resolve to their user on /userinfo.
+// Basic auth) and resolve to their user on /userinfo and their characters on
+// /profile/user/wow, which it serves too, standing in for the regional game API.
 type FakeBattleNet struct {
 	*httptest.Server
 
@@ -39,6 +48,7 @@ func NewFakeBattleNet(t *testing.T) *FakeBattleNet {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /token", fake.token(t))
 	mux.HandleFunc("GET /userinfo", fake.userinfo)
+	mux.HandleFunc("GET /profile/user/wow", fake.profile(t))
 	fake.Server = httptest.NewServer(mux)
 	t.Cleanup(fake.Close)
 	return fake
@@ -87,13 +97,48 @@ func (f *FakeBattleNet) token(t *testing.T) http.HandlerFunc {
 }
 
 func (f *FakeBattleNet) userinfo(w http.ResponseWriter, r *http.Request) {
-	code, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer token-for-")
-	f.mu.Lock()
-	user, known := f.codes[code]
-	f.mu.Unlock()
-	if !ok || !known {
+	user, ok := f.userFromToken(r)
+	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_token"})
 		return
 	}
 	writeJSON(w, http.StatusOK, user)
+}
+
+func (f *FakeBattleNet) userFromToken(r *http.Request) (BattleNetUser, bool) {
+	code, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer token-for-")
+	f.mu.Lock()
+	user, known := f.codes[code]
+	f.mu.Unlock()
+	return user, ok && known
+}
+
+func (f *FakeBattleNet) profile(t *testing.T) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("namespace"); got != BattleNetNamespace {
+			t.Errorf("profile request namespace = %q, want %q", got, BattleNetNamespace)
+		}
+		user, ok := f.userFromToken(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_token"})
+			return
+		}
+		// Blizzard answers 404 for an account with no characters in the namespace.
+		if len(user.Characters) == 0 {
+			writeJSON(w, http.StatusNotFound, map[string]any{"code": 404, "type": "BLZWEBAPI00000404", "detail": "Not Found"})
+			return
+		}
+		characters := []map[string]any{}
+		for _, c := range user.Characters {
+			characters = append(characters, map[string]any{
+				"name":  c.Name,
+				"level": 60,
+				"realm": map[string]any{"name": c.RealmSlug, "slug": c.RealmSlug},
+			})
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id":           user.ID,
+			"wow_accounts": []map[string]any{{"id": 1, "characters": characters}},
+		})
+	}
 }

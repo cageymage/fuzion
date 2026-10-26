@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,11 +13,17 @@ import (
 
 const BattleNetAPIBaseURL = "https://oauth.battle.net"
 
+var errNotFound = errors.New("not found")
+
 type BattleNetConfig struct {
 	ClientID     string
 	ClientSecret string
 	RedirectURL  string
 	BaseURL      string
+	// ProfileBaseURL is the regional game API host that serves /profile/user/wow, and
+	// Namespace its profile namespace, the same pair the roster sync uses.
+	ProfileBaseURL string
+	Namespace      string
 }
 
 var _ Provider = (*BattleNet)(nil)
@@ -52,7 +59,48 @@ func (b *BattleNet) Exchange(ctx context.Context, code string) (Identity, error)
 	if err != nil {
 		return Identity{}, fmt.Errorf("fetch battle.net user: %w", err)
 	}
-	return Identity{ProviderUserID: fmt.Sprint(user.ID), Username: user.BattleTag}, nil
+	characters, err := b.fetchCharacters(ctx, token)
+	if err != nil {
+		return Identity{}, fmt.Errorf("fetch wow characters: %w", err)
+	}
+	return Identity{ProviderUserID: fmt.Sprint(user.ID), Username: user.BattleTag, Characters: characters}, nil
+}
+
+// The token is used here and then dropped: it expires within a day, so storing it
+// would not spare members from linking again to pick up new characters.
+func (b *BattleNet) fetchCharacters(ctx context.Context, token string) ([]AccountCharacter, error) {
+	q := url.Values{}
+	q.Set("namespace", b.cfg.Namespace)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, b.cfg.ProfileBaseURL+"/profile/user/wow?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	var body struct {
+		WoWAccounts []struct {
+			Characters []struct {
+				Name  string `json:"name"`
+				Realm struct {
+					Slug string `json:"slug"`
+				} `json:"realm"`
+			} `json:"characters"`
+		} `json:"wow_accounts"`
+	}
+	// Blizzard answers 404 for an account with no characters in the namespace, which
+	// is not an error: the account is still linked, it just claims nothing.
+	if err := b.do(req, &body); errors.Is(err, errNotFound) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	var characters []AccountCharacter
+	for _, account := range body.WoWAccounts {
+		for _, c := range account.Characters {
+			characters = append(characters, AccountCharacter{Name: c.Name, RealmSlug: c.Realm.Slug})
+		}
+	}
+	return characters, nil
 }
 
 func (b *BattleNet) exchangeCode(ctx context.Context, code string) (string, error) {
@@ -109,6 +157,9 @@ func (b *BattleNet) do(req *http.Request, out any) error {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("%s %s: %w", req.Method, req.URL.Path, errNotFound)
+	}
 	if resp.StatusCode != http.StatusOK {
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return fmt.Errorf("%s %s: unexpected status %d: %s", req.Method, req.URL.Path, resp.StatusCode, strings.TrimSpace(string(snippet)))
