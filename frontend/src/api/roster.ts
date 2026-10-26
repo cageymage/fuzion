@@ -1,6 +1,7 @@
 import type {
   Character,
   CreateCharacterRequest,
+  MyCharacter,
   UpdateCharacterRequest,
   UpdateMyCharacterRequest,
 } from '../types/roster'
@@ -22,10 +23,10 @@ export function deleteCharacter(id: string): Promise<void> {
   return apiDelete(`/roster/${id}`)
 }
 
-export function fetchMyCharacters(): Promise<Character[]> {
-  return apiGet<Character[]>('/me/characters')
+export function fetchMyCharacters(): Promise<MyCharacter[]> {
+  return apiGet<MyCharacter[]>('/me/characters')
 }
 
-export function updateMyCharacter(id: string, request: UpdateMyCharacterRequest): Promise<Character> {
-  return apiSend<Character>('PATCH', `/me/characters/${id}`, request)
+export function updateMyCharacter(id: string, request: UpdateMyCharacterRequest): Promise<MyCharacter> {
+  return apiSend<MyCharacter>('PATCH', `/me/characters/${id}`, request)
 }

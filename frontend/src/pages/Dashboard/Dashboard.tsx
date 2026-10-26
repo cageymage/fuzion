@@ -4,7 +4,8 @@ import { battlenetLinkUrl, unlinkBattlenet } from '../../api/auth'
 import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
 import { useLoginUrl } from '../../hooks/useLoginUrl'
 import styles from './Dashboard.module.css'
-import { MyCharacters, myCharactersQueryKey } from './MyCharacters'
+import { MyCharacters } from './MyCharacters'
+import { myCharactersQueryKey } from './myCharactersQueryKey'
 
 export function Dashboard() {
   const currentUser = useCurrentUser()

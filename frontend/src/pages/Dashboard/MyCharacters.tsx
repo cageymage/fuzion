@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { battlenetLinkUrl } from '../../api/auth'
 import { fetchMyCharacters, updateMyCharacter } from '../../api/roster'
 import styles from './Dashboard.module.css'
-
-export const myCharactersQueryKey = ['me', 'characters'] as const
+import { myCharactersQueryKey } from './myCharactersQueryKey'
+import { MyProfessions } from './MyProfessions'
 
 export function MyCharacters() {
   const queryClient = useQueryClient()
@@ -36,27 +36,30 @@ export function MyCharacters() {
       )}
       {characters.data && characters.data.length > 0 && (
         <>
-          <ul className={styles.characters}>
+          <ul className={styles.characters} aria-label="Characters">
             {characters.data.map((character) => {
               const fullName = `${character.name} ${character.secondaryName}`.trim()
               return (
                 <li key={character.id} className={styles.character}>
-                  <span>
-                    <strong>{fullName}</strong> · {character.class}
-                  </span>
-                  {character.isMain ? (
-                    <span className={styles.mainBadge}>Main</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className={styles.button}
-                      aria-label={`Make ${fullName} your main`}
-                      onClick={() => makeMain.mutate(character.id)}
-                      disabled={makeMain.isPending}
-                    >
-                      Make main
-                    </button>
-                  )}
+                  <div className={styles.characterHeader} data-testid="character-header">
+                    <span>
+                      <strong>{fullName}</strong> · {character.class}
+                    </span>
+                    {character.isMain ? (
+                      <span className={styles.mainBadge}>Main</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className={styles.button}
+                        aria-label={`Make ${fullName} your main`}
+                        onClick={() => makeMain.mutate(character.id)}
+                        disabled={makeMain.isPending}
+                      >
+                        Make main
+                      </button>
+                    )}
+                  </div>
+                  <MyProfessions character={character} fullName={fullName} />
                 </li>
               )
             })}

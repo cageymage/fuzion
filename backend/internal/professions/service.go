@@ -13,6 +13,7 @@ var (
 	ErrNotFound         = errors.New("profession not found")
 	ErrConflict         = errors.New("character already has this profession")
 	ErrUnknownCharacter = errors.New("character not found")
+	ErrNotOwner         = errors.New("character belongs to someone else")
 )
 
 type ValidationError struct {
@@ -100,6 +101,49 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 		return fmt.Errorf("delete profession %s: %w", id, err)
 	}
 	return nil
+}
+
+// MyCreateRequest is CreateRequest without the character, which comes from the URL.
+type MyCreateRequest struct {
+	Profession string `json:"profession"`
+	SkillLevel int    `json:"skillLevel"`
+}
+
+// The member methods check ownership, then run the officer path, so validation and
+// conflicts behave exactly as they do for officers. Officers and members edit the same
+// rows and the last write wins (the precedence rule decided on #103).
+
+func (s *Service) CreateMine(ctx context.Context, userID, characterID uuid.UUID, req MyCreateRequest) (Profession, error) {
+	owner, err := s.repo.CharacterOwner(ctx, characterID)
+	if err != nil {
+		return Profession{}, fmt.Errorf("create my profession: %w", err)
+	}
+	if owner == nil || *owner != userID {
+		return Profession{}, ErrNotOwner
+	}
+	return s.Create(ctx, CreateRequest{CharacterID: characterID.String(), Profession: req.Profession, SkillLevel: req.SkillLevel})
+}
+
+func (s *Service) UpdateMine(ctx context.Context, userID, id uuid.UUID, req UpdateRequest) (Profession, error) {
+	owner, err := s.repo.ProfessionOwner(ctx, id)
+	if err != nil {
+		return Profession{}, fmt.Errorf("update my profession %s: %w", id, err)
+	}
+	if owner == nil || *owner != userID {
+		return Profession{}, ErrNotOwner
+	}
+	return s.Update(ctx, id, req)
+}
+
+func (s *Service) DeleteMine(ctx context.Context, userID, id uuid.UUID) error {
+	owner, err := s.repo.ProfessionOwner(ctx, id)
+	if err != nil {
+		return fmt.Errorf("delete my profession %s: %w", id, err)
+	}
+	if owner == nil || *owner != userID {
+		return ErrNotOwner
+	}
+	return s.Delete(ctx, id)
 }
 
 func errUnknownCharacter() error {
