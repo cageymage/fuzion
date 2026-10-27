@@ -1,15 +1,14 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type KeyboardEvent } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { deleteSubmission, deleteSubmissions, fetchSubmissions } from '../../api/submissions'
 import { Dialog } from '../../components/Dialog/Dialog'
+import { LightboxImage } from '../../components/LightboxImage/LightboxImage'
 import { OfficerOnly } from '../../components/OfficerOnly/OfficerOnly'
 import type { Submission } from '../../types/submissions'
 import styles from './OfficerSubmissions.module.css'
 
 export const PAGE_SIZE = 48
-
-type Zoom = 'fit' | 'actual'
 
 function describe(submission: Submission): string {
   return submission.description || submission.originalFilename
@@ -55,75 +54,8 @@ function ConfirmDelete({ count, onConfirm, onCancel, pending, error }: {
   )
 }
 
-function Viewer({ submission, onClose, onDelete }: {
-  submission: Submission
-  onClose: () => void
-  onDelete: () => void
-}) {
-  const [zoom, setZoom] = useState<Zoom>('fit')
-
-  // The native dialog closes on Escape in browsers; handling it here too keeps the
-  // shortcut keys and Escape in one place, and works where the dialog has no native support.
-  function onKeyDown(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-    } else if (event.key === 'f') {
-      setZoom('fit')
-    } else if (event.key === '1') {
-      setZoom('actual')
-    }
-  }
-
-  return (
-    <Dialog title={describe(submission)} onClose={onClose}>
-      <div className={styles.viewer} onKeyDown={onKeyDown}>
-        <div className={styles.toolbar} role="toolbar" aria-label="Zoom">
-          <button type="button" className={styles.button} aria-pressed={zoom === 'fit'} onClick={() => setZoom('fit')}>
-            Fit to window
-          </button>
-          <button
-            type="button"
-            className={styles.button}
-            aria-pressed={zoom === 'actual'}
-            onClick={() => setZoom('actual')}
-          >
-            100%
-          </button>
-          <span className={styles.hint}>Keys: F fits, 1 shows full size, arrows pan.</span>
-        </div>
-        {/* Scrolls when the image is larger than the window, so it pans with the mouse or the arrow keys. */}
-        <div className={styles.stage} tabIndex={0} aria-label="Image, scroll to pan" data-zoom={zoom}>
-          <img
-            className={zoom === 'fit' ? styles.fit : styles.actual}
-            src={submission.fullUrl}
-            alt={describe(submission)}
-            width={submission.width}
-            height={submission.height}
-          />
-        </div>
-        <p className={styles.meta}>
-          {submission.submitter.username} · {submission.originalFilename} · {submission.width}×{submission.height}
-        </p>
-        <div className={styles.actions}>
-          <a className={styles.button} href={submission.downloadUrl} download={submission.originalFilename}>
-            Download original
-          </a>
-          <button type="button" className={styles.danger} onClick={onDelete}>
-            Delete
-          </button>
-          <button type="button" className={styles.button} onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </div>
-    </Dialog>
-  )
-}
-
 function SubmissionGallery() {
   const [offset, setOffset] = useState(0)
-  const [viewing, setViewing] = useState<Submission | null>(null)
   const [selecting, setSelecting] = useState(false)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState<string[] | null>(null)
@@ -134,7 +66,6 @@ function SubmissionGallery() {
   })
   const remove = useDeleteMany(() => {
     setConfirming(null)
-    setViewing(null)
     setChecked(new Set())
   })
 
@@ -162,6 +93,11 @@ function SubmissionGallery() {
   }
 
   const { items, total } = page.data
+  const lastPageOffset = Math.max(0, Math.floor((total - 1) / PAGE_SIZE) * PAGE_SIZE)
+  if (offset > lastPageOffset) {
+    setOffset(lastPageOffset)
+    return <p className={styles.notice}>Loading submissions…</p>
+  }
   const lastShown = Math.min(offset + items.length, total)
 
   return (
@@ -208,27 +144,41 @@ function SubmissionGallery() {
                   aria-label={`Select ${describe(submission)}`}
                 />
               )}
-              <button
-                type="button"
-                className={styles.thumbButton}
-                onClick={() => (selecting ? toggle(submission.id) : setViewing(submission))}
-                aria-label={`Open ${describe(submission)}`}
-              >
-                <img className={styles.thumb} src={submission.thumbUrl} alt="" loading="lazy" />
-              </button>
+              {selecting ? (
+                <button
+                  type="button"
+                  className={styles.thumbButton}
+                  onClick={() => toggle(submission.id)}
+                  aria-label={`Toggle ${describe(submission)}`}
+                >
+                  <img className={styles.thumb} src={submission.thumbUrl} alt="" loading="lazy" />
+                </button>
+              ) : (
+                <LightboxImage src={submission.fullUrl} thumbSrc={submission.thumbUrl} alt={describe(submission)} />
+              )}
               <div className={styles.cardBody}>
                 <span className={styles.submitter}>{submission.submitter.username}</span>
                 {submission.description && <span className={styles.description}>{submission.description}</span>}
               </div>
               {!selecting && (
-                <button
-                  type="button"
-                  className={styles.button}
-                  onClick={() => setConfirming([submission.id])}
-                  aria-label={`Delete ${describe(submission)}`}
-                >
-                  Delete
-                </button>
+                <div className={styles.actions}>
+                  <a
+                    className={styles.button}
+                    href={submission.downloadUrl}
+                    download={submission.originalFilename}
+                    aria-label={`Download original of ${describe(submission)}`}
+                  >
+                    Download
+                  </a>
+                  <button
+                    type="button"
+                    className={styles.button}
+                    onClick={() => setConfirming([submission.id])}
+                    aria-label={`Delete ${describe(submission)}`}
+                  >
+                    Delete
+                  </button>
+                </div>
               )}
             </li>
           ))}
@@ -256,9 +206,6 @@ function SubmissionGallery() {
         </nav>
       )}
 
-      {viewing && !confirming && (
-        <Viewer submission={viewing} onClose={() => setViewing(null)} onDelete={() => setConfirming([viewing.id])} />
-      )}
       {confirming && (
         <ConfirmDelete
           count={confirming.length}
@@ -281,7 +228,7 @@ export function OfficerSubmissions() {
       <section className={styles.page}>
         <h1 className={styles.title}>Review submissions</h1>
         <div className={styles.links}>
-          <Link to="/submissions" className={styles.link}>
+          <Link to="/submissions">
             Back to the submission form
           </Link>
         </div>

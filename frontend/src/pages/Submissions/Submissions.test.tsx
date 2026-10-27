@@ -106,6 +106,18 @@ describe('Submissions', () => {
     expect(selectedNames()).toEqual(['Preview of keep.png'])
   })
 
+  it('should not add an image twice when the same file is chosen again', async () => {
+    asMember()
+    renderWithProviders(<Submissions />, '/submissions')
+    const shot = png('shot.png')
+    await chooseFiles(shot)
+
+    await chooseFiles(shot)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('shot.png: already added')
+    expect(selectedNames()).toEqual(['Preview of shot.png'])
+  })
+
   it('should keep Submit disabled until the attestation is checked', async () => {
     asMember()
     renderWithProviders(<Submissions />, '/submissions')
@@ -193,6 +205,54 @@ describe('Submissions', () => {
       ['files', 'again.png'],
     ])
     expect(selectedNames()).toEqual(['Preview of again.png'])
+  })
+
+  it('should keep an image added while an upload is in flight when that upload finishes', async () => {
+    asMember()
+    let finishUpload: () => void = () => {}
+    const uploadFinished = new Promise<void>((resolve) => {
+      finishUpload = resolve
+    })
+    server.use(
+      http.post('/api/submissions', async () => {
+        await uploadFinished
+        return HttpResponse.json({ results: [{ filename: 'first.png', submission: { id: 'sub-1' } }] }, { status: 201 })
+      }),
+    )
+    renderWithProviders(<Submissions />, '/submissions')
+    await chooseFiles(png('first.png'))
+    await userEvent.click(screen.getByRole('checkbox', { name: /I created these images/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    await chooseFiles(png('late.png'))
+
+    finishUpload()
+
+    await screen.findByRole('list', { name: 'Submission results' })
+    expect(selectedNames()).toEqual(['Preview of late.png'])
+  })
+
+  it('should accept an image with a supported extension when the browser reports no file type', async () => {
+    asMember()
+    renderWithProviders(<Submissions />, '/submissions')
+
+    await userEvent.upload(await screen.findByLabelText('Images to submit'), new File(['x'], 'screenshot.webp', { type: '' }), {
+      applyAccept: false,
+    })
+
+    expect(selectedNames()).toEqual(['Preview of screenshot.webp'])
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('should refuse a file with no reported type and an unsupported extension', async () => {
+    asMember()
+    renderWithProviders(<Submissions />, '/submissions')
+
+    await userEvent.upload(await screen.findByLabelText('Images to submit'), new File(['x'], 'notes.txt', { type: '' }), {
+      applyAccept: false,
+    })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('notes.txt: must be a PNG, JPEG, WebP or GIF image')
+    expect(selectedNames()).toEqual([])
   })
 
   it("should show the server's message when the daily quota is used up", async () => {

@@ -89,68 +89,39 @@ describe('OfficerSubmissions', () => {
 
     renderWithProviders(<OfficerSubmissions />, '/officer/submissions')
 
-    expect(await gridItems()).toEqual(['thundermaneOnyxia down!Delete', 'mendwellDelete'])
+    expect(await gridItems()).toEqual(['thundermaneOnyxia down!DownloadDelete', 'mendwellDownloadDelete'])
     expect(screen.getByText('Showing 1–2 of 2')).toBeInTheDocument()
   })
 
-  it('should open a submission at fit-to-window size when its thumbnail is clicked', async () => {
+  it('should show the full image in a lightbox when its thumbnail is clicked', async () => {
     serveSubmissions([onyxia])
     renderWithProviders(<OfficerSubmissions />, '/officer/submissions')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Open Onyxia down!' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Open image: Onyxia down!' }))
 
-    const viewer = screen.getByRole('dialog', { name: 'Onyxia down!' })
-    expect(within(viewer).getByRole('img', { name: 'Onyxia down!' })).toHaveAttribute('src', '/api/submissions/sub-1/full')
-    expect(within(viewer).getByRole('button', { name: 'Fit to window' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(viewer).getByText('thundermane · onyxia.png · 1920×1080')).toBeInTheDocument()
+    const lightbox = screen.getByRole('dialog', { name: 'Image preview' })
+    expect(within(lightbox).getByRole('img', { name: 'Onyxia down!' })).toHaveAttribute('src', '/api/submissions/sub-1/full')
   })
 
-  it('should switch to full size when the 100% button is clicked', async () => {
-    serveSubmissions([onyxia])
-    renderWithProviders(<OfficerSubmissions />, '/officer/submissions')
-    await userEvent.click(await screen.findByRole('button', { name: 'Open Onyxia down!' }))
-    const viewer = screen.getByRole('dialog', { name: 'Onyxia down!' })
-
-    await userEvent.click(within(viewer).getByRole('button', { name: '100%' }))
-
-    expect(within(viewer).getByRole('button', { name: '100%' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(viewer).getByRole('button', { name: 'Fit to window' })).toHaveAttribute('aria-pressed', 'false')
-  })
-
-  it('should switch zoom with the 1 and F keys', async () => {
-    serveSubmissions([onyxia])
-    renderWithProviders(<OfficerSubmissions />, '/officer/submissions')
-    await userEvent.click(await screen.findByRole('button', { name: 'Open Onyxia down!' }))
-    const viewer = screen.getByRole('dialog', { name: 'Onyxia down!' })
-    within(viewer).getByLabelText('Image, scroll to pan').focus()
-
-    await userEvent.keyboard('1')
-    expect(within(viewer).getByRole('button', { name: '100%' })).toHaveAttribute('aria-pressed', 'true')
-
-    await userEvent.keyboard('f')
-    expect(within(viewer).getByRole('button', { name: 'Fit to window' })).toHaveAttribute('aria-pressed', 'true')
-  })
-
-  it('should close the viewer when Escape is pressed', async () => {
-    serveSubmissions([onyxia])
-    renderWithProviders(<OfficerSubmissions />, '/officer/submissions')
-    await userEvent.click(await screen.findByRole('button', { name: 'Open Onyxia down!' }))
-    within(screen.getByRole('dialog', { name: 'Onyxia down!' })).getByRole('button', { name: 'Fit to window' }).focus()
-
-    await userEvent.keyboard('{Escape}')
-
-    expect(screen.queryByRole('dialog', { name: 'Onyxia down!' })).not.toBeInTheDocument()
-  })
-
-  it('should offer the original file as a download in the viewer', async () => {
+  it('should offer the original file as a download on the card', async () => {
     serveSubmissions([onyxia])
     renderWithProviders(<OfficerSubmissions />, '/officer/submissions')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Open Onyxia down!' }))
+    const download = await screen.findByRole('link', { name: 'Download original of Onyxia down!' })
 
-    const download = screen.getByRole('link', { name: 'Download original' })
     expect(download).toHaveAttribute('href', '/api/submissions/sub-1/download')
     expect(download).toHaveAttribute('download', 'onyxia.png')
+  })
+
+  it('should tick the submission instead of opening the lightbox when its thumbnail is clicked in select mode', async () => {
+    serveSubmissions([onyxia])
+    renderWithProviders(<OfficerSubmissions />, '/officer/submissions')
+    await userEvent.click(await screen.findByRole('button', { name: 'Select' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Toggle Onyxia down!' }))
+
+    expect(screen.getByRole('checkbox', { name: 'Select Onyxia down!' })).toBeChecked()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('should delete a submission from the grid once the deletion is confirmed', async () => {
@@ -160,7 +131,7 @@ describe('OfficerSubmissions', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Delete Onyxia down!' }))
     await userEvent.click(within(screen.getByRole('dialog', { name: 'Delete submission?' })).getByRole('button', { name: 'Delete' }))
 
-    expect(await gridItems()).toEqual(['mendwellDelete'])
+    expect(await gridItems()).toEqual(['mendwellDownloadDelete'])
     expect(deleted).toEqual([['sub-1']])
   })
 
@@ -172,21 +143,8 @@ describe('OfficerSubmissions', () => {
     await userEvent.click(within(screen.getByRole('dialog', { name: 'Delete submission?' })).getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByRole('dialog', { name: 'Delete submission?' })).not.toBeInTheDocument()
-    expect(await gridItems()).toEqual(['thundermaneOnyxia down!Delete'])
+    expect(await gridItems()).toEqual(['thundermaneOnyxia down!DownloadDelete'])
     expect(deleted).toEqual([])
-  })
-
-  it('should delete a submission from the viewer once the deletion is confirmed', async () => {
-    const deleted = serveSubmissions([onyxia, fanart])
-    renderWithProviders(<OfficerSubmissions />, '/officer/submissions')
-    await userEvent.click(await screen.findByRole('button', { name: 'Open fanart.jpg' }))
-
-    await userEvent.click(within(screen.getByRole('dialog', { name: 'fanart.jpg' })).getByRole('button', { name: 'Delete' }))
-    await userEvent.click(within(screen.getByRole('dialog', { name: 'Delete submission?' })).getByRole('button', { name: 'Delete' }))
-
-    expect(await gridItems()).toEqual(['thundermaneOnyxia down!Delete'])
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(deleted).toEqual([['sub-2']])
   })
 
   it('should delete every selected submission in one request when Delete selected is confirmed', async () => {
@@ -214,6 +172,32 @@ describe('OfficerSubmissions', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('delete submission failed')
   })
 
+  it('should go back to the previous page when the last submission on the last page is deleted', async () => {
+    let lastPageDeleted = false
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(officer)),
+      http.get('/api/submissions', ({ request }) => {
+        const offset = Number(new URL(request.url).searchParams.get('offset') ?? '0')
+        if (lastPageDeleted) {
+          return HttpResponse.json({ total: 48, limit: 48, offset, items: offset === 0 ? [onyxia] : [] })
+        }
+        return HttpResponse.json({ total: 49, limit: 48, offset, items: [offset === 0 ? onyxia : fanart] })
+      }),
+      http.delete('/api/submissions/:id', () => {
+        lastPageDeleted = true
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderWithProviders(<OfficerSubmissions />, '/officer/submissions')
+    await userEvent.click(await screen.findByRole('button', { name: 'Next' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete fanart.jpg' }))
+
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Delete submission?' })).getByRole('button', { name: 'Delete' }))
+
+    expect(await screen.findByText('Showing 1–1 of 48')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open image: Onyxia down!' })).toBeInTheDocument()
+  })
+
   it('should load the next page when Next is clicked', async () => {
     const offsets: string[] = []
     server.use(
@@ -226,11 +210,11 @@ describe('OfficerSubmissions', () => {
       }),
     )
     renderWithProviders(<OfficerSubmissions />, '/officer/submissions')
-    await screen.findByRole('button', { name: 'Open Onyxia down!' })
+    await screen.findByRole('button', { name: 'Open image: Onyxia down!' })
 
     await userEvent.click(screen.getByRole('button', { name: 'Next' }))
 
-    expect(await screen.findByRole('button', { name: 'Open fanart.jpg' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Open image: fanart.jpg' })).toBeInTheDocument()
     expect(offsets).toEqual(['0', '48'])
   })
 })

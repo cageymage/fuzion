@@ -64,6 +64,26 @@ describe('Dashboard', () => {
     expect(screen.queryByRole('link', { name: 'Link Battle.net' })).not.toBeInTheDocument()
   })
 
+  it('should link to the submission page when the user is a guild member', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(unlinkedMember)))
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    expect(await screen.findByRole('link', { name: 'Submit art or screenshots' })).toHaveAttribute(
+      'href',
+      '/submissions',
+    )
+  })
+
+  it('should not link to the submission page when the user is not a guild member', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ ...unlinkedMember, isGuildMember: false })))
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    await screen.findByRole('link', { name: 'Link Battle.net' })
+    expect(screen.queryByRole('link', { name: 'Submit art or screenshots' })).not.toBeInTheDocument()
+  })
+
   it('should show a Link Battle.net button when the user has not linked yet', async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json(unlinkedMember)))
 

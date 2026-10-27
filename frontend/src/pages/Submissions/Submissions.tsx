@@ -24,9 +24,16 @@ interface Selected {
 
 const mib = (bytes: number) => `${Math.round(bytes / (1024 * 1024))} MiB`
 
-// Checks a new file against the server's limits, so the member hears no before uploading.
+const IMAGE_EXTENSION = /\.(png|jpe?g|webp|gif)$/i
+
+function sameFile(a: File, b: File): boolean {
+  return a.name === b.name && a.size === b.size && a.lastModified === b.lastModified
+}
+
 function problemWith(file: File): string | null {
-  if (!ALLOWED_TYPES.includes(file.type)) return `${file.name}: must be a PNG, JPEG, WebP or GIF image`
+  // Some systems report no type for valid images; the server sniffs the content anyway.
+  const typeAllowed = file.type ? ALLOWED_TYPES.includes(file.type) : IMAGE_EXTENSION.test(file.name)
+  if (!typeAllowed) return `${file.name}: must be a PNG, JPEG, WebP or GIF image`
   if (file.size > MAX_FILE_BYTES) return `${file.name}: must be at most ${mib(MAX_FILE_BYTES)}`
   return null
 }
@@ -44,16 +51,13 @@ function SubmissionForm() {
       submitImages(items.map(({ file, description }) => ({ file, description: description.trim() }))),
     onSuccess: (fileResults, items) => {
       setResults(fileResults)
-      // Keep only the files that failed, so the member can fix and resend just those.
-      const kept = items.filter((_, i) => !fileResults[i]?.submission)
-      for (const item of items) {
-        if (!kept.includes(item)) URL.revokeObjectURL(item.previewUrl)
-      }
-      setSelected(kept)
+      const stored = items.filter((_, i) => fileResults[i]?.submission)
+      for (const item of stored) URL.revokeObjectURL(item.previewUrl)
+      const storedKeys = new Set(stored.map(({ key }) => key))
+      setSelected((current) => current.filter(({ key }) => !storedKeys.has(key)))
     },
   })
 
-  // Frees the previews still selected when the page goes away.
   const selectedRef = useRef(selected)
   selectedRef.current = selected
   useEffect(() => () => selectedRef.current.forEach(({ previewUrl }) => URL.revokeObjectURL(previewUrl)), [])
@@ -65,6 +69,10 @@ function SubmissionForm() {
       const problem = problemWith(file)
       if (problem) {
         newProblems.push(problem)
+        continue
+      }
+      if ([...selected, ...accepted].some((item) => sameFile(item.file, file))) {
+        newProblems.push(`${file.name}: already added`)
         continue
       }
       if (selected.length + accepted.length >= MAX_BATCH_FILES) {
@@ -79,11 +87,9 @@ function SubmissionForm() {
   }
 
   function remove(key: string) {
-    setSelected((current) => {
-      const item = current.find((candidate) => candidate.key === key)
-      if (item) URL.revokeObjectURL(item.previewUrl)
-      return current.filter((candidate) => candidate.key !== key)
-    })
+    const item = selectedRef.current.find((candidate) => candidate.key === key)
+    if (item) URL.revokeObjectURL(item.previewUrl)
+    setSelected((current) => current.filter((candidate) => candidate.key !== key))
   }
 
   function describe(key: string, description: string) {
@@ -152,7 +158,7 @@ function SubmissionForm() {
         <ul className={styles.selected} aria-label="Selected images">
           {selected.map((item) => (
             <li key={item.key} className={styles.item}>
-              <img className={styles.preview} src={item.previewUrl} alt={`Preview of ${item.file.name}`} />
+              <img className={styles.preview} src={item.previewUrl} decoding="async" alt={`Preview of ${item.file.name}`} />
               <div className={styles.itemBody}>
                 <span className={styles.filename}>{item.file.name}</span>
                 <textarea
