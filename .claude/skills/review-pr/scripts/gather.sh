@@ -33,7 +33,7 @@ grep -E '^\+\+\+ b/' "$out/diff.patch" | sed 's#^+++ b/##' > "$out/files.txt" ||
 
 body=$(jq -r '.body // ""' "$out/pr.json")
 issues=$( { jq -r '.closingIssuesReferences[]?.number' "$out/pr.json"; \
-            printf '%s' "$body" | grep -oiE '(closes|fixes|resolves) #[0-9]+' | grep -oE '[0-9]+'; } | sort -un )
+            printf '%s' "$body" | grep -oiE '(closes|fixes|resolves) #[0-9]+' | grep -oE '[0-9]+' || true; } | sort -un )
 
 for n in $issues; do
   gh issue view "$n" --json number,title,body,labels,comments > "$out/issue-$n.json"
