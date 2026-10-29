@@ -128,6 +128,8 @@ const characterRealmSlugSQL = `lower(replace(replace(realm, ' ', '-'), '''', '')
 // roster characters on that account, matched on name and realm, ignoring case.
 // Characters another member already owns stay theirs. Characters this user owned
 // that are no longer on the account are released, so linking again refreshes the set.
+// When the character list is unknown, only the identity is stored: an empty list
+// from a failed lookup would otherwise release every character the user owns.
 func (r *Repo) LinkBattleNet(ctx context.Context, userID uuid.UUID, identity Identity) error {
 	const link = `
 		UPDATE users
@@ -165,11 +167,13 @@ func (r *Repo) LinkBattleNet(ctx context.Context, userID uuid.UUID, identity Ide
 	if err != nil {
 		return fmt.Errorf("link battle.net: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, release, userID, names, realms); err != nil {
-		return fmt.Errorf("release characters no longer on the account: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, claim, userID, names, realms); err != nil {
-		return fmt.Errorf("claim characters: %w", err)
+	if identity.CharactersKnown {
+		if _, err := tx.ExecContext(ctx, release, userID, names, realms); err != nil {
+			return fmt.Errorf("release characters no longer on the account: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, claim, userID, names, realms); err != nil {
+			return fmt.Errorf("claim characters: %w", err)
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit link battle.net: %w", err)

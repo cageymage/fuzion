@@ -12,6 +12,9 @@ type Identity struct {
 
 	// Characters is only ever set by the Battle.net provider: the WoW characters on the account.
 	Characters []AccountCharacter
+	// CharactersKnown is true only when Blizzard returned the account's character list.
+	// When it is false, Characters says nothing, so ownership must be left as it is.
+	CharactersKnown bool
 }
 
 type AccountCharacter struct {

@@ -39,6 +39,16 @@ type FakeBattleNet struct {
 
 	mu    sync.Mutex
 	codes map[string]BattleNetUser
+	// profileStatus, when set, is what /profile/user/wow answers instead of the list.
+	profileStatus int
+}
+
+// FailProfile makes /profile/user/wow answer status, as a wrong namespace (404) or a
+// game API outage (500) would, while sign-in on oauth.battle.net keeps working.
+func (f *FakeBattleNet) FailProfile(status int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.profileStatus = status
 }
 
 func NewFakeBattleNet(t *testing.T) *FakeBattleNet {
@@ -123,9 +133,11 @@ func (f *FakeBattleNet) profile(t *testing.T) http.HandlerFunc {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_token"})
 			return
 		}
-		// Blizzard answers 404 for an account with no characters in the namespace.
-		if len(user.Characters) == 0 {
-			writeJSON(w, http.StatusNotFound, map[string]any{"code": 404, "type": "BLZWEBAPI00000404", "detail": "Not Found"})
+		f.mu.Lock()
+		status := f.profileStatus
+		f.mu.Unlock()
+		if status != 0 {
+			writeJSON(w, status, map[string]any{"code": status, "detail": http.StatusText(status)})
 			return
 		}
 		characters := []map[string]any{}
