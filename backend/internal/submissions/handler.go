@@ -1,6 +1,7 @@
 package submissions
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -26,12 +27,18 @@ const (
 	maxBulkDelete     = 100
 )
 
+// DefaultUploadSlots is how many uploads may be read and decoded at once. Each can
+// hold a 50 MiB body and a 25-megapixel decode (about 150 MB together), so two fit
+// on a 512 MB instance with room for everything else.
+const DefaultUploadSlots = 2
+
 type Handler struct {
 	service *Service
+	uploads chan struct{}
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, uploadSlots int) *Handler {
+	return &Handler{service: service, uploads: make(chan struct{}, uploadSlots)}
 }
 
 func (h *Handler) Register(r chi.Router) {
@@ -127,6 +134,16 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 	// Checked before the body is read, so a closed form costs a flood nothing.
 	if !h.service.Enabled() {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": ErrClosed.Error()})
+		return
+	}
+	// Taken before the body is read, so a burst of uploads is refused instead of
+	// buffered and decoded all at once.
+	select {
+	case h.uploads <- struct{}{}:
+		defer func() { <-h.uploads }()
+	default:
+		w.Header().Set("Retry-After", "10")
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "too many uploads are in progress; try again in a few seconds"})
 		return
 	}
 
@@ -231,6 +248,8 @@ func writeUploadError(w http.ResponseWriter, r *http.Request, err error) {
 		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "a submission must be at most " + strconv.Itoa(MaxBatchBytes>>20) + " MiB in total"})
 	case errors.Is(err, ErrClosed), errors.Is(err, ErrStorageFull):
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+	case errors.Is(err, context.Canceled):
+		// The client went away mid-upload; there is no one to answer and nothing to log.
 	default:
 		slog.ErrorContext(r.Context(), "upload submission", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "submission could not be uploaded"})

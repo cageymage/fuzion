@@ -88,7 +88,6 @@ describe('Legal', () => {
     expect(privacy).toHaveTextContent('we keep each exact original file')
     expect(privacy).toHaveTextContent('the GPS location where it was taken')
     expect(privacy).toHaveTextContent('Only officers can see submissions; they are never public.')
-    expect(privacy).toHaveTextContent('which re-encodes it and drops that data')
   })
 
   it('should state the license submitters grant and what they attest when the page renders', () => {

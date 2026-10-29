@@ -51,9 +51,8 @@ export function Legal() {
             it, and when they accepted the license and which version of its wording. Originals keep
             any data the file carries, such as EXIF details and, for some phone photos, the GPS
             location where it was taken. Only officers can see submissions; they are never public.
-            An image picked for a news post is copied through the site&apos;s image pipeline, which
-            re-encodes it and drops that data. Officers can delete a submission at any time, which
-            removes the original and the preview.
+            Officers can delete a submission at any time, which removes the original and the
+            preview.
           </li>
         </ul>
         <p>Other services are involved in running the site:</p>

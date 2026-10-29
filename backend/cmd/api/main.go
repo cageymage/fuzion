@@ -144,7 +144,7 @@ func run() error {
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), streams.NewSuggestedVideos(youTube, playlistID, clock.System{})),
-		Submissions:    submissions.NewHandler(submissions.NewService(submissions.NewRepo(db), clock.System{}, cfg.submissions.enabled, cfg.submissions.storageLimitBytes)),
+		Submissions:    submissions.NewHandler(submissions.NewService(submissions.NewRepo(db), clock.System{}, cfg.submissions.enabled, cfg.submissions.storageLimitBytes), submissions.DefaultUploadSlots),
 		Surveys:        surveys.NewHandler(surveys.NewService(surveys.NewRepo(db), clock.System{})),
 		AllowedOrigins: cfg.allowedOrigins,
 	})

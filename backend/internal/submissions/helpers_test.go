@@ -64,6 +64,17 @@ func pngHeaderOnly(width, height uint32) []byte {
 	return b.Bytes()
 }
 
+// gifHeaderOnly is a GIF whose logical screen is width×height and that has no frames,
+// so a pixel limit can be tested without allocating the image.
+func gifHeaderOnly(width, height uint16) []byte {
+	var b bytes.Buffer
+	b.WriteString("GIF89a")
+	_ = binary.Write(&b, binary.LittleEndian, width)
+	_ = binary.Write(&b, binary.LittleEndian, height)
+	b.Write([]byte{0, 0, 0, 0x3b}) // no color table, background, aspect, trailer
+	return b.Bytes()
+}
+
 func metadataPart(t *testing.T, accepted bool, version string, descriptions ...string) testutil.MultipartPart {
 	t.Helper()
 	data, err := json.Marshal(map[string]any{
@@ -124,25 +135,6 @@ type fileResultJSON struct {
 
 type uploadResponseJSON struct {
 	Results []fileResultJSON `json:"results"`
-}
-
-// expectedSubmission is the JSON a submission stored at FixedNow should come back as.
-func expectedSubmission(id string, submitter auth.User, filename, description string, width, height, byteSize int) submissionJSON {
-	base := "/api/submissions/" + id
-	return submissionJSON{
-		ID:               id,
-		Submitter:        submitterJSON{ID: submitter.ID.String(), Username: submitter.Username},
-		Description:      description,
-		OriginalFilename: filename,
-		ContentType:      "image/png",
-		Width:            width,
-		Height:           height,
-		ByteSize:         byteSize,
-		CreatedAt:        testutil.FixedNow,
-		ThumbURL:         base + "/thumb",
-		FullURL:          base + "/full",
-		DownloadURL:      base + "/download",
-	}
 }
 
 type storedRow struct {

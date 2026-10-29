@@ -15,11 +15,13 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	_ "golang.org/x/image/webp"
 
 	"github.com/cageymage/fuzion/backend/internal/clock"
@@ -41,9 +43,15 @@ const (
 	quotaWindow      = 24 * time.Hour
 	maxFilenameRunes = 200
 
-	// Rejects decompression bombs before a full decode: a decoded image costs about
-	// 4 bytes per pixel, so this is roughly 200 MB. Files are decoded one at a time.
-	MaxPixels = 50_000_000
+	// Rejects decompression bombs before a full decode. A decoded image costs about
+	// 4 bytes per pixel, so this is roughly 100 MB on a 512 MB instance, and still
+	// fits a 6000×4000 photo. Files are decoded one at a time, and the handler lets
+	// only a few uploads run at once.
+	MaxPixels = 25_000_000
+
+	// The status endpoint is public, so it reads the storage total from a short cache
+	// rather than summing the table on every page load. Uploads use the exact total.
+	statusCacheTTL = 30 * time.Second
 )
 
 var allowedTypes = map[string]bool{
@@ -102,6 +110,10 @@ type Service struct {
 	clock        clock.Clock
 	enabled      bool
 	storageLimit int64
+
+	mu            sync.Mutex
+	cachedTotal   int64
+	cachedTotalAt time.Time
 }
 
 // enabled is the SUBMISSIONS_ENABLED kill switch: off refuses uploads while officers
@@ -115,11 +127,34 @@ func (s *Service) Open(ctx context.Context) (bool, error) {
 	if !s.enabled {
 		return false, nil
 	}
-	total, err := s.repo.totalBytes(ctx)
+	total, err := s.statusTotal(ctx)
 	if err != nil {
 		return false, fmt.Errorf("check submission storage: %w", err)
 	}
 	return total < s.storageLimit, nil
+}
+
+func (s *Service) statusTotal(ctx context.Context) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.clock.Now()
+	if !s.cachedTotalAt.IsZero() && now.Sub(s.cachedTotalAt) < statusCacheTTL {
+		return s.cachedTotal, nil
+	}
+	total, err := s.repo.totalBytes(ctx, s.repo.db)
+	if err != nil {
+		return 0, err
+	}
+	s.cachedTotal, s.cachedTotalAt = total, now
+	return total, nil
+}
+
+// forgetTotal drops the cached total after an upload or delete, so the status
+// reflects it on the next call instead of up to statusCacheTTL later.
+func (s *Service) forgetTotal() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cachedTotalAt = time.Time{}
 }
 
 // Enabled is the kill switch alone, which the handler checks before reading a body.
@@ -134,7 +169,63 @@ func (s *Service) Upload(ctx context.Context, userID uuid.UUID, req UploadReques
 	if err := validateRequest(req); err != nil {
 		return nil, err
 	}
+	now := s.clock.Now().UTC()
 
+	// Checked once before decoding, so an over-quota member costs no CPU, and again
+	// under the upload lock, where it decides.
+	if err := s.checkLimits(ctx, s.repo.db, userID, req, now); err != nil {
+		return nil, err
+	}
+
+	results := make([]FileResult, len(req.Files))
+	prepared := make([]*newSubmission, len(req.Files))
+	for i, f := range req.Files {
+		// A client that has gone away gets no more decoding or inserts.
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		description := ""
+		if i < len(req.Descriptions) {
+			description = strings.TrimSpace(req.Descriptions[i])
+		}
+		results[i], prepared[i] = s.prepare(ctx, userID, f, description, req.AttestationVersion, now)
+	}
+
+	created := 0
+	err := s.repo.withUploadLock(ctx, func(q sqlx.ExtContext) error {
+		if err := s.checkLimits(ctx, q, userID, req, now); err != nil {
+			return err
+		}
+		for i, submission := range prepared {
+			if submission == nil {
+				continue
+			}
+			stored, err := s.repo.create(ctx, q, *submission)
+			if errors.Is(err, errDuplicate) {
+				results[i].Problem = "you have already submitted this image"
+				results[i].Duplicate = true
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			results[i].Submission = &stored
+			created++
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if created > 0 {
+		s.forgetTotal()
+	}
+	return results, nil
+}
+
+// checkLimits applies the storage ceiling and the member's daily quota to the whole
+// batch, counting every file in it, even ones that will fail validation.
+func (s *Service) checkLimits(ctx context.Context, q sqlx.QueryerContext, userID uuid.UUID, req UploadRequest, now time.Time) error {
 	var batchBytes int64
 	for _, f := range req.Files {
 		if !f.TooLarge {
@@ -142,35 +233,25 @@ func (s *Service) Upload(ctx context.Context, userID uuid.UUID, req UploadReques
 		}
 	}
 
-	total, err := s.repo.totalBytes(ctx)
+	total, err := s.repo.totalBytes(ctx, q)
 	if err != nil {
-		return nil, fmt.Errorf("check submission storage: %w", err)
+		return fmt.Errorf("check submission storage: %w", err)
 	}
 	if total+batchBytes > s.storageLimit {
-		return nil, ErrStorageFull
+		return ErrStorageFull
 	}
 
-	now := s.clock.Now().UTC()
-	files, usedBytes, err := s.repo.usageSince(ctx, userID, now.Add(-quotaWindow))
+	files, usedBytes, err := s.repo.usageSince(ctx, q, userID, now.Add(-quotaWindow))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if files+len(req.Files) > DailyFileQuota {
-		return nil, &QuotaError{Problem: fmt.Sprintf("you can submit at most %d images per 24 hours; %d left", DailyFileQuota, max(0, DailyFileQuota-files))}
+		return &QuotaError{Problem: fmt.Sprintf("you can submit at most %d images per 24 hours; %d left", DailyFileQuota, max(0, DailyFileQuota-files))}
 	}
 	if usedBytes+batchBytes > DailyByteQuota {
-		return nil, &QuotaError{Problem: fmt.Sprintf("you can submit at most %d MiB per 24 hours", DailyByteQuota>>20)}
+		return &QuotaError{Problem: fmt.Sprintf("you can submit at most %d MiB per 24 hours", DailyByteQuota>>20)}
 	}
-
-	results := make([]FileResult, len(req.Files))
-	for i, f := range req.Files {
-		description := ""
-		if i < len(req.Descriptions) {
-			description = strings.TrimSpace(req.Descriptions[i])
-		}
-		results[i] = s.store(ctx, userID, f, description, req.AttestationVersion, now)
-	}
-	return results, nil
+	return nil
 }
 
 func validateRequest(req UploadRequest) error {
@@ -197,11 +278,13 @@ func validateRequest(req UploadRequest) error {
 	return nil
 }
 
-func (s *Service) store(ctx context.Context, userID uuid.UUID, f UploadFile, description, version string, now time.Time) FileResult {
+// prepare validates, decodes and thumbnails one file without touching the database.
+// It returns the submission to insert, or nil with the reason in the result.
+func (s *Service) prepare(ctx context.Context, userID uuid.UUID, f UploadFile, description, version string, now time.Time) (FileResult, *newSubmission) {
 	result := FileResult{Filename: SafeFilename(f.Filename)}
 	if f.TooLarge {
 		result.Problem = fmt.Sprintf("must be at most %d MiB", MaxFileBytes>>20)
-		return result
+		return result, nil
 	}
 
 	// The declared type is the browser's guess from the file name, so only the
@@ -209,31 +292,34 @@ func (s *Service) store(ctx context.Context, userID uuid.UUID, f UploadFile, des
 	contentType := http.DetectContentType(f.Data)
 	if !allowedTypes[contentType] {
 		result.Problem = "must be a PNG, JPEG, WebP or GIF image"
-		return result
+		return result, nil
 	}
+	// For a GIF this is the logical screen. image.Decode keeps only the first frame,
+	// and the decoder rejects frames larger than the screen, so this also bounds a GIF
+	// with many frames.
 	config, _, err := image.DecodeConfig(bytes.NewReader(f.Data))
 	if err != nil || config.Width < 1 || config.Height < 1 {
 		result.Problem = "must be a PNG, JPEG, WebP or GIF image"
-		return result
+		return result, nil
 	}
 	if config.Width*config.Height > MaxPixels {
 		result.Problem = fmt.Sprintf("is %d×%d pixels; images must be at most %d megapixels", config.Width, config.Height, MaxPixels/1_000_000)
-		return result
+		return result, nil
 	}
 	src, _, err := image.Decode(bytes.NewReader(f.Data))
 	if err != nil {
 		result.Problem = "must be a PNG, JPEG, WebP or GIF image"
-		return result
+		return result, nil
 	}
 	thumb, err := images.Thumbnail(src)
 	if err != nil {
 		slog.ErrorContext(ctx, "make submission thumbnail", "error", err)
 		result.Problem = "could not be processed"
-		return result
+		return result, nil
 	}
 
 	hash := sha256.Sum256(f.Data)
-	created, err := s.repo.create(ctx, newSubmission{
+	return result, &newSubmission{
 		UserID:                userID,
 		Original:              f.Data,
 		ContentType:           contentType,
@@ -246,19 +332,7 @@ func (s *Service) store(ctx context.Context, userID uuid.UUID, f UploadFile, des
 		AttestationVersion:    version,
 		ContentHash:           hex.EncodeToString(hash[:]),
 		CreatedAt:             now,
-	})
-	if errors.Is(err, errDuplicate) {
-		result.Problem = "you have already submitted this image"
-		result.Duplicate = true
-		return result
 	}
-	if err != nil {
-		slog.ErrorContext(ctx, "store submission", "error", err)
-		result.Problem = "could not be stored"
-		return result
-	}
-	result.Submission = &created
-	return result
 }
 
 func (s *Service) List(ctx context.Context, limit, offset int) ([]Summary, int, error) {
@@ -284,6 +358,7 @@ func (s *Service) Delete(ctx context.Context, officerID uuid.UUID, ids []uuid.UU
 		return nil, err
 	}
 	if len(deleted) > 0 {
+		s.forgetTotal()
 		slog.InfoContext(ctx, "submissions deleted", "officer_id", officerID, "submission_ids", deleted)
 	}
 	return deleted, nil
