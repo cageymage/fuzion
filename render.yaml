@@ -110,6 +110,13 @@ services:
         value: us
       - key: BLIZZARD_NAMESPACE
         sync: false
+      # Emergency switch for art submissions: set to false to close uploads during a
+      # spam flood (officers keep reviewing and deleting). Unset means on.
+      - key: SUBMISSIONS_ENABLED
+        value: "true"
+      # Total MiB all submission originals may hold before new ones are refused.
+      - key: SUBMISSIONS_STORAGE_LIMIT_MB
+        value: "512"
       # Optional: without it, new applications are not announced in Discord. It is
       # a channel webhook URL (Edit Channel > Integrations > Webhooks); treat it
       # as a secret.

@@ -17,6 +17,8 @@ func setRequiredConfig(t *testing.T) {
 	t.Setenv("BLIZZARD_CLIENT_SECRET", "")
 	t.Setenv("BLIZZARD_REGION", "")
 	t.Setenv("BLIZZARD_NAMESPACE", "")
+	t.Setenv("SUBMISSIONS_ENABLED", "")
+	t.Setenv("SUBMISSIONS_STORAGE_LIMIT_MB", "")
 }
 
 func TestLoadConfig_ReturnsError_WhenBattleNetRedirectIsSetWithoutBlizzardCredentials(t *testing.T) {
@@ -117,5 +119,54 @@ func TestLoadConfig_DefaultsBattleNetNamespaceToTheRegionsProfile_WhenNamespaceI
 	}
 	if cfg.battleNet.region != "eu" || cfg.battleNet.namespace != "profile-eu" {
 		t.Errorf("region, namespace = %q, %q, want %q, %q", cfg.battleNet.region, cfg.battleNet.namespace, "eu", "profile-eu")
+	}
+}
+
+func TestLoadConfig_OpensSubmissionsWith512MiB_WhenTheirVariablesAreUnset(t *testing.T) {
+	// given neither submissions variable
+	setRequiredConfig(t)
+
+	// when I load the config
+	cfg, err := loadConfig()
+
+	// then I expect submissions on, so a missing variable never closes them, with the default ceiling
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.submissions != (submissionsConfig{enabled: true, storageLimitBytes: 512 << 20}) {
+		t.Errorf("submissions = %+v", cfg.submissions)
+	}
+}
+
+func TestLoadConfig_ClosesSubmissions_WhenSubmissionsEnabledIsFalse(t *testing.T) {
+	// given the emergency switch turned off and a 64 MiB ceiling
+	setRequiredConfig(t)
+	t.Setenv("SUBMISSIONS_ENABLED", "false")
+	t.Setenv("SUBMISSIONS_STORAGE_LIMIT_MB", "64")
+
+	// when I load the config
+	cfg, err := loadConfig()
+
+	// then I expect submissions off, with the ceiling I set
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.submissions != (submissionsConfig{enabled: false, storageLimitBytes: 64 << 20}) {
+		t.Errorf("submissions = %+v", cfg.submissions)
+	}
+}
+
+func TestLoadConfig_ReturnsError_WhenSubmissionsEnabledIsNotABoolean(t *testing.T) {
+	// given a mistyped switch
+	setRequiredConfig(t)
+	t.Setenv("SUBMISSIONS_ENABLED", "nope")
+
+	// when I load the config
+	_, err := loadConfig()
+
+	// then I expect startup to fail naming the variable, rather than guess
+	want := `SUBMISSIONS_ENABLED must be true or false, got "nope"`
+	if err == nil || err.Error() != want {
+		t.Errorf("expected error %q, got %v", want, err)
 	}
 }
