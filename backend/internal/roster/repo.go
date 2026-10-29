@@ -149,7 +149,9 @@ func (r *Repo) SetOwnMain(ctx context.Context, userID, id uuid.UUID, isMain bool
 	// from each clearing the other's old main and leaving two.
 	const lock = `SELECT id FROM characters WHERE user_id = $1 OR id = $2 FOR UPDATE`
 
-	const owner = `SELECT user_id FROM characters WHERE id = $1`
+	// A character that left the guild is hidden from the member's list, so it is not
+	// theirs to promote: making it main would demote the main they can see.
+	const owner = `SELECT user_id FROM characters WHERE id = $1 AND left_guild_at IS NULL`
 
 	const clearOtherMains = `
 		UPDATE characters SET is_main = false, is_main_set_by_hand = true
