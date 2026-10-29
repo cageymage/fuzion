@@ -8,11 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 )
-
-const uniqueViolationCode = "23505"
 
 var (
 	ErrNotFound  = errors.New("submission not found")
@@ -66,7 +63,31 @@ const summaryColumns = `
 	s.id, s.user_id, u.username, s.description, s.original_filename, s.content_type,
 	s.width, s.height, s.byte_size, s.created_at`
 
-func (r *Repo) create(ctx context.Context, s newSubmission) (Summary, error) {
+// withUploadLock runs fn in a transaction holding one advisory lock for all uploads,
+// so the quota and storage checks and the inserts that follow them cannot interleave
+// with another upload's. Uploads are rare, so serializing them costs nothing.
+func (r *Repo) withUploadLock(ctx context.Context, fn func(q sqlx.ExtContext) error) error {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin submission upload: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // no-op once committed
+
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext('submissions-upload'))`); err != nil {
+		return fmt.Errorf("lock submission uploads: %w", err)
+	}
+	if err := fn(tx); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit submission upload: %w", err)
+	}
+	return nil
+}
+
+// create inserts s, or returns errDuplicate when the user already submitted the same
+// file. ON CONFLICT keeps a duplicate from aborting the rest of the batch's transaction.
+func (r *Repo) create(ctx context.Context, q sqlx.ExtContext, s newSubmission) (Summary, error) {
 	const query = `
 		WITH s AS (
 			INSERT INTO submissions (
@@ -74,17 +95,17 @@ func (r *Repo) create(ctx context.Context, s newSubmission) (Summary, error) {
 				width, height, description, attestation_accepted_at, attestation_version, content_hash, created_at
 			)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+			ON CONFLICT (user_id, content_hash) DO NOTHING
 			RETURNING *
 		)
 		SELECT ` + summaryColumns + `
 		FROM s JOIN users u ON u.id = s.user_id`
 
 	var created Summary
-	err := r.db.GetContext(ctx, &created, query,
+	err := sqlx.GetContext(ctx, q, &created, query,
 		s.UserID, s.Original, len(s.Original), s.ContentType, s.OriginalFilename, s.Thumb,
 		s.Width, s.Height, s.Description, s.AttestationAcceptedAt, s.AttestationVersion, s.ContentHash, s.CreatedAt)
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
+	if errors.Is(err, sql.ErrNoRows) {
 		return Summary{}, errDuplicate
 	}
 	if err != nil {
@@ -95,7 +116,7 @@ func (r *Repo) create(ctx context.Context, s newSubmission) (Summary, error) {
 }
 
 // usageSince counts the user's submissions and their bytes created after since.
-func (r *Repo) usageSince(ctx context.Context, userID uuid.UUID, since time.Time) (files int, bytes int64, err error) {
+func (r *Repo) usageSince(ctx context.Context, q sqlx.QueryerContext, userID uuid.UUID, since time.Time) (files int, bytes int64, err error) {
 	const query = `
 		SELECT count(*) AS files, COALESCE(sum(byte_size), 0) AS bytes
 		FROM submissions
@@ -105,15 +126,15 @@ func (r *Repo) usageSince(ctx context.Context, userID uuid.UUID, since time.Time
 		Files int   `db:"files"`
 		Bytes int64 `db:"bytes"`
 	}
-	if err := r.db.GetContext(ctx, &usage, query, userID, since); err != nil {
+	if err := sqlx.GetContext(ctx, q, &usage, query, userID, since); err != nil {
 		return 0, 0, fmt.Errorf("select submission usage: %w", err)
 	}
 	return usage.Files, usage.Bytes, nil
 }
 
-func (r *Repo) totalBytes(ctx context.Context) (int64, error) {
+func (r *Repo) totalBytes(ctx context.Context, q sqlx.QueryerContext) (int64, error) {
 	var total int64
-	if err := r.db.GetContext(ctx, &total, `SELECT COALESCE(sum(byte_size), 0) FROM submissions`); err != nil {
+	if err := sqlx.GetContext(ctx, q, &total, `SELECT COALESCE(sum(byte_size), 0) FROM submissions`); err != nil {
 		return 0, fmt.Errorf("select submission storage: %w", err)
 	}
 	return total, nil

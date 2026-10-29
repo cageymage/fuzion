@@ -75,6 +75,7 @@ type serverOptions struct {
 	discordGuildID       string
 	submissionsDisabled  bool
 	submissionStorage    int64
+	submissionSlots      int
 }
 
 // SubmissionStorageLimit is the storage ceiling NewServer gives submissions unless a
@@ -90,6 +91,11 @@ func WithSubmissionsDisabled() ServerOption {
 // WithSubmissionStorageLimit sets the total bytes all submissions may hold.
 func WithSubmissionStorageLimit(bytes int64) ServerOption {
 	return func(o *serverOptions) { o.submissionStorage = bytes }
+}
+
+// WithSubmissionUploadSlots sets how many uploads may run at once.
+func WithSubmissionUploadSlots(slots int) ServerOption {
+	return func(o *serverOptions) { o.submissionSlots = slots }
 }
 
 // WithoutDiscordGuild builds the server the way a deploy without
@@ -131,7 +137,7 @@ func WithoutYouTubePlaylist() ServerOption {
 func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	t.Helper()
 
-	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey, discordGuildID: DiscordGuildID, submissionStorage: SubmissionStorageLimit}
+	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey, discordGuildID: DiscordGuildID, submissionStorage: SubmissionStorageLimit, submissionSlots: submissions.DefaultUploadSlots}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -191,7 +197,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), suggestedVideos),
-		Submissions:    submissions.NewHandler(submissions.NewService(submissions.NewRepo(db), clock.Fixed(FixedNow), !options.submissionsDisabled, options.submissionStorage)),
+		Submissions:    submissions.NewHandler(submissions.NewService(submissions.NewRepo(db), clock.Fixed(FixedNow), !options.submissionsDisabled, options.submissionStorage), options.submissionSlots),
 		Surveys:        surveys.NewHandler(surveys.NewService(surveys.NewRepo(db), clock.Fixed(FixedNow))),
 		AllowedOrigins: []string{"http://localhost:5173"},
 	})

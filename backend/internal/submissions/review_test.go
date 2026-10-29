@@ -44,20 +44,12 @@ func storedFilenames(t *testing.T, db *sqlx.DB) []string {
 	return names
 }
 
-func sortStrings() cmp.Option {
-	return cmpopts.SortSlices(func(a, b string) bool { return a < b })
-}
-
-func requirePrivateHeaders(t *testing.T, resp testutil.Response) {
-	t.Helper()
-	got := map[string]string{
-		"X-Content-Type-Options": resp.Header.Get("X-Content-Type-Options"),
-		"Cache-Control":          resp.Header.Get("Cache-Control"),
+func headers(resp testutil.Response, names ...string) map[string]string {
+	got := map[string]string{}
+	for _, name := range names {
+		got[name] = resp.Header.Get(name)
 	}
-	want := map[string]string{"X-Content-Type-Options": "nosniff", "Cache-Control": "private"}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("unexpected headers (-want +got):\n%s", diff)
-	}
+	return got
 }
 
 func TestListSubmissions_ReturnsPagedMetadata_WithoutImageBytes(t *testing.T) {
@@ -66,26 +58,34 @@ func TestListSubmissions_ReturnsPagedMetadata_WithoutImageBytes(t *testing.T) {
 	srv := testutil.NewServer(t, db)
 	member := loginMember(t, srv)
 	insertSubmission(t, db, member.ID, "oldest.png", []byte{1}, 10, testutil.FixedNow.Add(-2*time.Hour))
-	middle := insertSubmission(t, db, member.ID, "middle.png", []byte{2}, 20, testutil.FixedNow.Add(-time.Hour))
-	newest := insertSubmission(t, db, member.ID, "newest.png", []byte{3}, 30, testutil.FixedNow)
+	middle := insertSubmission(t, db, member.ID, "middle.png", []byte{2}, 20, testutil.FixedNow.Add(-time.Hour)).String()
+	newest := insertSubmission(t, db, member.ID, "newest.png", []byte{3}, 30, testutil.FixedNow).String()
 	loginOfficer(t, srv)
 
 	// when I list the first page of two
 	resp := srv.Get(t, "/api/submissions?limit=2")
 
-	// then I expect the two newest, the total, and URLs instead of image bytes
+	// then I expect the two newest, the total, URLs instead of image bytes, and private headers
 	resp.RequireStatus(t, http.StatusOK)
-	requirePrivateHeaders(t, resp)
+	if diff := cmp.Diff(map[string]string{"X-Content-Type-Options": "nosniff", "Cache-Control": "private"}, headers(resp, "X-Content-Type-Options", "Cache-Control")); diff != "" {
+		t.Errorf("unexpected headers (-want +got):\n%s", diff)
+	}
 	var got pageJSON
 	resp.DecodeJSON(t, &got)
-	item := func(id uuid.UUID, filename string, byteSize int, createdAt time.Time) submissionJSON {
-		s := expectedSubmission(id.String(), member, filename, "", 4, 4, byteSize)
-		s.CreatedAt = createdAt
-		return s
-	}
+	submitter := submitterJSON{ID: member.ID.String(), Username: "thundermane"}
 	want := pageJSON{Total: 3, Limit: 2, Offset: 0, Items: []submissionJSON{
-		item(newest, "newest.png", 30, testutil.FixedNow),
-		item(middle, "middle.png", 20, testutil.FixedNow.Add(-time.Hour)),
+		{
+			ID: newest, Submitter: submitter, OriginalFilename: "newest.png", ContentType: "image/png",
+			Width: 4, Height: 4, ByteSize: 30, CreatedAt: testutil.FixedNow,
+			ThumbURL: "/api/submissions/" + newest + "/thumb", FullURL: "/api/submissions/" + newest + "/full",
+			DownloadURL: "/api/submissions/" + newest + "/download",
+		},
+		{
+			ID: middle, Submitter: submitter, OriginalFilename: "middle.png", ContentType: "image/png",
+			Width: 4, Height: 4, ByteSize: 20, CreatedAt: testutil.FixedNow.Add(-time.Hour),
+			ThumbURL: "/api/submissions/" + middle + "/thumb", FullURL: "/api/submissions/" + middle + "/full",
+			DownloadURL: "/api/submissions/" + middle + "/download",
+		},
 	}}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("unexpected page (-want +got):\n%s", diff)
@@ -96,10 +96,13 @@ func TestListSubmissions_ReturnsPagedMetadata_WithoutImageBytes(t *testing.T) {
 	if err := json.Unmarshal(resp.Body, &raw); err != nil {
 		t.Fatalf("decode raw page: %v", err)
 	}
+	wantKeys := []string{"byteSize", "contentType", "createdAt", "description", "downloadUrl", "fullUrl", "height", "id", "originalFilename", "submitter", "thumbUrl", "width"}
+	var gotKeys []string
 	for key := range raw.Items[0] {
-		if key == "originalBytes" || key == "thumbBytes" || key == "bytes" {
-			t.Errorf("list item carries image bytes under %q", key)
-		}
+		gotKeys = append(gotKeys, key)
+	}
+	if diff := cmp.Diff(wantKeys, gotKeys, cmpopts.SortSlices(func(a, b string) bool { return a < b })); diff != "" {
+		t.Errorf("unexpected list item fields (-want +got):\n%s", diff)
 	}
 }
 
@@ -108,7 +111,7 @@ func TestListSubmissions_ReturnsTheNextPage_WhenOffsetIsGiven(t *testing.T) {
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
 	member := loginMember(t, srv)
-	oldest := insertSubmission(t, db, member.ID, "oldest.png", []byte{1}, 10, testutil.FixedNow.Add(-2*time.Hour))
+	oldest := insertSubmission(t, db, member.ID, "oldest.png", []byte{1}, 10, testutil.FixedNow.Add(-2*time.Hour)).String()
 	insertSubmission(t, db, member.ID, "middle.png", []byte{2}, 20, testutil.FixedNow.Add(-time.Hour))
 	insertSubmission(t, db, member.ID, "newest.png", []byte{3}, 30, testutil.FixedNow)
 	loginOfficer(t, srv)
@@ -120,9 +123,13 @@ func TestListSubmissions_ReturnsTheNextPage_WhenOffsetIsGiven(t *testing.T) {
 	resp.RequireStatus(t, http.StatusOK)
 	var got pageJSON
 	resp.DecodeJSON(t, &got)
-	wantItem := expectedSubmission(oldest.String(), member, "oldest.png", "", 4, 4, 10)
-	wantItem.CreatedAt = testutil.FixedNow.Add(-2 * time.Hour)
-	if diff := cmp.Diff(pageJSON{Total: 3, Limit: 2, Offset: 2, Items: []submissionJSON{wantItem}}, got); diff != "" {
+	want := pageJSON{Total: 3, Limit: 2, Offset: 2, Items: []submissionJSON{{
+		ID: oldest, Submitter: submitterJSON{ID: member.ID.String(), Username: "thundermane"},
+		OriginalFilename: "oldest.png", ContentType: "image/png", Width: 4, Height: 4, ByteSize: 10,
+		CreatedAt: testutil.FixedNow.Add(-2 * time.Hour), ThumbURL: "/api/submissions/" + oldest + "/thumb",
+		FullURL: "/api/submissions/" + oldest + "/full", DownloadURL: "/api/submissions/" + oldest + "/download",
+	}}}
+	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("unexpected page (-want +got):\n%s", diff)
 	}
 }
@@ -138,7 +145,9 @@ func TestListSubmissions_ReturnsBadRequest_WhenLimitIsTooLarge(t *testing.T) {
 
 	// then I expect a 400
 	resp.RequireStatus(t, http.StatusBadRequest)
-	requireError(t, resp, "limit: must be between 1 and 100")
+	if diff := cmp.Diff(map[string]string{"error": "limit: must be between 1 and 100"}, errorBody(t, resp)); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
 }
 
 func TestListSubmissions_ReturnsForbidden_WhenUserIsNotOfficer(t *testing.T) {
@@ -179,12 +188,28 @@ func TestGetSubmissionFull_ReturnsTheOriginal_WhenOfficerAsks(t *testing.T) {
 
 	// then I expect the exact original bytes, served as the sniffed type with private headers
 	resp.RequireStatus(t, http.StatusOK)
-	requirePrivateHeaders(t, resp)
-	if got := resp.Header.Get("Content-Type"); got != "image/png" {
-		t.Errorf("Content-Type = %q, want image/png", got)
+	want := map[string]string{"Content-Type": "image/png", "X-Content-Type-Options": "nosniff", "Cache-Control": "private"}
+	if diff := cmp.Diff(want, headers(resp, "Content-Type", "X-Content-Type-Options", "Cache-Control")); diff != "" {
+		t.Errorf("unexpected headers (-want +got):\n%s", diff)
 	}
 	if !bytes.Equal(original, resp.Body) {
 		t.Errorf("full image differs from the original (%d vs %d bytes)", len(resp.Body), len(original))
+	}
+}
+
+func TestGetSubmissionFull_ReturnsNotFound_WhenSubmissionDoesNotExist(t *testing.T) {
+	// given an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	loginOfficer(t, srv)
+
+	// when I open the full image for an id that does not exist
+	resp := srv.Get(t, "/api/submissions/"+uuid.NewString()+"/full")
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+	if diff := cmp.Diff(map[string]string{"error": "submission not found"}, errorBody(t, resp)); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
 	}
 }
 
@@ -213,14 +238,16 @@ func TestGetSubmissionThumb_ReturnsAWebPPreview_WhenOfficerAsks(t *testing.T) {
 
 	// then I expect a WebP at most 800 pixels on its long edge, with private headers
 	resp.RequireStatus(t, http.StatusOK)
-	requirePrivateHeaders(t, resp)
+	wantHeaders := map[string]string{"Content-Type": "image/webp", "X-Content-Type-Options": "nosniff", "Cache-Control": "private"}
+	if diff := cmp.Diff(wantHeaders, headers(resp, "Content-Type", "X-Content-Type-Options", "Cache-Control")); diff != "" {
+		t.Errorf("unexpected headers (-want +got):\n%s", diff)
+	}
 	config, format, err := image.DecodeConfig(bytes.NewReader(resp.Body))
 	if err != nil {
 		t.Fatalf("decode thumbnail: %v", err)
 	}
-	got := map[string]any{"type": resp.Header.Get("Content-Type"), "format": format, "width": config.Width, "height": config.Height}
-	want := map[string]any{"type": "image/webp", "format": "webp", "width": 800, "height": 450}
-	if diff := cmp.Diff(want, got); diff != "" {
+	got := map[string]any{"format": format, "width": config.Width, "height": config.Height}
+	if diff := cmp.Diff(map[string]any{"format": "webp", "width": 800, "height": 450}, got); diff != "" {
 		t.Errorf("unexpected thumbnail (-want +got):\n%s", diff)
 	}
 }
@@ -236,7 +263,9 @@ func TestGetSubmissionThumb_ReturnsNotFound_WhenSubmissionDoesNotExist(t *testin
 
 	// then I expect a 404
 	resp.RequireStatus(t, http.StatusNotFound)
-	requireError(t, resp, "submission not found")
+	if diff := cmp.Diff(map[string]string{"error": "submission not found"}, errorBody(t, resp)); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
 }
 
 func TestDownloadSubmission_ReturnsTheOriginalAsAnAttachment_WithItsOriginalFilename(t *testing.T) {
@@ -250,11 +279,16 @@ func TestDownloadSubmission_ReturnsTheOriginalAsAnAttachment_WithItsOriginalFile
 	// when I download it
 	resp := srv.Get(t, "/api/submissions/"+id+"/download")
 
-	// then I expect the original bytes as an attachment named as uploaded
+	// then I expect the original bytes as an attachment named as uploaded, with private headers
 	resp.RequireStatus(t, http.StatusOK)
-	requirePrivateHeaders(t, resp)
-	if got := resp.Header.Get("Content-Disposition"); got != `attachment; filename="Onyxia kill.png"` {
-		t.Errorf("Content-Disposition = %q", got)
+	want := map[string]string{
+		"Content-Disposition":    `attachment; filename="Onyxia kill.png"`,
+		"Content-Type":           "image/png",
+		"X-Content-Type-Options": "nosniff",
+		"Cache-Control":          "private",
+	}
+	if diff := cmp.Diff(want, headers(resp, "Content-Disposition", "Content-Type", "X-Content-Type-Options", "Cache-Control")); diff != "" {
+		t.Errorf("unexpected headers (-want +got):\n%s", diff)
 	}
 	if !bytes.Equal(original, resp.Body) {
 		t.Errorf("download differs from the original")
@@ -279,6 +313,25 @@ func TestDownloadSubmission_SetsAttachmentDisposition_WhenFilenameContainsHeader
 	}
 	if got := resp.Header.Values("Set-Cookie"); len(got) != 0 {
 		t.Errorf("expected no Set-Cookie header, got %q", got)
+	}
+}
+
+func TestDownloadSubmission_ReturnsNotFound_WhenSubmissionDoesNotExist(t *testing.T) {
+	// given an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	loginOfficer(t, srv)
+
+	// when I download an id that does not exist
+	resp := srv.Get(t, "/api/submissions/"+uuid.NewString()+"/download")
+
+	// then I expect a 404 and no attachment header
+	resp.RequireStatus(t, http.StatusNotFound)
+	if diff := cmp.Diff(map[string]string{"error": "submission not found"}, errorBody(t, resp)); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+	if got := resp.Header.Get("Content-Disposition"); got != "" {
+		t.Errorf("Content-Disposition = %q, want none", got)
 	}
 }
 
@@ -329,7 +382,9 @@ func TestDeleteSubmission_ReturnsNotFound_WhenSubmissionDoesNotExist(t *testing.
 
 	// then I expect a 404
 	resp.RequireStatus(t, http.StatusNotFound)
-	requireError(t, resp, "submission not found")
+	if diff := cmp.Diff(map[string]string{"error": "submission not found"}, errorBody(t, resp)); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
 }
 
 func TestDeleteSubmission_Succeeds_WhenSubmissionsAreDisabled(t *testing.T) {
@@ -370,7 +425,7 @@ func TestBulkDeleteSubmissions_RemovesAllSelected_WhenIdsAreValid(t *testing.T) 
 		Deleted []string `json:"deleted"`
 	}
 	resp.DecodeJSON(t, &got)
-	if diff := cmp.Diff([]string{first.String(), second.String()}, got.Deleted, sortStrings()); diff != "" {
+	if diff := cmp.Diff([]string{first.String(), second.String()}, got.Deleted, cmpopts.SortSlices(func(a, b string) bool { return a < b })); diff != "" {
 		t.Errorf("unexpected deleted ids (-want +got):\n%s", diff)
 	}
 	if diff := cmp.Diff([]string{"keeper.png"}, storedFilenames(t, db)); diff != "" {
@@ -391,7 +446,50 @@ func TestBulkDeleteSubmissions_ReturnsBadRequest_WhenAnIdIsMalformed(t *testing.
 
 	// then I expect a 400 and nothing deleted
 	resp.RequireStatus(t, http.StatusBadRequest)
-	requireError(t, resp, "ids[1]: must be a submission id")
+	if diff := cmp.Diff(map[string]string{"error": "ids[1]: must be a submission id"}, errorBody(t, resp)); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"kept.png"}, storedFilenames(t, db)); diff != "" {
+		t.Errorf("unexpected remaining submissions (-want +got):\n%s", diff)
+	}
+}
+
+func TestBulkDeleteSubmissions_ReturnsBadRequest_WhenNoIdsAreGiven(t *testing.T) {
+	// given an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	loginOfficer(t, srv)
+
+	// when I bulk-delete an empty list
+	resp := srv.Post(t, "/api/submissions/bulk-delete", map[string]any{"ids": []string{}})
+
+	// then I expect a 400
+	resp.RequireStatus(t, http.StatusBadRequest)
+	if diff := cmp.Diff(map[string]string{"error": "ids: must list between 1 and 100 submissions"}, errorBody(t, resp)); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
+}
+
+func TestBulkDeleteSubmissions_ReturnsBadRequest_WhenMoreThanOneHundredIdsGiven(t *testing.T) {
+	// given a member submission and an officer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	member := loginMember(t, srv)
+	kept := insertSubmission(t, db, member.ID, "kept.png", []byte{1}, 1, testutil.FixedNow)
+	loginOfficer(t, srv)
+	ids := []string{kept.String()}
+	for range 100 {
+		ids = append(ids, uuid.NewString())
+	}
+
+	// when I bulk-delete 101 ids, the real one among them
+	resp := srv.Post(t, "/api/submissions/bulk-delete", map[string]any{"ids": ids})
+
+	// then I expect a 400 and nothing deleted
+	resp.RequireStatus(t, http.StatusBadRequest)
+	if diff := cmp.Diff(map[string]string{"error": "ids: must list between 1 and 100 submissions"}, errorBody(t, resp)); diff != "" {
+		t.Errorf("unexpected error body (-want +got):\n%s", diff)
+	}
 	if diff := cmp.Diff([]string{"kept.png"}, storedFilenames(t, db)); diff != "" {
 		t.Errorf("unexpected remaining submissions (-want +got):\n%s", diff)
 	}
