@@ -1,0 +1,37 @@
+.card {
+  padding: 20px 26px;
+  min-width: 270px;
+}
+
+.segments {
+  display: flex;
+  gap: 18px;
+  margin-top: 6px;
+}
+
+.segment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.value {
+  font-size: 34px;
+  color: var(--gold);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-size: var(--text-label);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.live {
+  font-size: 26px;
+  color: var(--gold);
+  font-weight: 700;
+  margin-top: 6px;
+}

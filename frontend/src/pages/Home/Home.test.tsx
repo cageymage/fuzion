@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { LAUNCH_AT } from '../../components/LaunchCountdownCard/LaunchCountdownCard'
 import { newsPage } from '../../mocks/handlers'
 import { server } from '../../mocks/server'
 import { renderWithProviders } from '../../testUtils'
@@ -38,6 +39,7 @@ const youTubeStream: Stream = {
 describe('Home', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
   // React warns once per process, so this has to run before any other test renders the hero.
@@ -166,6 +168,32 @@ describe('Home', () => {
 
     expect(await screen.findByText('2h 14m')).toBeInTheDocument()
     expect(screen.getByText("Mythic · Nerub'ar Palace")).toBeInTheDocument()
+  })
+
+  it('should show the launch countdown above the next raid card when launch is in the future', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(new Date(LAUNCH_AT).getTime() - 86_400_000))
+
+    renderWithProviders(<Home />)
+
+    const launchEyebrow = screen.getByText('WoW Forever launches in')
+    const raidEyebrow = await screen.findByText('Next Raid')
+    expect(
+      launchEyebrow.compareDocumentPosition(raidEyebrow) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    vi.useRealTimers()
+  })
+
+  it('should not show the launch countdown when 48 hours have passed since launch', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(new Date(LAUNCH_AT).getTime() + 48 * 3_600_000))
+
+    renderWithProviders(<Home />)
+
+    await screen.findByText('Next Raid')
+    expect(screen.queryByText('WoW Forever launches in')).not.toBeInTheDocument()
+    expect(screen.queryByText('WoW Forever is live')).not.toBeInTheDocument()
+    vi.useRealTimers()
   })
 
   it('should show a no-raid message when no raid is scheduled', async () => {
