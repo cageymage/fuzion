@@ -250,3 +250,27 @@ func TestUpdateMyCharacter_ReturnsUnauthorized_WhenNotLoggedIn(t *testing.T) {
 	// then I expect a 401
 	resp.RequireStatus(t, http.StatusUnauthorized)
 }
+
+func TestUpdateMyCharacter_ReturnsNotFound_WhenCharacterHasLeftTheGuild(t *testing.T) {
+	// given my visible main and one of my characters that has left the guild
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	me := srv.LoginAs(t, "80351110224678912", "thundermane")
+	insertOwnedCharacter(t, db, tankardID, "Tankard", true, &me.ID)
+	insertOwnedCharacter(t, db, quitterID, "Quitter", false, &me.ID)
+	db.MustExec(`UPDATE characters SET left_guild_at = now() WHERE id = $1`, quitterID)
+
+	// when I try to make the left character my main
+	resp := srv.Patch(t, "/api/me/characters/"+quitterID, map[string]any{"isMain": true})
+
+	// then I expect a 404, and my visible main still my main
+	resp.RequireStatus(t, http.StatusNotFound)
+	requireErrorBody(t, resp, "character not found")
+	want := []mainRow{
+		{Name: "Quitter", IsMain: false, IsMainSetByHand: false},
+		{Name: "Tankard", IsMain: true, IsMainSetByHand: false},
+	}
+	if diff := cmp.Diff(want, mainRows(t, db)); diff != "" {
+		t.Errorf("unexpected mains (-want +got):\n%s", diff)
+	}
+}
