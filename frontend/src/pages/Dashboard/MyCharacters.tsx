@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { battlenetLinkUrl } from '../../api/auth'
 import { fetchMyCharacters, updateMyCharacter } from '../../api/roster'
+import { classColor } from '../../lib/classColor'
 import styles from './Dashboard.module.css'
 
 export const myCharactersQueryKey = ['me', 'characters'] as const
@@ -42,7 +43,8 @@ export function MyCharacters() {
               return (
                 <li key={character.id} className={styles.character}>
                   <span>
-                    <strong>{fullName}</strong> · {character.class}
+                    <strong style={{ color: classColor(character.class) }}>{fullName}</strong> ·{' '}
+                    <span style={{ color: classColor(character.class) }}>{character.class}</span>
                   </span>
                   {character.isMain ? (
                     <span className={styles.mainBadge}>Main</span>

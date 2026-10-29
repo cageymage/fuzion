@@ -135,6 +135,27 @@ describe('Dashboard', () => {
     ])
   })
 
+  it("should color each character's name and class with its class color", async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(linkedMember)))
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    const list = await screen.findByRole('region', { name: 'Your characters' })
+    expect(await within(list).findByText('Thundermane Stormcaller')).toHaveStyle({ color: '#C79C6E' })
+    expect(within(list).getByText('Warrior')).toHaveStyle({ color: '#C79C6E' })
+    expect(within(list).getByText('Thundermend Lightward')).toHaveStyle({ color: '#FFFFFF' })
+  })
+
+  it('should say no characters were claimed when the callback redirects with battlenet=characters-unavailable', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(linkedMember)))
+
+    renderWithProviders(<Dashboard />, '/dashboard?battlenet=characters-unavailable')
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Battle.net is linked, but its World of Warcraft characters could not be read, so none were claimed',
+    )
+  })
+
   it('should not show a characters section when Battle.net is not linked', async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json(unlinkedMember)))
 
