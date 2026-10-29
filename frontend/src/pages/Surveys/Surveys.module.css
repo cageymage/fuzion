@@ -28,11 +28,17 @@
 }
 
 .item {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
+}
+
+.item:hover,
+.item:focus-within {
+  border-color: var(--gold);
 }
 
 .link {
@@ -41,6 +47,17 @@
   text-decoration: underline;
   text-decoration-color: rgba(211, 162, 77, 0.5);
   text-underline-offset: 4px;
+}
+
+.link:hover {
+  color: var(--gold-hover);
+}
+
+/* Stretched link: the title stays the only link, but its click area covers the whole card. */
+.link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
 }
 
 .deadline {

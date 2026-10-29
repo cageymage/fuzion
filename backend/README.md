@@ -92,7 +92,10 @@ mains, on every run, so a rank change in game moves the character. Once an offic
 sets main/alt by hand (on a new character, or by changing it on an existing one),
 `is_main_set_by_hand` is set and the sync stops changing it, whatever the rank. Rank
 numbers for Forever are not known until the first real sync: read them from
-`characters.guild_rank`, then set the variable. A
+`characters.guild_rank`, then set the variable. Alts the sync created before migration
+`000025` and alts an officer demoted on purpose look the same (`is_main = false`, a
+`guild_rank`), so the backfill locks neither. Re-set any deliberate alt by hand first,
+or the next sync makes it a main if its rank is not an alt rank. A
 character the sync saw before and no longer sees gets `left_guild_at` and
 drops off `GET /api/roster`; characters entered by hand that Blizzard never
 listed are left alone. Members with a class the site lacks (Death Knight,
