@@ -57,18 +57,20 @@ func (s *Service) BattleNetAuthURL(state string) string {
 
 // LinkBattleNet attaches the Battle.net account behind a callback code to an
 // already logged-in user. It is linking, not a second login: no session is created.
-func (s *Service) LinkBattleNet(ctx context.Context, userID uuid.UUID, code string) error {
+// charactersRead reports whether the account's characters could be read and claimed;
+// when false the link still succeeded but ownership was left as it was.
+func (s *Service) LinkBattleNet(ctx context.Context, userID uuid.UUID, code string) (charactersRead bool, err error) {
 	if s.battleNet == nil {
-		return ErrBattleNetNotConfigured
+		return false, ErrBattleNetNotConfigured
 	}
 	identity, err := s.battleNet.Exchange(ctx, code)
 	if err != nil {
-		return fmt.Errorf("link battle.net: %w", err)
+		return false, fmt.Errorf("link battle.net: %w", err)
 	}
 	if err := s.repo.LinkBattleNet(ctx, userID, identity); err != nil {
-		return fmt.Errorf("link battle.net: %w", err)
+		return false, fmt.Errorf("link battle.net: %w", err)
 	}
-	return nil
+	return identity.CharactersKnown, nil
 }
 
 func (s *Service) UnlinkBattleNet(ctx context.Context, userID uuid.UUID) error {

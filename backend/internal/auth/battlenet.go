@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -59,11 +60,17 @@ func (b *BattleNet) Exchange(ctx context.Context, code string) (Identity, error)
 	if err != nil {
 		return Identity{}, fmt.Errorf("fetch battle.net user: %w", err)
 	}
+	identity := Identity{ProviderUserID: fmt.Sprint(user.ID), Username: user.BattleTag}
+	// The link itself only needs oauth.battle.net, so a failing game API must not block it;
+	// the characters stay unknown and the caller leaves ownership alone.
 	characters, err := b.fetchCharacters(ctx, token)
 	if err != nil {
-		return Identity{}, fmt.Errorf("fetch wow characters: %w", err)
+		slog.WarnContext(ctx, "battle.net characters unavailable, linking without claiming", "error", err)
+		return identity, nil
 	}
-	return Identity{ProviderUserID: fmt.Sprint(user.ID), Username: user.BattleTag, Characters: characters}, nil
+	identity.Characters = characters
+	identity.CharactersKnown = true
+	return identity, nil
 }
 
 // The token is used here and then dropped: it expires within a day, so storing it
@@ -87,11 +94,10 @@ func (b *BattleNet) fetchCharacters(ctx context.Context, token string) ([]Accoun
 			} `json:"characters"`
 		} `json:"wow_accounts"`
 	}
-	// Blizzard answers 404 for an account with no characters in the namespace, which
-	// is not an error: the account is still linked, it just claims nothing.
-	if err := b.do(req, &body); errors.Is(err, errNotFound) {
-		return nil, nil
-	} else if err != nil {
+	// Blizzard answers 404 both for an account with no characters in the namespace and
+	// for a namespace the endpoint does not serve, so a 404 is not proof of "no
+	// characters" and is returned as an error like any other failure.
+	if err := b.do(req, &body); err != nil {
 		return nil, err
 	}
 	var characters []AccountCharacter
