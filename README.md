@@ -253,7 +253,10 @@ First-time setup:
    the first run's `sync_log` row before trusting it; see
    [backend/README.md](backend/README.md) for what the job writes. Once that run
    has filled `characters.guild_rank`, set `BLIZZARD_ALT_RANKS` to the alt ranks'
-   numbers so other ranks sync as mains.
+   numbers so other ranks sync as mains. Before you do, re-set by hand any synced
+   alt that an officer chose on purpose: the migration that added hand-set
+   tracking cannot tell those from alts the sync created, so they are not
+   protected, and one in a non-alt rank would become a main.
 7. Custom domain: the guild site is `forever.fuziongaming.gg`. Add it under
    `forever-fuzion-web` → Custom Domains, then create the record Render shows (a
    CNAME `forever` → the service's `onrender.com` hostname) at the domain's DNS host.
