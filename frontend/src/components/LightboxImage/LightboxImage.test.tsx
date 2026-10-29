@@ -67,4 +67,18 @@ describe('LightboxImage', () => {
       '/api/images/2f1c0b9e-1111-4222-8333-444455556666',
     )
   })
+
+  it('should show the given thumbnail and open the full image when a thumbnail source is passed', async () => {
+    const user = userEvent.setup()
+    render(<LightboxImage src="/api/submissions/s1/full" thumbSrc="/api/submissions/s1/thumb" alt="Boss kill" />)
+
+    expect(screen.getByRole('img', { name: 'Boss kill' })).toHaveAttribute('src', '/api/submissions/s1/thumb')
+    await user.click(screen.getByRole('button', { name: 'Open image: Boss kill' }))
+
+    const lightbox = screen.getByRole('dialog', { name: 'Image preview' })
+    expect(within(lightbox).getByRole('img', { name: 'Boss kill' })).toHaveAttribute(
+      'src',
+      '/api/submissions/s1/full',
+    )
+  })
 })
