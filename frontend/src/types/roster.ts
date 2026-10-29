@@ -49,3 +49,12 @@ export interface Character {
   createdAt: string
   professions: CharacterProfession[]
 }
+
+// The member dashboard edits professions by row id, which the roster page has no use for.
+export interface MyCharacterProfession extends CharacterProfession {
+  id: string
+}
+
+export interface MyCharacter extends Omit<Character, 'professions'> {
+  professions: MyCharacterProfession[]
+}

@@ -4,7 +4,7 @@ import type { EditablePost, NewsPage, NewsPost } from '../types/news'
 import type { RaidProgress, RaidTier } from '../types/raidProgress'
 import type { Raid } from '../types/raids'
 import type { ProfessionEntry } from '../types/professions'
-import type { Character } from '../types/roster'
+import type { Character, MyCharacter } from '../types/roster'
 import type { Stream } from '../types/streams'
 import type { OfficerSurveyResponse, Survey, SurveyResults } from '../types/surveys'
 
@@ -156,7 +156,7 @@ const allStreams: Stream[] = [
   },
 ]
 
-const myCharacters: Character[] = [
+const myCharacters: MyCharacter[] = [
   {
     id: 'mine-1',
     name: 'Thundermane',
@@ -173,7 +173,7 @@ const myCharacters: Character[] = [
     level: 60,
     faction: 'Horde',
     createdAt: '2026-10-01T12:00:00Z',
-    professions: [],
+    professions: [{ id: 'mine-1-mining', profession: 'Mining', skillLevel: 300 }],
   },
   {
     id: 'mine-2',
@@ -560,6 +560,19 @@ export const handlers = [
     const character = myCharacters.find((candidate) => candidate.id === params.id)
     return HttpResponse.json({ ...character, isMain: body.isMain })
   }),
+  http.post('/api/me/characters/:id/professions', async ({ params, request }) => {
+    const body = (await request.json()) as { profession: string; skillLevel: number }
+    const character = myCharacters.find((candidate) => candidate.id === params.id)
+    return HttpResponse.json(
+      { id: 'new-profession', ...body, character: { id: character?.id, name: character?.name, secondaryName: character?.secondaryName, class: character?.class } },
+      { status: 201 },
+    )
+  }),
+  http.patch('/api/me/professions/:id', async ({ params, request }) => {
+    const body = (await request.json()) as { skillLevel?: number }
+    return HttpResponse.json({ id: params.id, profession: 'Mining', skillLevel: body.skillLevel ?? 300 })
+  }),
+  http.delete('/api/me/professions/:id', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/roster', () => HttpResponse.json(rosterCharacters)),
   http.post('/api/roster', () => HttpResponse.json(rosterCharacters[0], { status: 201 })),
   http.patch('/api/roster/:id', () => HttpResponse.json(rosterCharacters[0])),
