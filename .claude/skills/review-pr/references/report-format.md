@@ -1,6 +1,6 @@
 # Report and draft-comment format
 
-Read this at the report step (step 5) and when the user asks for draft comments (step 6).
+Read this at the report step (step 4) and when the user asks for draft comments (step 5).
 
 ## Report layout
 
