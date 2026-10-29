@@ -40,7 +40,17 @@ type blizzardConfig struct {
 	namespace    string
 	realmSlug    string
 	guildSlug    string
-	altRanks     []int
+	// altRanks is BLIZZARD_ALT_RANKS as set; validate parses it, so a typo fails only
+	// this job and only when it is switched on, never the Twitch or YouTube syncs.
+	altRanks string
+}
+
+func (c blizzardConfig) parsedAltRanks() ([]int, error) {
+	ranks, err := parseRanks(c.altRanks)
+	if err != nil {
+		return nil, fmt.Errorf("BLIZZARD_ALT_RANKS: %w", err)
+	}
+	return ranks, nil
 }
 
 // The job is flagged off until Blizzard's API is known to serve Forever. Once it is
@@ -61,6 +71,9 @@ func (c blizzardConfig) validate() error {
 	if len(missing) > 0 {
 		return fmt.Errorf("SYNC_BLIZZARD_ROSTER_ENABLED is true but these are not set: %s", strings.Join(missing, ", "))
 	}
+	if _, err := c.parsedAltRanks(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -68,11 +81,6 @@ func loadConfig() (config, error) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		return config{}, errors.New("DATABASE_URL is required")
-	}
-
-	altRanks, err := parseRanks(os.Getenv("BLIZZARD_ALT_RANKS"))
-	if err != nil {
-		return config{}, fmt.Errorf("BLIZZARD_ALT_RANKS: %w", err)
 	}
 
 	region := envOr("BLIZZARD_REGION", "us")
@@ -93,7 +101,7 @@ func loadConfig() (config, error) {
 			namespace:    envOr("BLIZZARD_NAMESPACE", "profile-"+region),
 			realmSlug:    os.Getenv("GUILD_REALM_SLUG"),
 			guildSlug:    os.Getenv("GUILD_NAME_SLUG"),
-			altRanks:     altRanks,
+			altRanks:     os.Getenv("BLIZZARD_ALT_RANKS"),
 		},
 	}, nil
 }
