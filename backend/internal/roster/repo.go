@@ -101,8 +101,8 @@ const uniqueViolationCode = "23505"
 
 func (r *Repo) Create(ctx context.Context, c Character, professions []string) (Character, error) {
 	const query = `
-		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, is_main_set_by_hand)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
 		RETURNING ` + returningColumns
 
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -165,6 +165,7 @@ func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, seco
 			spec           = COALESCE($6, spec),
 			role           = COALESCE($7, role),
 			is_main        = COALESCE($8, is_main),
+			is_main_set_by_hand = is_main_set_by_hand OR $8::boolean IS NOT NULL,
 			raid_team      = COALESCE($9, raid_team),
 			spec2          = CASE WHEN $10::boolean THEN $11::text ELSE spec2 END,
 			role2          = CASE WHEN $10::boolean THEN $12::text ELSE role2 END,

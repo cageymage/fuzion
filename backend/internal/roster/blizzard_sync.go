@@ -46,22 +46,25 @@ type UpsertResult struct {
 
 // UpsertFromBlizzard makes the guild's members match Blizzard's list. Characters are
 // matched on name and realm, ignoring case. For existing characters only class, level,
-// race, guild rank and left_guild_at are written; role, spec, main/alt, raid team and owner
-// belong to officers and members. A character that was seen in an earlier sync and is
-// now absent is marked as having left; one the sync has never seen is left alone.
-func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.RosterMember) (UpsertResult, error) {
+// race, guild rank and left_guild_at are written; role, spec, raid team and owner
+// belong to officers and members. With alt ranks configured, main/alt follows the
+// guild rank until an officer sets it by hand; without them every new character is an
+// alt and main/alt is never written. A character that was seen in an earlier sync and
+// is now absent is marked as having left; one the sync has never seen is left alone.
+func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.RosterMember, altRanks []int) (UpsertResult, error) {
 	const update = `
 		UPDATE characters SET
 			class         = $3,
 			level         = COALESCE($4, level),
 			race          = COALESCE($6, race),
 			guild_rank    = $5,
+			is_main       = CASE WHEN is_main_set_by_hand THEN is_main ELSE COALESCE($7, is_main) END,
 			left_guild_at = NULL
 		WHERE lower(name) = lower($1) AND ` + realmSlugSQL + ` = $2`
 
 	const insert = `
 		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main, level, guild_rank, race)
-		VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8, $9)
+		VALUES ($1, $2, $3, $4, $5, $6, COALESCE($10, false), $7, $8, $9)
 		ON CONFLICT (name, secondary_name) DO NOTHING`
 
 	const markLeft = `
@@ -95,7 +98,8 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 		if race == nil {
 			result.UnmappedRaces[m.RaceID]++
 		}
-		updated, err := tx.ExecContext(ctx, update, m.Name, slug, m.Class, level, m.Rank, race)
+		isMain := mainByRank(m.Rank, altRanks)
+		updated, err := tx.ExecContext(ctx, update, m.Name, slug, m.Class, level, m.Rank, race, isMain)
 		if err != nil {
 			return UpsertResult{}, fmt.Errorf("update character %s: %w", m.Name, err)
 		}
@@ -106,7 +110,7 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 			continue
 		}
 
-		inserted, err := tx.ExecContext(ctx, insert, uuid.New(), m.Name, placeholderSecondaryName, realmDisplayName(slug), m.Class, placeholderRole, level, m.Rank, race)
+		inserted, err := tx.ExecContext(ctx, insert, uuid.New(), m.Name, placeholderSecondaryName, realmDisplayName(slug), m.Class, placeholderRole, level, m.Rank, race, isMain)
 		if err != nil {
 			return UpsertResult{}, fmt.Errorf("insert character %s: %w", m.Name, err)
 		}
@@ -133,6 +137,15 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 		return UpsertResult{}, fmt.Errorf("commit blizzard upsert: %w", err)
 	}
 	return result, nil
+}
+
+// nil when no alt ranks are configured, so the sync leaves main/alt alone.
+func mainByRank(rank int, altRanks []int) *bool {
+	if len(altRanks) == 0 {
+		return nil
+	}
+	isMain := !slices.Contains(altRanks, rank)
+	return &isMain
 }
 
 // A level outside what the table accepts is treated as unknown rather than failing the
@@ -165,10 +178,11 @@ type SyncBlizzardRoster struct {
 	syncLog   *synclog.Repo
 	realmSlug string
 	guildSlug string
+	altRanks  []int
 }
 
-func NewSyncBlizzardRoster(repo *Repo, client BlizzardRoster, syncLog *synclog.Repo, realmSlug, guildSlug string) *SyncBlizzardRoster {
-	return &SyncBlizzardRoster{repo: repo, blizzard: client, syncLog: syncLog, realmSlug: realmSlug, guildSlug: guildSlug}
+func NewSyncBlizzardRoster(repo *Repo, client BlizzardRoster, syncLog *synclog.Repo, realmSlug, guildSlug string, altRanks []int) *SyncBlizzardRoster {
+	return &SyncBlizzardRoster{repo: repo, blizzard: client, syncLog: syncLog, realmSlug: realmSlug, guildSlug: guildSlug, altRanks: altRanks}
 }
 
 func (j *SyncBlizzardRoster) Run(ctx context.Context) error {
@@ -193,7 +207,7 @@ func (j *SyncBlizzardRoster) sync(ctx context.Context) (string, error) {
 		return "", errors.New("blizzard returned an empty guild roster")
 	}
 
-	result, err := j.repo.UpsertFromBlizzard(ctx, members)
+	result, err := j.repo.UpsertFromBlizzard(ctx, members, j.altRanks)
 	if err != nil {
 		return "", fmt.Errorf("store guild roster: %w", err)
 	}

@@ -204,6 +204,10 @@ services:
         sync: false
       - key: GUILD_NAME_SLUG
         sync: false
+      # Guild rank numbers that hold alts, e.g. "4,5". Leave unset until the first
+      # sync shows Forever's rank numbers in characters.guild_rank.
+      - key: BLIZZARD_ALT_RANKS
+        sync: false
 
 databases:
   # Deliberately not the free plan: a free database expires after 30 days, and
