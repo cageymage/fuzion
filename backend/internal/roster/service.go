@@ -26,6 +26,7 @@ const (
 var (
 	ErrNotFound = errors.New("character not found")
 	ErrConflict = errors.New("character with this name and secondary name already exists")
+	ErrNotOwner = errors.New("character belongs to someone else")
 
 	// Mirrors the CHECK constraint on characters.class.
 	classes = []string{"Warrior", "Paladin", "Hunter", "Rogue", "Priest", "Shaman", "Mage", "Warlock", "Druid"}
@@ -115,6 +116,35 @@ func (s *Service) Roster(ctx context.Context) ([]Character, error) {
 		characters[i].Faction = factionOf(characters[i].Race)
 	}
 	return characters, nil
+}
+
+func (s *Service) MyCharacters(ctx context.Context, userID uuid.UUID) ([]Character, error) {
+	characters, err := s.repo.ListOwnedBy(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("my characters: %w", err)
+	}
+	for i := range characters {
+		characters[i].Faction = factionOf(characters[i].Race)
+	}
+	return characters, nil
+}
+
+// UpdateMyCharacterRequest is all a member may change on their own character; raid
+// team and the rest stay with officers.
+type UpdateMyCharacterRequest struct {
+	IsMain *bool `json:"isMain"`
+}
+
+func (s *Service) UpdateMyCharacter(ctx context.Context, userID, id uuid.UUID, req UpdateMyCharacterRequest) (Character, error) {
+	if req.IsMain == nil {
+		return Character{}, &ValidationError{Field: "isMain", Problem: "is required"}
+	}
+	updated, err := s.repo.SetOwnMain(ctx, userID, id, *req.IsMain)
+	if err != nil {
+		return Character{}, fmt.Errorf("update my character: %w", err)
+	}
+	updated.Faction = factionOf(updated.Race)
+	return updated, nil
 }
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, error) {

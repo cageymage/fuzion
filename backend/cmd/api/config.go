@@ -45,11 +45,15 @@ func (c youTubeConfig) enabled() bool {
 }
 
 // Optional: without BATTLENET_REDIRECT_URL, members cannot link a Battle.net
-// account. The client credentials are the same Blizzard app the roster sync uses.
+// account. The client credentials, region and namespace are the same ones the
+// roster sync uses; region and namespace pick the game API that lists a member's
+// characters.
 type battleNetConfig struct {
 	clientID     string
 	clientSecret string
 	redirectURL  string
+	region       string
+	namespace    string
 }
 
 func (c battleNetConfig) enabled() bool {
@@ -88,10 +92,20 @@ func loadConfig() (config, error) {
 		return config{}, err
 	}
 
+	region := os.Getenv("BLIZZARD_REGION")
+	if region == "" {
+		region = "us"
+	}
+	namespace := os.Getenv("BLIZZARD_NAMESPACE")
+	if namespace == "" {
+		namespace = "profile-" + region
+	}
 	battleNet := battleNetConfig{
 		clientID:     os.Getenv("BLIZZARD_CLIENT_ID"),
 		clientSecret: os.Getenv("BLIZZARD_CLIENT_SECRET"),
 		redirectURL:  os.Getenv("BATTLENET_REDIRECT_URL"),
+		region:       region,
+		namespace:    namespace,
 	}
 	if battleNet.enabled() {
 		for _, v := range []struct{ name, value string }{
@@ -116,7 +130,7 @@ func loadConfig() (config, error) {
 		allowedOrigins: allowedOrigins,
 		discord:        discord,
 		battleNet:      battleNet,
-		youtube:youTubeConfig{
+		youtube: youTubeConfig{
 			apiKey:     os.Getenv("YOUTUBE_API_KEY"),
 			playlistID: os.Getenv("YOUTUBE_PLAYLIST_ID"),
 		},

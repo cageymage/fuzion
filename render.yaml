@@ -103,6 +103,13 @@ services:
         sync: false
       - key: BLIZZARD_CLIENT_SECRET
         sync: false
+      # The game API that lists a linked member's characters; the same values as the
+      # roster sync's. BLIZZARD_NAMESPACE defaults to profile-<region>; Forever's is
+      # not known yet.
+      - key: BLIZZARD_REGION
+        value: us
+      - key: BLIZZARD_NAMESPACE
+        sync: false
       # Optional: without it, new applications are not announced in Discord. It is
       # a channel webhook URL (Edit Channel > Integrations > Webhooks); treat it
       # as a secret.

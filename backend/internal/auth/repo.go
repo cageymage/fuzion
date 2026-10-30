@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -119,13 +120,46 @@ func (r *Repo) UpdateUserRoles(ctx context.Context, id uuid.UUID, isOfficer, isA
 	return user.utc(), nil
 }
 
+// The roster sync's realm slug for a stored realm: lowercase, spaces to hyphens,
+// apostrophes dropped, so a link matches characters the same way the sync does.
+const characterRealmSlugSQL = `lower(replace(replace(realm, ' ', '-'), '''', ''))`
+
+// LinkBattleNet stores the Battle.net identity and makes the user the owner of the
+// roster characters on that account, matched on name and realm, ignoring case.
+// Characters another member already owns stay theirs. Characters this user owned
+// that are no longer on the account are released, so linking again refreshes the set.
+// When the character list is unknown, only the identity is stored: an empty list
+// from a failed lookup would otherwise release every character the user owns.
 func (r *Repo) LinkBattleNet(ctx context.Context, userID uuid.UUID, identity Identity) error {
-	const query = `
+	const link = `
 		UPDATE users
 		SET battlenet_id = $2, battlenet_tag = $3
 		WHERE id = $1`
 
-	_, err := r.db.ExecContext(ctx, query, userID, identity.ProviderUserID, identity.Username)
+	const release = `
+		UPDATE characters SET user_id = NULL
+		WHERE user_id = $1
+		  AND (lower(name), ` + characterRealmSlugSQL + `) NOT IN (SELECT * FROM unnest($2::text[], $3::text[]))`
+
+	const claim = `
+		UPDATE characters SET user_id = $1
+		WHERE user_id IS NULL
+		  AND (lower(name), ` + characterRealmSlugSQL + `) IN (SELECT * FROM unnest($2::text[], $3::text[]))`
+
+	names := make([]string, 0, len(identity.Characters))
+	realms := make([]string, 0, len(identity.Characters))
+	for _, c := range identity.Characters {
+		names = append(names, strings.ToLower(c.Name))
+		realms = append(realms, strings.ToLower(c.RealmSlug))
+	}
+
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin link battle.net: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // no-op once committed
+
+	_, err = tx.ExecContext(ctx, link, userID, identity.ProviderUserID, identity.Username)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
 		return ErrBattleNetAlreadyLinked
@@ -133,17 +167,44 @@ func (r *Repo) LinkBattleNet(ctx context.Context, userID uuid.UUID, identity Ide
 	if err != nil {
 		return fmt.Errorf("link battle.net: %w", err)
 	}
+	if identity.CharactersKnown {
+		if _, err := tx.ExecContext(ctx, release, userID, names, realms); err != nil {
+			return fmt.Errorf("release characters no longer on the account: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, claim, userID, names, realms); err != nil {
+			return fmt.Errorf("claim characters: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit link battle.net: %w", err)
+	}
 	return nil
 }
 
+// UnlinkBattleNet clears the identity and releases every character the user owns,
+// since ownership only ever came from the link.
 func (r *Repo) UnlinkBattleNet(ctx context.Context, userID uuid.UUID) error {
-	const query = `
+	const unlink = `
 		UPDATE users
 		SET battlenet_id = NULL, battlenet_tag = NULL
 		WHERE id = $1`
 
-	if _, err := r.db.ExecContext(ctx, query, userID); err != nil {
+	const release = `UPDATE characters SET user_id = NULL WHERE user_id = $1`
+
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin unlink battle.net: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // no-op once committed
+
+	if _, err := tx.ExecContext(ctx, unlink, userID); err != nil {
 		return fmt.Errorf("unlink battle.net: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, release, userID); err != nil {
+		return fmt.Errorf("release characters: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit unlink battle.net: %w", err)
 	}
 	return nil
 }
