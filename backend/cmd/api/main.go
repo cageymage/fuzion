@@ -16,6 +16,7 @@ import (
 
 	"github.com/cageymage/fuzion/backend/internal/applications"
 	"github.com/cageymage/fuzion/backend/internal/auth"
+	"github.com/cageymage/fuzion/backend/internal/blizzard"
 	"github.com/cageymage/fuzion/backend/internal/clock"
 	idiscord "github.com/cageymage/fuzion/backend/internal/discord"
 	"github.com/cageymage/fuzion/backend/internal/images"
@@ -76,10 +77,12 @@ func run() error {
 	// Assign only when configured: a typed-nil *BattleNet in the option would read as enabled.
 	if cfg.battleNet.enabled() {
 		authOptions = append(authOptions, auth.WithBattleNet(auth.NewBattleNet(auth.BattleNetConfig{
-			ClientID:     cfg.battleNet.clientID,
-			ClientSecret: cfg.battleNet.clientSecret,
-			RedirectURL:  cfg.battleNet.redirectURL,
-			BaseURL:      auth.BattleNetAPIBaseURL,
+			ClientID:       cfg.battleNet.clientID,
+			ClientSecret:   cfg.battleNet.clientSecret,
+			RedirectURL:    cfg.battleNet.redirectURL,
+			BaseURL:        auth.BattleNetAPIBaseURL,
+			ProfileBaseURL: blizzard.APIBaseURL(cfg.battleNet.region),
+			Namespace:      cfg.battleNet.namespace,
 		}, &http.Client{Timeout: 10 * time.Second})))
 	} else {
 		slog.Info("battle.net linking disabled: BATTLENET_REDIRECT_URL is not set")

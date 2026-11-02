@@ -204,7 +204,7 @@ func (h *Handler) battleNetCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, _ := UserFrom(r.Context())
-	err = h.service.LinkBattleNet(r.Context(), user.ID, r.URL.Query().Get("code"))
+	charactersRead, err := h.service.LinkBattleNet(r.Context(), user.ID, r.URL.Query().Get("code"))
 	switch {
 	case errors.Is(err, ErrBattleNetAlreadyLinked):
 		http.Redirect(w, r, "/dashboard?battlenet=already-linked", http.StatusFound)
@@ -212,6 +212,9 @@ func (h *Handler) battleNetCallback(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		slog.ErrorContext(r.Context(), "link battle.net", "error", err, "user_id", user.ID)
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "battle.net could not be linked"})
+		return
+	case !charactersRead:
+		http.Redirect(w, r, "/dashboard?battlenet=characters-unavailable", http.StatusFound)
 		return
 	}
 	http.Redirect(w, r, "/dashboard", http.StatusFound)

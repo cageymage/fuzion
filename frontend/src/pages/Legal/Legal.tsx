@@ -34,7 +34,10 @@ export function Legal() {
           </li>
           <li>
             Battle.net link: if you choose to link Battle.net on your dashboard, your Battle.net ID
-            and BattleTag. Unlinking deletes both.
+            and BattleTag. While linking, we also read the list of World of Warcraft characters on
+            that account once, to record which guild roster characters are yours. We keep only that
+            ownership, not the list or Battle.net&apos;s access token. Unlinking deletes both and
+            removes you as the owner of those characters.
           </li>
           <li>
             Survey responses: your answers, the guild name you optionally enter, and your Discord
@@ -47,7 +50,10 @@ export function Legal() {
         <ul>
           <li>Cloudflare Turnstile checks that application submissions come from a person.</li>
           <li>Twitch and YouTube provide live status, thumbnails and embedded streams and videos.</li>
-          <li>Blizzard Battle.net signs you in when you link your account.</li>
+          <li>
+            Blizzard Battle.net signs you in when you link your account and tells us which
+            characters are on it.
+          </li>
           <li>Render hosts the site and its database.</li>
         </ul>
         <p>

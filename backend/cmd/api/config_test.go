@@ -15,6 +15,8 @@ func setRequiredConfig(t *testing.T) {
 	t.Setenv("BATTLENET_REDIRECT_URL", "")
 	t.Setenv("BLIZZARD_CLIENT_ID", "")
 	t.Setenv("BLIZZARD_CLIENT_SECRET", "")
+	t.Setenv("BLIZZARD_REGION", "")
+	t.Setenv("BLIZZARD_NAMESPACE", "")
 }
 
 func TestLoadConfig_ReturnsError_WhenBattleNetRedirectIsSetWithoutBlizzardCredentials(t *testing.T) {
@@ -95,5 +97,25 @@ func TestLoadConfig_ReadsDiscordGuildID_WhenItIsSet(t *testing.T) {
 	}
 	if cfg.discord.guildID != "987654321098765432" {
 		t.Errorf("expected guild ID 987654321098765432, got %q", cfg.discord.guildID)
+	}
+}
+
+func TestLoadConfig_DefaultsBattleNetNamespaceToTheRegionsProfile_WhenNamespaceIsNotSet(t *testing.T) {
+	// given Battle.net linking in the eu region with no namespace
+	setRequiredConfig(t)
+	t.Setenv("BATTLENET_REDIRECT_URL", "http://localhost/battlenet/callback")
+	t.Setenv("BLIZZARD_CLIENT_ID", "id")
+	t.Setenv("BLIZZARD_CLIENT_SECRET", "secret")
+	t.Setenv("BLIZZARD_REGION", "eu")
+
+	// when I load the config
+	cfg, err := loadConfig()
+
+	// then I expect the eu region with the eu profile namespace, as the roster sync defaults it
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.battleNet.region != "eu" || cfg.battleNet.namespace != "profile-eu" {
+		t.Errorf("region, namespace = %q, %q, want %q, %q", cfg.battleNet.region, cfg.battleNet.namespace, "eu", "profile-eu")
 	}
 }

@@ -59,7 +59,7 @@ type Server struct {
 	// Shell is the static site's index.html that per-post news pages wrap tags around.
 	Shell *FakeShell
 
-	db    *sqlx.DB
+	db     *sqlx.DB
 	client *http.Client
 }
 
@@ -151,10 +151,12 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 
 	fakeBattleNet := NewFakeBattleNet(t)
 	battleNet := auth.NewBattleNet(auth.BattleNetConfig{
-		ClientID:     BattleNetClientID,
-		ClientSecret: BattleNetClientSecret,
-		RedirectURL:  BattleNetRedirectURL,
-		BaseURL:      fakeBattleNet.URL,
+		ClientID:       BattleNetClientID,
+		ClientSecret:   BattleNetClientSecret,
+		RedirectURL:    BattleNetRedirectURL,
+		BaseURL:        fakeBattleNet.URL,
+		ProfileBaseURL: fakeBattleNet.URL,
+		Namespace:      BattleNetNamespace,
 	}, fakeBattleNet.Client())
 
 	fakeShell := NewFakeShell(t)
@@ -163,7 +165,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting, verifier, SiteBaseURL)),
 		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), auth.WithDiscordServerMembership(options.discordGuildID), auth.WithBattleNet(battleNet))),
-		Images:        images.NewHandler(images.NewService(images.NewRepo(db))),
+		Images:         images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL), shell),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
 		RaidHelper:     raidhelper.NewHandler(raidhelper.NewService(raidhelper.NewRepo(db)), options.raidHelperWebhookKey),

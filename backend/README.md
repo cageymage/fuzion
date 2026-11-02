@@ -40,7 +40,7 @@ Environment:
 | `GUILD_REALM_SLUG`      | when enabled | the guild's realm in Blizzard's slug form, e.g. `area-52` |
 | `GUILD_NAME_SLUG`       | when enabled | the guild name as a slug (lowercase, spaces to hyphens), e.g. `my-guild` |
 | `BLIZZARD_ALT_RANKS`    | optional | comma-separated guild rank numbers that hold alts, e.g. `4,5` (0 is the guild master). When set, the roster sync marks members of those ranks as alts and every other rank as mains; unset, every new character is an alt |
-| `BATTLENET_REDIRECT_URL` | optional | enables Battle.net account linking on `/dashboard`; must be registered on the Blizzard client, `http://localhost:5173/api/auth/battlenet/callback` in dev. Needs `BLIZZARD_CLIENT_ID` and `BLIZZARD_CLIENT_SECRET` on the API too |
+| `BATTLENET_REDIRECT_URL` | optional | enables Battle.net account linking on `/dashboard`; must be registered on the Blizzard client, `http://localhost:5173/api/auth/battlenet/callback` in dev. Needs `BLIZZARD_CLIENT_ID` and `BLIZZARD_CLIENT_SECRET` on the API too, and the API reads `BLIZZARD_REGION` and `BLIZZARD_NAMESPACE` to list the member's characters |
 
 Background jobs run from `cmd/sync`, one job per invocation, once and exit
 (Render runs `/sync twitch` every minute and `/sync youtube` every 5 minutes). Locally, with the API already run
@@ -139,6 +139,10 @@ is no separate migrate step.
 | GET    | `/api/auth/callback` | Discord lands here; verifies state, upserts the user, sets `fuzion_session`, 302 to `/` |
 | POST   | `/api/auth/logout`   | deletes the session server-side, clears the cookie, 204 |
 | GET    | `/api/auth/me`       | `{id, username, avatarUrl}` for the cookie's user, or 401 |
+| GET    | `/api/auth/battlenet/callback` | Battle.net lands here after `/api/auth/battlenet/link`: stores the Battle.net ID and BattleTag, then reads the account's characters from `/profile/user/wow` and makes the member the owner of the roster characters with the same name and realm (ignoring case). Characters another member owns stay theirs, and ones the account no longer has are released. The token is not stored, so linking again refreshes the set. 302 to `/dashboard` |
+| DELETE | `/api/auth/battlenet` | unlinks Battle.net and releases every character the member owns, 204 |
+| GET    | `/api/me/characters` | login required: the caller's characters still in the guild, in the roster's shape, mains first (`[]` when none) |
+| PATCH  | `/api/me/characters/{id}` | login required, owner only: `{isMain}` and nothing else (raid team and the rest stay with officers); making a character a main turns the owner's other mains into alts. Both count as set by hand, so the roster sync's rank mapping leaves them alone. 403 when someone else or nobody owns it, 404 when unknown, 400 without `isMain` |
 | GET    | `/api/surveys`       | every survey, latest deadline first: `[{id, title, closesAt, status}]`, `status` being `open` or `closed` |
 | GET    | `/api/surveys/{id}`  | the survey with its questions in order (`{id, prompt, type: "single"\|"multi", required, options}`) and `myResponse: {guildName, answers: [{questionId, values}]}` for a logged-in caller who has answered, else `null`; 404 for an unknown or malformed id |
 | PUT    | `/api/surveys/{id}/response` | login required: `{guildName?, answers: [{questionId, values}]}` creates or replaces the caller's response, 200 with what was saved; 400 for an unanswered required question, a value that is not an option, two values on a single-choice question, a question from another survey or a guild name over 64 characters; 409 after the deadline; 404 for an unknown survey. Saving over a voided response clears the void |
