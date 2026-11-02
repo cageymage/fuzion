@@ -68,12 +68,15 @@
 }
 
 .character {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.characterHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
 }
 
 .mainBadge {
@@ -90,4 +93,46 @@
 .hint {
   color: var(--muted);
   font-size: var(--text-meta);
+}
+
+.professions {
+  margin-top: 8px;
+}
+
+.professionList {
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.professionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.professionName {
+  min-width: 120px;
+  color: var(--muted);
+}
+
+.skillInput {
+  width: 5.5em;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
 }

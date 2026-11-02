@@ -141,6 +141,40 @@ func (r *Repo) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// CharacterOwner returns the user who owns the character, nil when nobody does, and
+// ErrUnknownCharacter when there is no such character.
+func (r *Repo) CharacterOwner(ctx context.Context, characterID uuid.UUID) (*uuid.UUID, error) {
+	var owner *uuid.UUID
+	err := r.db.GetContext(ctx, &owner, `SELECT user_id FROM characters WHERE id = $1`, characterID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrUnknownCharacter
+	}
+	if err != nil {
+		return nil, fmt.Errorf("select character owner: %w", err)
+	}
+	return owner, nil
+}
+
+// ProfessionOwner returns the user who owns the profession's character, nil when nobody
+// does, and ErrNotFound when there is no such profession.
+func (r *Repo) ProfessionOwner(ctx context.Context, id uuid.UUID) (*uuid.UUID, error) {
+	const query = `
+		SELECT c.user_id
+		FROM professions p
+		JOIN characters c ON c.id = p.character_id
+		WHERE p.id = $1`
+
+	var owner *uuid.UUID
+	err := r.db.GetContext(ctx, &owner, query, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("select profession owner: %w", err)
+	}
+	return owner, nil
+}
+
 func mapWriteError(err error) error {
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound

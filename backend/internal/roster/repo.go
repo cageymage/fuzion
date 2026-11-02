@@ -32,8 +32,9 @@ type Character struct {
 }
 
 type CharacterProfession struct {
-	Profession string `json:"profession"`
-	SkillLevel int    `json:"skillLevel"`
+	ID         uuid.UUID `json:"id"`
+	Profession string    `json:"profession"`
+	SkillLevel int       `json:"skillLevel"`
 }
 
 type Repo struct {
@@ -82,12 +83,13 @@ func (r *Repo) list(ctx context.Context, owner *uuid.UUID) ([]Character, error) 
 // Characters without any are absent from the map, so callers get empty slices.
 func (r *Repo) professionsByCharacter(ctx context.Context, only *uuid.UUID) (map[uuid.UUID][]CharacterProfession, error) {
 	const query = `
-		SELECT character_id, profession, skill_level
+		SELECT id, character_id, profession, skill_level
 		FROM professions
 		WHERE $1::uuid IS NULL OR character_id = $1
 		ORDER BY skill_level DESC, profession ASC`
 
 	var rows []struct {
+		ID          uuid.UUID `db:"id"`
 		CharacterID uuid.UUID `db:"character_id"`
 		Profession  string    `db:"profession"`
 		SkillLevel  int       `db:"skill_level"`
@@ -98,7 +100,7 @@ func (r *Repo) professionsByCharacter(ctx context.Context, only *uuid.UUID) (map
 
 	byCharacter := make(map[uuid.UUID][]CharacterProfession)
 	for _, row := range rows {
-		byCharacter[row.CharacterID] = append(byCharacter[row.CharacterID], CharacterProfession{Profession: row.Profession, SkillLevel: row.SkillLevel})
+		byCharacter[row.CharacterID] = append(byCharacter[row.CharacterID], CharacterProfession{ID: row.ID, Profession: row.Profession, SkillLevel: row.SkillLevel})
 	}
 	return byCharacter, nil
 }

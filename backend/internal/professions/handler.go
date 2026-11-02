@@ -27,6 +27,62 @@ func (h *Handler) Register(r chi.Router) {
 	r.With(auth.RequireOfficer).Post("/professions", h.create)
 	r.With(auth.RequireOfficer).Patch("/professions/{id}", h.update)
 	r.With(auth.RequireOfficer).Delete("/professions/{id}", h.delete)
+	r.With(auth.RequireUser).Post("/me/characters/{id}/professions", h.createMine)
+	r.With(auth.RequireUser).Patch("/me/professions/{id}", h.updateMine)
+	r.With(auth.RequireUser).Delete("/me/professions/{id}", h.deleteMine)
+}
+
+func (h *Handler) createMine(w http.ResponseWriter, r *http.Request) {
+	characterID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrUnknownCharacter.Error()})
+		return
+	}
+	var req MyCreateRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+
+	user, _ := auth.UserFrom(r.Context())
+	created, err := h.service.CreateMine(r.Context(), user.ID, characterID, req)
+	if err != nil {
+		writeError(w, r, "create my profession", err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, created)
+}
+
+func (h *Handler) updateMine(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	var req UpdateRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+
+	user, _ := auth.UserFrom(r.Context())
+	updated, err := h.service.UpdateMine(r.Context(), user.ID, id, req)
+	if err != nil {
+		writeError(w, r, "update my profession", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
+func (h *Handler) deleteMine(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+
+	user, _ := auth.UserFrom(r.Context())
+	if err := h.service.DeleteMine(r.Context(), user.ID, id); err != nil {
+		writeError(w, r, "delete my profession", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +167,10 @@ func writeError(w http.ResponseWriter, r *http.Request, action string, err error
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrNotFound.Error()})
 	case errors.Is(err, ErrConflict):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrConflict.Error()})
+	case errors.Is(err, ErrUnknownCharacter):
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrUnknownCharacter.Error()})
+	case errors.Is(err, ErrNotOwner):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": ErrNotOwner.Error()})
 	default:
 		slog.ErrorContext(r.Context(), action, "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": action + " failed"})
