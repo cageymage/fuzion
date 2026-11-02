@@ -140,7 +140,69 @@ func TestCreateMyProfession_ReturnsBadRequest_WhenSkillLevelIsNegative(t *testin
 
 	// then I expect the same 400 officers get
 	resp.RequireStatus(t, http.StatusBadRequest)
-	requireError(t, resp, "skillLevel: must be 0 or more")
+	requireError(t, resp, "skillLevel: must be between 0 and 300")
+}
+
+func TestCreateMyProfession_ReturnsBadRequest_WhenSkillLevelExceedsTheCap(t *testing.T) {
+	// given I own Aeliana
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	seedOwnedCharacters(t, db, srv)
+
+	// when I add a profession with a skill level above 300
+	resp := srv.Post(t, "/api/me/characters/"+aeliana.ID+"/professions", map[string]any{"profession": "Tailoring", "skillLevel": 301})
+
+	// then I expect a 400 and nothing added
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireError(t, resp, "skillLevel: must be between 0 and 300")
+	if diff := cmp.Diff(seededProfessions, storedProfessions(t, db)); diff != "" {
+		t.Errorf("professions changed (-want +got):\n%s", diff)
+	}
+}
+
+func TestCreateMyProfession_ReturnsBadRequest_WhenSkillLevelOverflowsPostgresInteger(t *testing.T) {
+	// given I own Aeliana
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	seedOwnedCharacters(t, db, srv)
+
+	// when I add a profession with a skill level larger than a Postgres int4
+	resp := srv.Post(t, "/api/me/characters/"+aeliana.ID+"/professions", map[string]any{"profession": "Tailoring", "skillLevel": 3000000000})
+
+	// then I expect a 400, not a server error
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireError(t, resp, "skillLevel: must be between 0 and 300")
+}
+
+func TestCreateMyProfession_ReturnsBadRequest_WhenProfessionNameIsLongerThanFiftyCharacters(t *testing.T) {
+	// given I own Aeliana
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	seedOwnedCharacters(t, db, srv)
+
+	// when I add a profession named with 51 characters
+	resp := srv.Post(t, "/api/me/characters/"+aeliana.ID+"/professions", map[string]any{"profession": strings.Repeat("a", 51), "skillLevel": 150})
+
+	// then I expect a 400 and nothing added
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireError(t, resp, "profession: must be 50 characters or fewer")
+	if diff := cmp.Diff(seededProfessions, storedProfessions(t, db)); diff != "" {
+		t.Errorf("professions changed (-want +got):\n%s", diff)
+	}
+}
+
+func TestCreateMyProfession_ReturnsCreated_WhenProfessionNameIsExactlyFiftyCharacters(t *testing.T) {
+	// given I own Aeliana
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	seedOwnedCharacters(t, db, srv)
+
+	// when I add a profession named with exactly 50 multi-byte characters
+	name := strings.Repeat("é", 50)
+	resp := srv.Post(t, "/api/me/characters/"+aeliana.ID+"/professions", map[string]any{"profession": name, "skillLevel": 300})
+
+	// then I expect a 201
+	resp.RequireStatus(t, http.StatusCreated)
 }
 
 func TestCreateMyProfession_ReturnsConflict_WhenCharacterAlreadyHasThatProfession(t *testing.T) {
@@ -176,14 +238,14 @@ func TestUpdateMyProfession_ChangesSkillLevel_WhenMemberOwnsCharacter(t *testing
 	srv := testutil.NewServer(t, db)
 	seedOwnedCharacters(t, db, srv)
 
-	// when I raise her Alchemy to 310
-	resp := srv.Patch(t, "/api/me/professions/a3333333-3333-3333-3333-333333333333", map[string]any{"skillLevel": 310})
+	// when I lower her Alchemy to 250
+	resp := srv.Patch(t, "/api/me/professions/a3333333-3333-3333-3333-333333333333", map[string]any{"skillLevel": 250})
 
 	// then I expect the updated row back
 	resp.RequireStatus(t, http.StatusOK)
 	var updated professionJSON
 	resp.DecodeJSON(t, &updated)
-	want := professionJSON{ID: "a3333333-3333-3333-3333-333333333333", Profession: "Alchemy", SkillLevel: 310, Character: aeliana}
+	want := professionJSON{ID: "a3333333-3333-3333-3333-333333333333", Profession: "Alchemy", SkillLevel: 250, Character: aeliana}
 	if diff := cmp.Diff(want, updated); diff != "" {
 		t.Errorf("unexpected updated profession (-want +got):\n%s", diff)
 	}
@@ -219,6 +281,91 @@ func TestUpdateMyProfession_ReturnsNotFound_WhenProfessionDoesNotExist(t *testin
 	requireError(t, resp, "profession not found")
 }
 
+func TestUpdateMyProfession_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given nobody is logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(seedCharacters)
+	db.MustExec(seedProfessions)
+
+	// when I update Aeliana's Alchemy
+	resp := srv.Patch(t, "/api/me/professions/a3333333-3333-3333-3333-333333333333", map[string]any{"skillLevel": 1})
+
+	// then I expect a 401 and nothing changed
+	resp.RequireStatus(t, http.StatusUnauthorized)
+	if diff := cmp.Diff(seededProfessions, storedProfessions(t, db)); diff != "" {
+		t.Errorf("professions changed (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateMyProfession_ReturnsForbidden_WhenCharacterHasNoOwner(t *testing.T) {
+	// given nobody owns Aeliana
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	seedOwnedCharacters(t, db, srv)
+	db.MustExec(`UPDATE characters SET user_id = NULL WHERE id = $1`, aeliana.ID)
+
+	// when I update her Alchemy
+	resp := srv.Patch(t, "/api/me/professions/a3333333-3333-3333-3333-333333333333", map[string]any{"skillLevel": 1})
+
+	// then I expect a 403 and nothing changed
+	resp.RequireStatus(t, http.StatusForbidden)
+	if diff := cmp.Diff(seededProfessions, storedProfessions(t, db)); diff != "" {
+		t.Errorf("professions changed (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateMyProfession_ReturnsConflict_WhenRenamedToAnotherOfTheCharactersProfessions(t *testing.T) {
+	// given I own Aeliana, who knows Blacksmithing and Alchemy
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	seedOwnedCharacters(t, db, srv)
+
+	// when I rename her Alchemy to Blacksmithing
+	resp := srv.Patch(t, "/api/me/professions/a3333333-3333-3333-3333-333333333333", map[string]any{"profession": "Blacksmithing"})
+
+	// then I expect a 409 and nothing changed
+	resp.RequireStatus(t, http.StatusConflict)
+	requireError(t, resp, "character already has this profession")
+	if diff := cmp.Diff(seededProfessions, storedProfessions(t, db)); diff != "" {
+		t.Errorf("professions changed (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateMyProfession_ReturnsBadRequest_WhenSkillLevelExceedsTheCap(t *testing.T) {
+	// given I own Aeliana, who knows Alchemy at 300
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	seedOwnedCharacters(t, db, srv)
+
+	// when I raise her Alchemy to 301
+	resp := srv.Patch(t, "/api/me/professions/a3333333-3333-3333-3333-333333333333", map[string]any{"skillLevel": 301})
+
+	// then I expect a 400 and nothing changed
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireError(t, resp, "skillLevel: must be between 0 and 300")
+	if diff := cmp.Diff(seededProfessions, storedProfessions(t, db)); diff != "" {
+		t.Errorf("professions changed (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateMyProfession_ReturnsBadRequest_WhenProfessionNameIsLongerThanFiftyCharacters(t *testing.T) {
+	// given I own Aeliana, who knows Alchemy
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	seedOwnedCharacters(t, db, srv)
+
+	// when I rename her Alchemy to a name with 51 characters
+	resp := srv.Patch(t, "/api/me/professions/a3333333-3333-3333-3333-333333333333", map[string]any{"profession": strings.Repeat("a", 51)})
+
+	// then I expect a 400 and nothing changed
+	resp.RequireStatus(t, http.StatusBadRequest)
+	requireError(t, resp, "profession: must be 50 characters or fewer")
+	if diff := cmp.Diff(seededProfessions, storedProfessions(t, db)); diff != "" {
+		t.Errorf("professions changed (-want +got):\n%s", diff)
+	}
+}
+
 func TestDeleteMyProfession_ReturnsNoContent_WhenMemberOwnsCharacter(t *testing.T) {
 	// given I own Aeliana, who knows Alchemy
 	db := testutil.DB(t)
@@ -244,6 +391,57 @@ func TestDeleteMyProfession_ReturnsForbidden_WhenCharacterBelongsToSomeoneElse(t
 
 	// when I remove his Alchemy
 	resp := srv.Delete(t, "/api/me/professions/a4444444-4444-4444-4444-444444444444")
+
+	// then I expect a 403 and nothing removed
+	resp.RequireStatus(t, http.StatusForbidden)
+	if diff := cmp.Diff(seededProfessions, storedProfessions(t, db)); diff != "" {
+		t.Errorf("professions changed (-want +got):\n%s", diff)
+	}
+}
+
+func TestDeleteMyProfession_ReturnsUnauthorized_WhenCallerIsAnonymous(t *testing.T) {
+	// given nobody is logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(seedCharacters)
+	db.MustExec(seedProfessions)
+
+	// when I remove Aeliana's Alchemy
+	resp := srv.Delete(t, "/api/me/professions/a3333333-3333-3333-3333-333333333333")
+
+	// then I expect a 401 and nothing removed
+	resp.RequireStatus(t, http.StatusUnauthorized)
+	if diff := cmp.Diff(seededProfessions, storedProfessions(t, db)); diff != "" {
+		t.Errorf("professions changed (-want +got):\n%s", diff)
+	}
+}
+
+func TestDeleteMyProfession_ReturnsNotFound_WhenProfessionDoesNotExist(t *testing.T) {
+	// given I own Aeliana
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	seedOwnedCharacters(t, db, srv)
+
+	// when I remove a profession id that does not exist
+	resp := srv.Delete(t, "/api/me/professions/99999999-9999-9999-9999-999999999999")
+
+	// then I expect a 404 and nothing removed
+	resp.RequireStatus(t, http.StatusNotFound)
+	requireError(t, resp, "profession not found")
+	if diff := cmp.Diff(seededProfessions, storedProfessions(t, db)); diff != "" {
+		t.Errorf("professions changed (-want +got):\n%s", diff)
+	}
+}
+
+func TestDeleteMyProfession_ReturnsForbidden_WhenCharacterHasNoOwner(t *testing.T) {
+	// given nobody owns Aeliana
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	seedOwnedCharacters(t, db, srv)
+	db.MustExec(`UPDATE characters SET user_id = NULL WHERE id = $1`, aeliana.ID)
+
+	// when I remove her Alchemy
+	resp := srv.Delete(t, "/api/me/professions/a3333333-3333-3333-3333-333333333333")
 
 	// then I expect a 403 and nothing removed
 	resp.RequireStatus(t, http.StatusForbidden)

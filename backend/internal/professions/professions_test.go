@@ -220,7 +220,7 @@ func TestCreateProfession_ReturnsBadRequest_WhenSkillLevelIsNegative(t *testing.
 	resp.RequireStatus(t, http.StatusBadRequest)
 	var body map[string]string
 	resp.DecodeJSON(t, &body)
-	if diff := cmp.Diff(map[string]string{"error": "skillLevel: must be 0 or more"}, body); diff != "" {
+	if diff := cmp.Diff(map[string]string{"error": "skillLevel: must be between 0 and 300"}, body); diff != "" {
 		t.Errorf("unexpected error body (-want +got):\n%s", diff)
 	}
 }

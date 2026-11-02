@@ -5,8 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
+)
+
+const (
+	maxProfessionNameLength = 50
+	maxSkillLevel           = 300
 )
 
 var (
@@ -112,6 +118,11 @@ type MyCreateRequest struct {
 // The member methods check ownership, then run the officer path, so validation and
 // conflicts behave exactly as they do for officers. Officers and members edit the same
 // rows and the last write wins (the precedence rule decided on #103).
+//
+// Ownership is checked in its own query before the write, so a character released or
+// reassigned in between still lets the previous owner's write through. No current flow
+// reassigns a character mid-request and the impact is a single profession row, so the
+// window is accepted in exchange for reusing the officer path's validation.
 
 func (s *Service) CreateMine(ctx context.Context, userID, characterID uuid.UUID, req MyCreateRequest) (Profession, error) {
 	owner, err := s.repo.CharacterOwner(ctx, characterID)
@@ -154,12 +165,15 @@ func validateProfession(profession string) error {
 	if profession == "" {
 		return &ValidationError{Field: "profession", Problem: "must not be empty"}
 	}
+	if utf8.RuneCountInString(profession) > maxProfessionNameLength {
+		return &ValidationError{Field: "profession", Problem: fmt.Sprintf("must be %d characters or fewer", maxProfessionNameLength)}
+	}
 	return nil
 }
 
 func validateSkillLevel(skillLevel int) error {
-	if skillLevel < 0 {
-		return &ValidationError{Field: "skillLevel", Problem: "must be 0 or more"}
+	if skillLevel < 0 || skillLevel > maxSkillLevel {
+		return &ValidationError{Field: "skillLevel", Problem: fmt.Sprintf("must be between 0 and %d", maxSkillLevel)}
 	}
 	return nil
 }
