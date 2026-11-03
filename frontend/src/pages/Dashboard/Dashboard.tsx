@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { battlenetLinkUrl, unlinkBattlenet } from '../../api/auth'
 import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
 import { useLoginUrl } from '../../hooks/useLoginUrl'
@@ -48,6 +48,12 @@ export function Dashboard() {
         <p>
           Logged in as <strong>{user.username}</strong>.
         </p>
+        {user.isGuildMember && (
+          <p>
+            <Link to="/submissions">Submit art or screenshots</Link> for news posts and the guild&apos;s
+            social media.
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="battlenet-heading" className={styles.section}>
