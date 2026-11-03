@@ -28,6 +28,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/submissions"
 	"github.com/cageymage/fuzion/backend/internal/surveys"
 	"github.com/cageymage/fuzion/backend/internal/turnstile"
 	"github.com/cageymage/fuzion/backend/internal/youtube"
@@ -88,6 +89,10 @@ func run() error {
 		slog.Info("battle.net linking disabled: BATTLENET_REDIRECT_URL is not set")
 	}
 
+	if !cfg.submissions.enabled {
+		slog.Warn("art submissions closed: SUBMISSIONS_ENABLED is false")
+	}
+
 	playlistID := cfg.youtube.playlistID
 	if !cfg.youtube.enabled() {
 		slog.Info("suggested videos disabled: YOUTUBE_API_KEY and YOUTUBE_PLAYLIST_ID are not both set")
@@ -139,6 +144,7 @@ func run() error {
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), streams.NewSuggestedVideos(youTube, playlistID, clock.System{})),
+		Submissions:    submissions.NewHandler(submissions.NewService(submissions.NewRepo(db), clock.System{}, cfg.submissions.enabled, cfg.submissions.storageLimitBytes), submissions.DefaultUploadSlots),
 		Surveys:        surveys.NewHandler(surveys.NewService(surveys.NewRepo(db), clock.System{})),
 		AllowedOrigins: cfg.allowedOrigins,
 	})

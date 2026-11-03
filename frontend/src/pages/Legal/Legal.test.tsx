@@ -81,6 +81,27 @@ describe('Legal', () => {
     expect(privacy).toHaveTextContent('removes you as the owner of those characters')
   })
 
+  it('should say submitted originals are kept with their file data and are visible only to officers when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    const privacy = screen.getByRole('region', { name: 'Privacy policy' })
+    expect(privacy).toHaveTextContent('we keep each exact original file')
+    expect(privacy).toHaveTextContent('the GPS location where it was taken')
+    expect(privacy).toHaveTextContent('Only officers can see submissions; they are never public.')
+  })
+
+  it('should state the license submitters grant and what they attest when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    const copyright = screen.getByRole('region', { name: 'Copyright and content' })
+    expect(copyright).toHaveTextContent(
+      'you confirm that you created each image or bought the rights to it (game screenshots are fine)',
+    )
+    expect(copyright).toHaveTextContent(
+      'grant the guild an unrestricted license to use it on this site and in related social media posts',
+    )
+  })
+
   it('should say removal is requested through an officer on Discord when the page renders', () => {
     renderWithProviders(<Legal />)
 

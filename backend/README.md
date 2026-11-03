@@ -40,6 +40,8 @@ Environment:
 | `GUILD_REALM_SLUG`      | when enabled | the guild's realm in Blizzard's slug form, e.g. `area-52` |
 | `GUILD_NAME_SLUG`       | when enabled | the guild name as a slug (lowercase, spaces to hyphens), e.g. `my-guild` |
 | `BLIZZARD_ALT_RANKS`    | optional | comma-separated guild rank numbers that hold alts, e.g. `4,5` (0 is the guild master). When set, the roster sync marks members of those ranks as alts and every other rank as mains; unset, every new character is an alt |
+| `SUBMISSIONS_ENABLED`   | `true` | emergency switch for art and screenshot submissions: `false` makes uploads return 503 and the submission page show a closed message, while officers keep reviewing, downloading and deleting. Unset means on. Needs a restart or redeploy to change |
+| `SUBMISSIONS_STORAGE_LIMIT_MB` | `512` | total MiB all submission originals may hold; past it, new submissions are refused (503) and the page shows the closed message |
 | `BATTLENET_REDIRECT_URL` | optional | enables Battle.net account linking on `/dashboard`; must be registered on the Blizzard client, `http://localhost:5173/api/auth/battlenet/callback` in dev. Needs `BLIZZARD_CLIENT_ID` and `BLIZZARD_CLIENT_SECRET` on the API too, and the API reads `BLIZZARD_REGION` and `BLIZZARD_NAMESPACE` to list the member's characters |
 
 Background jobs run from `cmd/sync`, one job per invocation, once and exit
@@ -115,6 +117,10 @@ stops a late create or update from bringing it back. Hand-entered raids (no
 `raid_helper_event_id`) are never touched. Payload details and the captures the
 tests use are in [plans/integrations/raid-helper.md](../plans/integrations/raid-helper.md).
 
+Every `/api/submissions` response carries `X-Content-Type-Options: nosniff` and
+`Cache-Control: private`. Submissions are never publicly readable, unlike
+`/api/images`. Originals are kept byte for byte, EXIF data included.
+
 Migrations under `migrations/` are embedded and applied on startup, so there
 is no separate migrate step.
 
@@ -146,6 +152,14 @@ is no separate migrate step.
 | DELETE | `/api/auth/battlenet` | unlinks Battle.net and releases every character the member owns, 204 |
 | GET    | `/api/me/characters` | login required: the caller's characters still in the guild, in the roster's shape, mains first (`[]` when none). Each profession carries its row `id`, for the `/api/me/professions` routes |
 | PATCH  | `/api/me/characters/{id}` | login required, owner only: `{isMain}` and nothing else (raid team and the rest stay with officers); making a character a main turns the owner's other mains into alts. Both count as set by hand, so the roster sync's rank mapping leaves them alone. 403 when someone else or nobody owns it, 404 when unknown, 400 without `isMain` |
+| GET    | `/api/submissions/status` | public: `{open, attestationVersion}`; `open` is false when `SUBMISSIONS_ENABLED=false` or storage is full |
+| POST   | `/api/submissions`   | guild members only: multipart, a `metadata` JSON part (`{attestationAccepted, attestationVersion, descriptions}`) first, then up to 10 `files` parts (PNG, JPEG, WebP or GIF, sniffed from the bytes, at most 20 MiB each, 50 MiB in total, 25 megapixels). `descriptions[i]` belongs to the i-th file, at most 500 characters. 201 with `{results: [{filename, submission?, error?}]}` when any file was stored; 400 or 409 (all duplicates) when none were. 400 without the attestation or with an out-of-date `attestationVersion`; 413 over 50 MiB; 429 over 20 files or 100 MiB per member per rolling 24 hours; 503 when closed or storage is full, or when two uploads are already in progress (with `Retry-After: 10`). The quota and storage checks and the inserts run under one advisory lock, so parallel uploads cannot overshoot them |
+| GET    | `/api/submissions`   | officer only: `{total, limit, offset, items}`, newest first, metadata and URLs only (never image bytes); `?limit=` 1 to 100 (default 48), `?offset=` |
+| GET    | `/api/submissions/{id}/thumb` | officer only: an 800px WebP preview |
+| GET    | `/api/submissions/{id}/full` | officer only: the exact original, as the type sniffed at upload |
+| GET    | `/api/submissions/{id}/download` | officer only: the original as `Content-Disposition: attachment` with its sanitized original filename |
+| DELETE | `/api/submissions/{id}` | officer only: hard-deletes the original and thumbnail, 204; 404 when unknown. Works while submissions are closed |
+| POST   | `/api/submissions/bulk-delete` | officer only: `{ids}` (1 to 100), 200 with `{deleted}`, the ids that existed; 400 for a malformed id. Every delete is logged with the officer's id |
 | GET    | `/api/surveys`       | every survey, latest deadline first: `[{id, title, closesAt, status}]`, `status` being `open` or `closed` |
 | GET    | `/api/surveys/{id}`  | the survey with its questions in order (`{id, prompt, type: "single"\|"multi", required, options}`) and `myResponse: {guildName, answers: [{questionId, values}]}` for a logged-in caller who has answered, else `null`; 404 for an unknown or malformed id |
 | PUT    | `/api/surveys/{id}/response` | login required: `{guildName?, answers: [{questionId, values}]}` creates or replaces the caller's response, 200 with what was saved; 400 for an unanswered required question, a value that is not an option, two values on a single-choice question, a question from another survey or a guild name over 64 characters; 409 after the deadline; 404 for an unknown survey. Saving over a voided response clears the void |

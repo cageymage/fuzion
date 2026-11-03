@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -31,6 +32,38 @@ type config struct {
 	// Optional: empty disables the Raid-Helper webhook endpoint, so no event can be
 	// mirrored without the key that proves a request came from Raid-Helper.
 	raidHelperWebhookKey string
+
+	submissions submissionsConfig
+}
+
+// SUBMISSIONS_ENABLED is the emergency switch for art submissions: false refuses
+// uploads (officers can still review and delete), and unset means on, so a missing
+// variable never silently closes the form. storageLimitBytes caps what all
+// submissions may hold, so many accounts cannot fill the database.
+type submissionsConfig struct {
+	enabled           bool
+	storageLimitBytes int64
+}
+
+const defaultSubmissionStorageMB = 512
+
+func loadSubmissionsConfig() (submissionsConfig, error) {
+	cfg := submissionsConfig{enabled: true, storageLimitBytes: defaultSubmissionStorageMB << 20}
+	if raw := os.Getenv("SUBMISSIONS_ENABLED"); raw != "" {
+		enabled, err := strconv.ParseBool(raw)
+		if err != nil {
+			return submissionsConfig{}, fmt.Errorf("SUBMISSIONS_ENABLED must be true or false, got %q", raw)
+		}
+		cfg.enabled = enabled
+	}
+	if raw := os.Getenv("SUBMISSIONS_STORAGE_LIMIT_MB"); raw != "" {
+		mb, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || mb < 1 {
+			return submissionsConfig{}, fmt.Errorf("SUBMISSIONS_STORAGE_LIMIT_MB must be a whole number of MiB above 0, got %q", raw)
+		}
+		cfg.storageLimitBytes = mb << 20
+	}
+	return cfg, nil
 }
 
 // Both values are optional: without them the Home page simply has no suggested
@@ -118,6 +151,11 @@ func loadConfig() (config, error) {
 		}
 	}
 
+	submissions, err := loadSubmissionsConfig()
+	if err != nil {
+		return config{}, err
+	}
+
 	for _, webhook := range []string{"DISCORD_ANNOUNCEMENTS_WEBHOOK_URL", "DISCORD_RECRUITING_WEBHOOK_URL"} {
 		if os.Getenv(webhook) != "" && os.Getenv("SITE_BASE_URL") == "" {
 			return config{}, fmt.Errorf("SITE_BASE_URL is required when %s is set", webhook)
@@ -139,6 +177,7 @@ func loadConfig() (config, error) {
 		turnstileSecretKey:      os.Getenv("TURNSTILE_SECRET_KEY"),
 		siteBaseURL:             os.Getenv("SITE_BASE_URL"),
 		raidHelperWebhookKey:    os.Getenv("RAID_HELPER_WEBHOOK_SECRET"),
+		submissions:             submissions,
 	}, nil
 }
 
