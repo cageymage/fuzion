@@ -132,3 +132,34 @@ func TestRunBlizzardRoster_IgnoresInvalidAltRanks_WhenFlagIsDisabled(t *testing.
 		t.Errorf("runBlizzardRoster = %v, want nil", err)
 	}
 }
+
+func TestSyncProfessions_IsNoOp_WhenFlagIsOff(t *testing.T) {
+	// given the professions flag is off and Blizzard credentials are missing
+	cfg := config{databaseURL: unreachableDatabase}
+
+	// when the professions sync runs
+	err := runBlizzardProfessions(context.Background(), cfg)
+
+	// then I expect it to exit cleanly without touching the database
+	if err != nil {
+		t.Errorf("runBlizzardProfessions = %v, want nil", err)
+	}
+}
+
+func TestSyncProfessions_ReturnsError_WhenFlagIsOnWithoutCredentials(t *testing.T) {
+	// given the professions flag is on but no credentials are configured
+	cfg := config{databaseURL: unreachableDatabase, blizzard: blizzardConfig{professionsEnabled: true}}
+
+	// when the professions sync runs
+	err := runBlizzardProfessions(context.Background(), cfg)
+
+	// then I expect an error naming the missing credentials
+	if err == nil {
+		t.Fatal("runBlizzardProfessions = nil, want an error")
+	}
+	for _, name := range []string{"BLIZZARD_CLIENT_ID", "BLIZZARD_CLIENT_SECRET"} {
+		if !strings.Contains(err.Error(), name) {
+			t.Errorf("error %q does not mention %s", err, name)
+		}
+	}
+}

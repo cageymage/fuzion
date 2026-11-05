@@ -33,12 +33,13 @@ func (c youTubeConfig) configured() bool {
 }
 
 type blizzardConfig struct {
-	enabled      bool
-	clientID     string
-	clientSecret string
-	region       string
-	namespace    string
-	guildSlug    string
+	enabled            bool
+	professionsEnabled bool
+	clientID           string
+	clientSecret       string
+	region             string
+	namespace          string
+	guildSlug          string
 	// altRanks is BLIZZARD_ALT_RANKS as set; validate parses it, so a typo fails only
 	// this job and only when it is switched on, never the Twitch or YouTube syncs.
 	altRanks string
@@ -92,13 +93,14 @@ func loadConfig() (config, error) {
 			apiKey: os.Getenv("YOUTUBE_API_KEY"),
 		},
 		blizzard: blizzardConfig{
-			enabled:      os.Getenv("SYNC_BLIZZARD_ROSTER_ENABLED") == "true",
-			clientID:     os.Getenv("BLIZZARD_CLIENT_ID"),
-			clientSecret: os.Getenv("BLIZZARD_CLIENT_SECRET"),
-			region:       region,
-			namespace:    envOr("BLIZZARD_NAMESPACE", "profile-"+region),
-			guildSlug:    os.Getenv("GUILD_NAME_SLUG"),
-			altRanks:     os.Getenv("BLIZZARD_ALT_RANKS"),
+			enabled:            os.Getenv("SYNC_BLIZZARD_ROSTER_ENABLED") == "true",
+			professionsEnabled: os.Getenv("SYNC_BLIZZARD_PROFESSIONS_ENABLED") == "true",
+			clientID:           os.Getenv("BLIZZARD_CLIENT_ID"),
+			clientSecret:       os.Getenv("BLIZZARD_CLIENT_SECRET"),
+			region:             region,
+			namespace:          envOr("BLIZZARD_NAMESPACE", "profile-"+region),
+			guildSlug:          os.Getenv("GUILD_NAME_SLUG"),
+			altRanks:           os.Getenv("BLIZZARD_ALT_RANKS"),
 		},
 	}, nil
 }

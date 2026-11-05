@@ -221,6 +221,33 @@ services:
       - key: BLIZZARD_ALT_RANKS
         sync: false
 
+  # Pulls each roster character's professions from Blizzard, half an hour after the
+  # roster sync so new characters are already in the table. Off until
+  # SYNC_BLIZZARD_PROFESSIONS_ENABLED is set to true.
+  - type: cron
+    name: fuzion-sync-blizzard-professions
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerCommand: /sync blizzard-professions
+    schedule: "30 * * * *"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fuzion-db
+          property: connectionString
+      - key: SYNC_BLIZZARD_PROFESSIONS_ENABLED
+        value: "false"
+      - key: BLIZZARD_CLIENT_ID
+        sync: false
+      - key: BLIZZARD_CLIENT_SECRET
+        sync: false
+      - key: BLIZZARD_REGION
+        value: us
+      # The game version's profile namespace; Forever's is profile-forever-us.
+      - key: BLIZZARD_NAMESPACE
+        sync: false
+
 databases:
   # Deliberately not the free plan: a free database expires after 30 days, and
   # losing it would empty the users table, which hands admin to whoever signs

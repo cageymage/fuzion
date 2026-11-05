@@ -3,6 +3,7 @@ package blizzard
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -172,10 +173,72 @@ func (c *Client) do(req *http.Request, out any) error {
 
 	if resp.StatusCode != http.StatusOK {
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return fmt.Errorf("%s %s: unexpected status %d: %s", req.Method, req.URL.Path, resp.StatusCode, strings.TrimSpace(string(snippet)))
+		err := fmt.Errorf("%s %s: unexpected status %d: %s", req.Method, req.URL.Path, resp.StatusCode, strings.TrimSpace(string(snippet)))
+		if resp.StatusCode == http.StatusNotFound {
+			return fmt.Errorf("%w: %w", ErrNotFound, err)
+		}
+		return err
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
 		return fmt.Errorf("decode %s response: %w", req.URL.Path, err)
 	}
 	return nil
+}
+
+// ErrNotFound is wrapped by every call Blizzard answers with 404.
+var ErrNotFound = errors.New("not found")
+
+// CharacterProfession is one profession a character knows. SkillPoints comes from the
+// highest tier, which on Forever is its only tier.
+type CharacterProfession struct {
+	Name        string
+	SkillPoints int
+}
+
+// CharacterProfessions returns a character's primary then secondary professions.
+// characterSlug is name-surname, lowercase. A character Blizzard has no profile for
+// yields an error wrapping ErrNotFound.
+func (c *Client) CharacterProfessions(ctx context.Context, characterSlug string) ([]CharacterProfession, error) {
+	token, err := c.appToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fetch blizzard app token: %w", err)
+	}
+
+	q := url.Values{}
+	q.Set("namespace", c.cfg.Namespace)
+	q.Set("locale", c.cfg.Locale)
+	endpoint := fmt.Sprintf("%s/profile/wow/character/%s/professions?%s",
+		c.cfg.BaseURL, url.PathEscape(characterSlug), q.Encode())
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	type entry struct {
+		Profession struct {
+			Name string `json:"name"`
+		} `json:"profession"`
+		Tiers []struct {
+			SkillPoints int `json:"skill_points"`
+		} `json:"tiers"`
+	}
+	var body struct {
+		Primaries   []entry `json:"primaries"`
+		Secondaries []entry `json:"secondaries"`
+	}
+	if err := c.do(req, &body); err != nil {
+		return nil, fmt.Errorf("fetch professions of %s: %w", characterSlug, err)
+	}
+
+	var professions []CharacterProfession
+	for _, e := range append(body.Primaries, body.Secondaries...) {
+		skill := 0
+		for _, tier := range e.Tiers {
+			skill = max(skill, tier.SkillPoints)
+		}
+		professions = append(professions, CharacterProfession{Name: e.Profession.Name, SkillPoints: skill})
+	}
+	return professions, nil
 }

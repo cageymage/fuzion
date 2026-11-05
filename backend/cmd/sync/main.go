@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/cageymage/fuzion/backend/internal/blizzard"
+	"github.com/cageymage/fuzion/backend/internal/professions"
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/streams"
 	"github.com/cageymage/fuzion/backend/internal/synclog"
@@ -22,7 +24,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/youtube"
 )
 
-const usage = "usage: sync twitch|youtube|blizzard-roster"
+const usage = "usage: sync twitch|youtube|blizzard-roster|blizzard-professions"
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
@@ -38,6 +40,8 @@ func main() {
 		run = runTwitch
 	case "youtube":
 		run = runYouTube
+	case "blizzard-professions":
+		run = runBlizzardProfessions
 	case "blizzard-roster":
 		run = runBlizzardRoster
 	default:
@@ -120,13 +124,33 @@ func runBlizzardRoster(ctx context.Context, cfg config) error {
 	}
 	defer db.Close()
 
-	client := blizzard.NewClient(blizzard.Config{
-		ClientID:     cfg.blizzard.clientID,
-		ClientSecret: cfg.blizzard.clientSecret,
-		BaseURL:      blizzard.APIBaseURL(cfg.blizzard.region),
-		AuthURL:      blizzard.AuthBaseURL,
-		Namespace:    cfg.blizzard.namespace,
-	}, &http.Client{Timeout: 30 * time.Second})
+	return roster.NewSyncBlizzardRoster(roster.NewRepo(db), newBlizzardClient(cfg.blizzard), synclog.NewRepo(db), cfg.blizzard.guildSlug, altRanks).Run(ctx)
+}
 
-	return roster.NewSyncBlizzardRoster(roster.NewRepo(db), client, synclog.NewRepo(db), cfg.blizzard.guildSlug, altRanks).Run(ctx)
+func runBlizzardProfessions(ctx context.Context, cfg config) error {
+	if !cfg.blizzard.professionsEnabled {
+		slog.Info("sync blizzard-professions disabled: SYNC_BLIZZARD_PROFESSIONS_ENABLED is not true")
+		return nil
+	}
+	if cfg.blizzard.clientID == "" || cfg.blizzard.clientSecret == "" {
+		return errors.New("SYNC_BLIZZARD_PROFESSIONS_ENABLED is true but these are not set: BLIZZARD_CLIENT_ID, BLIZZARD_CLIENT_SECRET")
+	}
+
+	db, err := sqlx.ConnectContext(ctx, "pgx", cfg.databaseURL)
+	if err != nil {
+		return fmt.Errorf("connect to database: %w", err)
+	}
+	defer db.Close()
+
+	return professions.NewSyncBlizzardProfessions(professions.NewRepo(db), newBlizzardClient(cfg.blizzard), synclog.NewRepo(db)).Run(ctx)
+}
+
+func newBlizzardClient(cfg blizzardConfig) *blizzard.Client {
+	return blizzard.NewClient(blizzard.Config{
+		ClientID:     cfg.clientID,
+		ClientSecret: cfg.clientSecret,
+		BaseURL:      blizzard.APIBaseURL(cfg.region),
+		AuthURL:      blizzard.AuthBaseURL,
+		Namespace:    cfg.namespace,
+	}, &http.Client{Timeout: 30 * time.Second})
 }
