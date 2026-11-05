@@ -118,6 +118,11 @@
   background: var(--gold-soft);
 }
 
+.characterLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .professionIcons {
   display: flex;
   gap: 6px;
