@@ -38,7 +38,6 @@ type blizzardConfig struct {
 	clientSecret string
 	region       string
 	namespace    string
-	realmSlug    string
 	guildSlug    string
 	// altRanks is BLIZZARD_ALT_RANKS as set; validate parses it, so a typo fails only
 	// this job and only when it is switched on, never the Twitch or YouTube syncs.
@@ -59,7 +58,6 @@ func (c blizzardConfig) validate() error {
 	required := []struct{ name, value string }{
 		{"BLIZZARD_CLIENT_ID", c.clientID},
 		{"BLIZZARD_CLIENT_SECRET", c.clientSecret},
-		{"GUILD_REALM_SLUG", c.realmSlug},
 		{"GUILD_NAME_SLUG", c.guildSlug},
 	}
 	var missing []string
@@ -99,7 +97,6 @@ func loadConfig() (config, error) {
 			clientSecret: os.Getenv("BLIZZARD_CLIENT_SECRET"),
 			region:       region,
 			namespace:    envOr("BLIZZARD_NAMESPACE", "profile-"+region),
-			realmSlug:    os.Getenv("GUILD_REALM_SLUG"),
 			guildSlug:    os.Getenv("GUILD_NAME_SLUG"),
 			altRanks:     os.Getenv("BLIZZARD_ALT_RANKS"),
 		},

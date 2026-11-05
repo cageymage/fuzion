@@ -35,7 +35,7 @@ func TestRunBlizzardRoster_ReturnsError_WhenFlagIsEnabledWithoutCredentials(t *t
 	if err == nil {
 		t.Fatal("runBlizzardRoster = nil, want an error")
 	}
-	for _, name := range []string{"BLIZZARD_CLIENT_ID", "BLIZZARD_CLIENT_SECRET", "GUILD_REALM_SLUG", "GUILD_NAME_SLUG"} {
+	for _, name := range []string{"BLIZZARD_CLIENT_ID", "BLIZZARD_CLIENT_SECRET", "GUILD_NAME_SLUG"} {
 		if !strings.Contains(err.Error(), name) {
 			t.Errorf("error %q does not mention %s", err, name)
 		}
@@ -104,7 +104,7 @@ func TestLoadConfig_Succeeds_WhenBlizzardAltRanksHasANonNumber(t *testing.T) {
 func TestRunBlizzardRoster_ReturnsError_WhenAltRanksHaveANonNumber(t *testing.T) {
 	// given the roster sync switched on and fully configured, but with an alt rank written as a name
 	cfg := config{databaseURL: unreachableDatabase, blizzard: blizzardConfig{
-		enabled: true, clientID: "id", clientSecret: "secret", realmSlug: "emberreach", guildSlug: "fuzion",
+		enabled: true, clientID: "id", clientSecret: "secret", guildSlug: "fuzion",
 		altRanks: "4,Alt",
 	}}
 
