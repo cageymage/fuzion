@@ -24,6 +24,7 @@ func NewHandler(service *Service) *Handler {
 
 func (h *Handler) Register(r chi.Router) {
 	r.Get("/professions", h.list)
+	r.Get("/recipes", h.listRecipes)
 	r.With(auth.RequireOfficer).Post("/professions", h.create)
 	r.With(auth.RequireOfficer).Patch("/professions/{id}", h.update)
 	r.With(auth.RequireOfficer).Delete("/professions/{id}", h.delete)

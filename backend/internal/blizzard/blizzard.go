@@ -188,11 +188,19 @@ func (c *Client) do(req *http.Request, out any) error {
 // ErrNotFound is wrapped by every call Blizzard answers with 404.
 var ErrNotFound = errors.New("not found")
 
+// Recipe is one thing a character can craft. The id is Blizzard's own; it is not the
+// spell id Wowhead uses.
+type Recipe struct {
+	ID   int
+	Name string
+}
+
 // CharacterProfession is one profession a character knows. SkillPoints comes from the
-// highest tier, which on Forever is its only tier.
+// highest tier, which on Forever is its only tier; Recipes spans all tiers.
 type CharacterProfession struct {
 	Name        string
 	SkillPoints int
+	Recipes     []Recipe
 }
 
 // CharacterProfessions returns a character's primary then secondary professions.
@@ -221,7 +229,11 @@ func (c *Client) CharacterProfessions(ctx context.Context, characterSlug string)
 			Name string `json:"name"`
 		} `json:"profession"`
 		Tiers []struct {
-			SkillPoints int `json:"skill_points"`
+			SkillPoints  int `json:"skill_points"`
+			KnownRecipes []struct {
+				ID   int    `json:"id"`
+				Name string `json:"name"`
+			} `json:"known_recipes"`
 		} `json:"tiers"`
 	}
 	var body struct {
@@ -234,11 +246,14 @@ func (c *Client) CharacterProfessions(ctx context.Context, characterSlug string)
 
 	var professions []CharacterProfession
 	for _, e := range append(body.Primaries, body.Secondaries...) {
-		skill := 0
+		profession := CharacterProfession{Name: e.Profession.Name}
 		for _, tier := range e.Tiers {
-			skill = max(skill, tier.SkillPoints)
+			profession.SkillPoints = max(profession.SkillPoints, tier.SkillPoints)
+			for _, r := range tier.KnownRecipes {
+				profession.Recipes = append(profession.Recipes, Recipe{ID: r.ID, Name: r.Name})
+			}
 		}
-		professions = append(professions, CharacterProfession{Name: e.Profession.Name, SkillPoints: skill})
+		professions = append(professions, profession)
 	}
 	return professions, nil
 }

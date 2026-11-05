@@ -73,3 +73,75 @@
 .skill {
   font-variant-numeric: tabular-nums;
 }
+
+.recipeProfession {
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+
+.crafters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 14px;
+}
+
+.characterEntry {
+  border-bottom: 1px solid var(--border);
+}
+
+.characterEntry:nth-child(even) {
+  background: var(--surface);
+}
+
+.entryButton {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.entryButton:hover {
+  background: var(--surface);
+}
+
+.chevron {
+  display: inline-block;
+  width: 1.2em;
+  color: var(--muted);
+}
+
+.recipePanel {
+  padding: 4px 12px 12px 34px;
+}
+
+.recipeList {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.recipeChip {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  padding: 2px 10px;
+  font-size: var(--text-meta);
+}
+
+.showAll {
+  background: none;
+  border: 0;
+  color: var(--gold);
+  font: inherit;
+  font-size: var(--text-meta);
+  cursor: pointer;
+  text-decoration: underline;
+}

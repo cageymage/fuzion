@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 
 	"github.com/cageymage/fuzion/backend/internal/blizzard"
 	"github.com/cageymage/fuzion/backend/internal/synclog"
@@ -107,9 +108,47 @@ func (r *Repo) upsertFromBlizzard(ctx context.Context, characterID uuid.UUID, kn
 		if _, err := tx.ExecContext(ctx, upsert, uuid.New(), characterID, p.Name, p.SkillPoints); err != nil {
 			return fmt.Errorf("upsert profession %q: %w", p.Name, err)
 		}
+		if err := replaceRecipes(ctx, tx, characterID, p); err != nil {
+			return err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit professions upsert: %w", err)
+	}
+	return nil
+}
+
+// replaceRecipes makes the character's recipes for one profession match what Blizzard
+// lists. Forever lists the profession itself ("Skinning", "Fishing") among its recipes;
+// it is not something to craft, so it is left out.
+func replaceRecipes(ctx context.Context, tx *sqlx.Tx, characterID uuid.UUID, p blizzard.CharacterProfession) error {
+	const upsertRecipe = `
+		INSERT INTO recipes (id, profession, name) VALUES ($1, $2, $3)
+		ON CONFLICT (id) DO UPDATE SET profession = EXCLUDED.profession, name = EXCLUDED.name`
+	const link = `
+		INSERT INTO character_recipes (character_id, recipe_id) VALUES ($1, $2)
+		ON CONFLICT DO NOTHING`
+	const forget = `
+		DELETE FROM character_recipes
+		WHERE character_id = $1
+		  AND recipe_id IN (SELECT id FROM recipes WHERE profession = $2)
+		  AND NOT (recipe_id = ANY($3::int[]))`
+
+	ids := []int32{}
+	for _, recipe := range p.Recipes {
+		if recipe.Name == p.Name {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, upsertRecipe, recipe.ID, p.Name, recipe.Name); err != nil {
+			return fmt.Errorf("upsert recipe %q: %w", recipe.Name, err)
+		}
+		if _, err := tx.ExecContext(ctx, link, characterID, recipe.ID); err != nil {
+			return fmt.Errorf("link recipe %q: %w", recipe.Name, err)
+		}
+		ids = append(ids, int32(recipe.ID))
+	}
+	if _, err := tx.ExecContext(ctx, forget, characterID, p.Name, ids); err != nil {
+		return fmt.Errorf("forget dropped %s recipes: %w", p.Name, err)
 	}
 	return nil
 }
