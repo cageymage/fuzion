@@ -108,7 +108,7 @@ describe('Roster', () => {
     const link = within(await screen.findByRole('table')).getByRole('link', { name: 'Ragnok' })
     expect(link).toHaveAttribute(
       'href',
-      'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/emberreach/ragnok',
+      'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/ragnok',
     )
   })
 
@@ -120,7 +120,7 @@ describe('Roster', () => {
     const link = within(await screen.findByRole('table')).getByRole('link', { name: 'Ironhide' })
     expect(link).toHaveAttribute(
       'href',
-      'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/emberreach/ragnok-ironhide',
+      'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/ragnok-ironhide',
     )
   })
 

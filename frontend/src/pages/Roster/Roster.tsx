@@ -120,7 +120,7 @@ function ArmoryLink({ character, children }: { character: Character; children: s
   return (
     <a
       className={styles.characterLink}
-      href={armoryUrl(character.realm, character.name, character.secondaryName)}
+      href={armoryUrl(character.name, character.secondaryName)}
       target="_blank"
       rel="noreferrer"
       style={{ color: classColor(character.class) }}
