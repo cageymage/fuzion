@@ -36,8 +36,7 @@ Environment:
 | `BLIZZARD_CLIENT_ID`    | when enabled | from a develop.battle.net client |
 | `BLIZZARD_CLIENT_SECRET` | when enabled | same place; never commit it |
 | `BLIZZARD_REGION`       | `us` | API host region |
-| `BLIZZARD_NAMESPACE`    | `profile-<region>` | the game version's profile namespace, e.g. `profile-classic1x-us`; Forever's value is not known yet |
-| `GUILD_REALM_SLUG`      | when enabled | the guild's realm in Blizzard's slug form, e.g. `area-52` |
+| `BLIZZARD_NAMESPACE`    | `profile-<region>` | the game version's profile namespace, e.g. `profile-forever-us` |
 | `GUILD_NAME_SLUG`       | when enabled | the guild name as a slug (lowercase, spaces to hyphens), e.g. `my-guild` |
 | `BLIZZARD_ALT_RANKS`    | optional | comma-separated guild rank numbers that hold alts, e.g. `4,5` (0 is the guild master). When set, the roster sync marks members of those ranks as alts and every other rank as mains; unset, every new character is an alt |
 | `SUBMISSIONS_ENABLED`   | `true` | emergency switch for art and screenshot submissions: `false` makes uploads return 503 and the submission page show a closed message, while officers keep reviewing, downloading and deleting. Unset means on. Needs a restart or redeploy to change |
@@ -82,11 +81,13 @@ then run `npx dotenv -e .env -e .env.example -- go run -C backend ./cmd/sync you
 `sync blizzard-roster` pulls the guild roster from Blizzard once an hour and
 is off until `SYNC_BLIZZARD_ROSTER_ENABLED=true`. For each member it adds the
 character if the roster lacks it, or refreshes class, level, race and guild rank if
-it exists (matched on name and realm, ignoring case). Race is set from the
+it exists (matched on name and surname, ignoring case; Forever has no realms). A row left
+with the secondary name `Unset` by an earlier sync takes the surname on first match.
+Race is set from the
 roster when its id is known (Classic races only; Skyborne ids are not mapped yet, so
 those members keep whatever race an officer set and show up as `unmapped race N` in
-the `sync_log` message). New characters get the
-secondary name `Unset` and role `dps` because Blizzard supplies neither; the
+the `sync_log` message). New characters take Blizzard's surname as the
+secondary name and get role `dps` because Blizzard supplies no role; the
 sync never touches role, spec, raid team or owner after that. Main/alt follows
 `BLIZZARD_ALT_RANKS`: with it unset, new characters are alts and the sync never
 changes main/alt; with it set, members of those ranks are alts and all others are

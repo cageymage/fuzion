@@ -211,10 +211,8 @@ services:
         sync: false
       - key: BLIZZARD_REGION
         value: us
-      # The game version's profile namespace; Forever's is not known yet.
+      # The game version's profile namespace; Forever's is profile-forever-us.
       - key: BLIZZARD_NAMESPACE
-        sync: false
-      - key: GUILD_REALM_SLUG
         sync: false
       - key: GUILD_NAME_SLUG
         sync: false

@@ -7,8 +7,6 @@ import (
 	"maps"
 	"slices"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -18,12 +16,10 @@ import (
 
 const blizzardSyncSource = "blizzard-roster"
 
-// Blizzard's slug for a realm: lowercase, spaces to hyphens, apostrophes dropped.
-const realmSlugSQL = `lower(replace(replace(realm, ' ', '-'), '''', ''))`
-
-// Blizzard knows only one name per character, but the table requires a secondary name
-// and a role, so new characters get placeholders for an officer to correct; the sync
-// never writes those columns again.
+// Blizzard supplies a surname but not a role, and the table requires one, so new
+// characters get a placeholder role for an officer to correct; the sync never writes
+// it again. The secondary name placeholder marks characters imported before the sync
+// read surnames; the sync fills it in on first sight.
 const (
 	placeholderSecondaryName = "Unset"
 	placeholderRole          = "dps"
@@ -45,33 +41,41 @@ type UpsertResult struct {
 }
 
 // UpsertFromBlizzard makes the guild's members match Blizzard's list. Characters are
-// matched on name and realm, ignoring case. For existing characters only class, level,
+// matched on name and surname, ignoring case. For existing characters only class, level,
 // race, guild rank and left_guild_at are written; role, spec, raid team and owner
 // belong to officers and members. With alt ranks configured, main/alt follows the
 // guild rank until an officer sets it by hand; without them every new character is an
 // alt and main/alt is never written. A character that was seen in an earlier sync and
 // is now absent is marked as having left; one the sync has never seen is left alone.
 func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.RosterMember, altRanks []int) (UpsertResult, error) {
-	const update = `
-		UPDATE characters SET
+	const setFromBlizzard = `
 			class         = $3,
 			level         = COALESCE($4, level),
 			race          = COALESCE($6, race),
 			guild_rank    = $5,
 			is_main       = CASE WHEN is_main_set_by_hand THEN is_main ELSE COALESCE($7, is_main) END,
-			left_guild_at = NULL
-		WHERE lower(name) = lower($1) AND ` + realmSlugSQL + ` = $2`
+			left_guild_at = NULL`
+
+	const update = `UPDATE characters SET ` + setFromBlizzard + `
+		WHERE lower(name) = lower($1) AND lower(secondary_name) = lower($2)`
+
+	const fillInSurname = `UPDATE characters SET secondary_name = $2, ` + setFromBlizzard + `
+		WHERE id = (
+			SELECT id FROM characters
+			WHERE lower(name) = lower($1) AND secondary_name = '` + placeholderSecondaryName + `'
+			LIMIT 1
+		)`
 
 	const insert = `
-		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main, level, guild_rank, race)
-		VALUES ($1, $2, $3, $4, $5, $6, COALESCE($10, false), $7, $8, $9)
+		INSERT INTO characters (id, name, secondary_name, class, role, is_main, level, guild_rank, race)
+		VALUES ($1, $2, $3, $4, $5, COALESCE($9, false), $6, $7, $8)
 		ON CONFLICT (name, secondary_name) DO NOTHING`
 
 	const markLeft = `
 		UPDATE characters SET left_guild_at = now()
 		WHERE guild_rank IS NOT NULL
 		  AND left_guild_at IS NULL
-		  AND (lower(name), ` + realmSlugSQL + `) NOT IN (SELECT * FROM unnest($1::text[], $2::text[]))`
+		  AND (lower(name), lower(secondary_name)) NOT IN (SELECT * FROM unnest($1::text[], $2::text[]))`
 
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -81,11 +85,10 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 
 	result := UpsertResult{UnsupportedClasses: map[int]int{}, UnmappedRaces: map[int]int{}}
 	seenNames := make([]string, 0, len(members))
-	seenRealms := make([]string, 0, len(members))
+	seenSurnames := make([]string, 0, len(members))
 	for _, m := range members {
-		slug := strings.ToLower(m.RealmSlug)
 		seenNames = append(seenNames, strings.ToLower(m.Name))
-		seenRealms = append(seenRealms, slug)
+		seenSurnames = append(seenSurnames, strings.ToLower(m.Surname))
 
 		if m.Class == "" {
 			result.Skipped++
@@ -99,20 +102,30 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 			result.UnmappedRaces[m.RaceID]++
 		}
 		isMain := mainByRank(m.Rank, altRanks)
-		updated, err := tx.ExecContext(ctx, update, m.Name, slug, m.Class, level, m.Rank, race, isMain)
-		if err != nil {
-			return UpsertResult{}, fmt.Errorf("update character %s: %w", m.Name, err)
+
+		found := false
+		for _, query := range []string{update, fillInSurname} {
+			updated, err := tx.ExecContext(ctx, query, m.Name, m.Surname, m.Class, level, m.Rank, race, isMain)
+			if err != nil {
+				return UpsertResult{}, fmt.Errorf("update character %s %s: %w", m.Name, m.Surname, err)
+			}
+			n, err := updated.RowsAffected()
+			if err != nil {
+				return UpsertResult{}, fmt.Errorf("count updated characters: %w", err)
+			}
+			if n > 0 {
+				found = true
+				break
+			}
 		}
-		if n, err := updated.RowsAffected(); err != nil {
-			return UpsertResult{}, fmt.Errorf("count updated characters: %w", err)
-		} else if n > 0 {
+		if found {
 			result.Updated++
 			continue
 		}
 
-		inserted, err := tx.ExecContext(ctx, insert, uuid.New(), m.Name, placeholderSecondaryName, realmDisplayName(slug), m.Class, placeholderRole, level, m.Rank, race, isMain)
+		inserted, err := tx.ExecContext(ctx, insert, uuid.New(), m.Name, m.Surname, m.Class, placeholderRole, level, m.Rank, race, isMain)
 		if err != nil {
-			return UpsertResult{}, fmt.Errorf("insert character %s: %w", m.Name, err)
+			return UpsertResult{}, fmt.Errorf("insert character %s %s: %w", m.Name, m.Surname, err)
 		}
 		if n, err := inserted.RowsAffected(); err != nil {
 			return UpsertResult{}, fmt.Errorf("count inserted characters: %w", err)
@@ -123,7 +136,7 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 		}
 	}
 
-	left, err := tx.ExecContext(ctx, markLeft, seenNames, seenRealms)
+	left, err := tx.ExecContext(ctx, markLeft, seenNames, seenSurnames)
 	if err != nil {
 		return UpsertResult{}, fmt.Errorf("mark characters as left: %w", err)
 	}
@@ -157,32 +170,20 @@ func validLevel(level int) *int {
 	return &level
 }
 
-// "area-52" becomes "Area 52". The slug has lost any apostrophe, so a realm such as
-// Mal'Ganis comes out as "Malganis"; officers can correct the stored realm.
-func realmDisplayName(slug string) string {
-	words := strings.Split(slug, "-")
-	for i, word := range words {
-		first, size := utf8.DecodeRuneInString(word)
-		words[i] = string(unicode.ToUpper(first)) + word[size:]
-	}
-	return strings.Join(words, " ")
-}
-
 type BlizzardRoster interface {
-	GuildRoster(ctx context.Context, realmSlug, guildSlug string) ([]blizzard.RosterMember, error)
+	GuildRoster(ctx context.Context, guildSlug string) ([]blizzard.RosterMember, error)
 }
 
 type SyncBlizzardRoster struct {
 	repo      *Repo
 	blizzard  BlizzardRoster
 	syncLog   *synclog.Repo
-	realmSlug string
 	guildSlug string
 	altRanks  []int
 }
 
-func NewSyncBlizzardRoster(repo *Repo, client BlizzardRoster, syncLog *synclog.Repo, realmSlug, guildSlug string, altRanks []int) *SyncBlizzardRoster {
-	return &SyncBlizzardRoster{repo: repo, blizzard: client, syncLog: syncLog, realmSlug: realmSlug, guildSlug: guildSlug, altRanks: altRanks}
+func NewSyncBlizzardRoster(repo *Repo, client BlizzardRoster, syncLog *synclog.Repo, guildSlug string, altRanks []int) *SyncBlizzardRoster {
+	return &SyncBlizzardRoster{repo: repo, blizzard: client, syncLog: syncLog, guildSlug: guildSlug, altRanks: altRanks}
 }
 
 func (j *SyncBlizzardRoster) Run(ctx context.Context) error {
@@ -197,7 +198,7 @@ func (j *SyncBlizzardRoster) Run(ctx context.Context) error {
 }
 
 func (j *SyncBlizzardRoster) sync(ctx context.Context) (string, error) {
-	members, err := j.blizzard.GuildRoster(ctx, j.realmSlug, j.guildSlug)
+	members, err := j.blizzard.GuildRoster(ctx, j.guildSlug)
 	if err != nil {
 		return "", fmt.Errorf("ask blizzard for the guild roster: %w", err)
 	}
