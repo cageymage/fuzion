@@ -172,6 +172,40 @@ func validLevel(level int) *int {
 
 type BlizzardRoster interface {
 	GuildRoster(ctx context.Context, guildSlug string) ([]blizzard.RosterMember, error)
+	CharacterGender(ctx context.Context, characterSlug string) (string, error)
+}
+
+// FillMissingGenders asks Blizzard for the gender of every guild character that has none
+// and stores it. It returns how many it stored and how many Blizzard has no profile for.
+func (r *Repo) FillMissingGenders(ctx context.Context, blizzardAPI BlizzardRoster) (stored, notFound int, err error) {
+	var missing []struct {
+		Name          string `db:"name"`
+		SecondaryName string `db:"secondary_name"`
+	}
+	if err := r.db.SelectContext(ctx, &missing, `
+		SELECT name, secondary_name FROM characters
+		WHERE gender IS NULL AND guild_rank IS NOT NULL AND left_guild_at IS NULL AND secondary_name <> $1
+		ORDER BY name, secondary_name`, placeholderSecondaryName); err != nil {
+		return 0, 0, fmt.Errorf("select characters without a gender: %w", err)
+	}
+
+	for _, c := range missing {
+		slug := strings.ToLower(c.Name) + "-" + strings.ToLower(c.SecondaryName)
+		gender, err := blizzardAPI.CharacterGender(ctx, slug)
+		if errors.Is(err, blizzard.ErrNotFound) {
+			notFound++
+			continue
+		}
+		if err != nil {
+			return stored, notFound, fmt.Errorf("ask blizzard for the gender of %s %s: %w", c.Name, c.SecondaryName, err)
+		}
+		if _, err := r.db.ExecContext(ctx,
+			`UPDATE characters SET gender = $3 WHERE name = $1 AND secondary_name = $2`, c.Name, c.SecondaryName, gender); err != nil {
+			return stored, notFound, fmt.Errorf("store gender of %s %s: %w", c.Name, c.SecondaryName, err)
+		}
+		stored++
+	}
+	return stored, notFound, nil
 }
 
 type SyncBlizzardRoster struct {
@@ -212,9 +246,18 @@ func (j *SyncBlizzardRoster) sync(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("store guild roster: %w", err)
 	}
-	return fmt.Sprintf("%d members: %d added, %d updated, %d left, %d skipped%s%s",
+
+	_, noProfile, err := j.repo.FillMissingGenders(ctx, j.blizzard)
+	if err != nil {
+		return "", fmt.Errorf("store character genders: %w", err)
+	}
+	genderNote := ""
+	if noProfile > 0 {
+		genderNote = fmt.Sprintf(", %d without a Blizzard profile", noProfile)
+	}
+	return fmt.Sprintf("%d members: %d added, %d updated, %d left, %d skipped%s%s%s",
 		len(members), result.Inserted, result.Updated, result.Left, result.Skipped,
-		describeCounts("class", result.UnsupportedClasses), describeCounts("unmapped race", result.UnmappedRaces)), nil
+		describeCounts("class", result.UnsupportedClasses), describeCounts("unmapped race", result.UnmappedRaces), genderNote), nil
 }
 
 func raceOrNil(m blizzard.RosterMember) *string {

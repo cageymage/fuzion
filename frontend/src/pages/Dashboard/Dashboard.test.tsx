@@ -40,6 +40,7 @@ function ownedCharacter(id: string, name: string, secondaryName: string, isMain:
     race: null,
     level: 60,
     faction: null,
+    gender: null,
     createdAt: '2026-10-01T12:00:00Z',
     professions: [],
   }

@@ -88,7 +88,13 @@ roster when its id is known (Classic races and Skyborne (Windshaper), id 96; Sky
 (High Order)'s id is not mapped yet, so those members keep whatever race an officer set and show up as `unmapped race N` in
 the `sync_log` message). New characters take Blizzard's surname as the
 secondary name and get role `dps` because Blizzard supplies no role; the
-sync never touches role, spec, raid team or owner after that. Main/alt follows
+sync never touches role, spec, raid team or owner after that. Gender is not in the
+roster response, so after the upsert the job asks each in-guild character that has none
+for its profile (`/profile/wow/character/{name}-{surname}`, with the app token) and
+stores `male` or `female`, which `GET /api/roster` returns as `gender` and the roster
+page uses to pick the race icon. It asks once per character; a profile Blizzard answers
+404 for is counted in the `sync_log` message as `N without a Blizzard profile` and tried
+again next run, and any other Blizzard error fails the run. Main/alt follows
 `BLIZZARD_ALT_RANKS`: with it unset, new characters are mains and the sync never
 changes main/alt afterwards; with it set, members of those ranks are alts and all others are
 mains, on every run, so a rank change in game moves the character. Once an officer

@@ -25,6 +25,7 @@ const ragnok: Character = {
   race: null,
   level: null,
   faction: null,
+  gender: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   professions: [],
 }

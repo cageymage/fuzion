@@ -8,6 +8,18 @@ describe('raceIcon', () => {
     )
   })
 
+  it('should return the female icon when the gender is female', () => {
+    expect(raceIcon('Night Elf', 'female')).toBe(
+      'https://render.worldofwarcraft.com/us/icons/36/achievement_character_nightelf_female.jpg',
+    )
+  })
+
+  it('should return the male icon when the gender is unknown', () => {
+    expect(raceIcon('Troll', null)).toBe(
+      'https://render.worldofwarcraft.com/us/icons/36/achievement_character_troll_male.jpg',
+    )
+  })
+
   it('should return null when the race is not set', () => {
     expect(raceIcon(null)).toBeNull()
   })

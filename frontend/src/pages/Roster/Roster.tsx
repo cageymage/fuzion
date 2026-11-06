@@ -108,9 +108,9 @@ function GenericRaceBadge({ race }: { race: string }) {
   )
 }
 
-function RaceCell({ race }: { race: string | null }) {
+function RaceCell({ race, gender }: { race: string | null; gender: Character['gender'] }) {
   if (race === null) return null
-  const iconUrl = raceIcon(race)
+  const iconUrl = raceIcon(race, gender)
   if (iconUrl === null) return <GenericRaceBadge race={race} />
   return <img className={styles.raceIcon} src={iconUrl} alt={race} title={race} width={24} height={24} />
 }
@@ -267,7 +267,7 @@ export function Roster() {
                   {visibleCharacters.map((character) => (
                     <tr key={character.id}>
                       <td>
-                        <RaceCell race={character.race} />
+                        <RaceCell race={character.race} gender={character.gender} />
                       </td>
                       <td>
                         <ArmoryLink character={character}>{character.name}</ArmoryLink>
