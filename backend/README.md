@@ -38,7 +38,7 @@ Environment:
 | `BLIZZARD_REGION`       | `us` | API host region |
 | `BLIZZARD_NAMESPACE`    | `profile-<region>` | the game version's profile namespace, e.g. `profile-forever-us` |
 | `GUILD_NAME_SLUG`       | when enabled | the guild name as a slug (lowercase, spaces to hyphens), e.g. `my-guild` |
-| `BLIZZARD_ALT_RANKS`    | optional | comma-separated guild rank numbers that hold alts, e.g. `4,5` (0 is the guild master). When set, the roster sync marks members of those ranks as alts and every other rank as mains; unset, every new character is an alt |
+| `BLIZZARD_ALT_RANKS`    | optional | comma-separated guild rank numbers that hold alts, e.g. `4,5` (0 is the guild master). When set, the roster sync marks members of those ranks as alts and every other rank as mains; unset, every new character is a main |
 | `SUBMISSIONS_ENABLED`   | `true` | emergency switch for art and screenshot submissions: `false` makes uploads return 503 and the submission page show a closed message, while officers keep reviewing, downloading and deleting. Unset means on. Needs a restart or redeploy to change |
 | `SUBMISSIONS_STORAGE_LIMIT_MB` | `512` | total MiB all submission originals may hold; past it, new submissions are refused (503) and the page shows the closed message |
 | `BATTLENET_REDIRECT_URL` | optional | enables Battle.net account linking on `/dashboard`; must be registered on the Blizzard client, `http://localhost:5173/api/auth/battlenet/callback` in dev. Needs `BLIZZARD_CLIENT_ID` and `BLIZZARD_CLIENT_SECRET` on the API too, and the API reads `BLIZZARD_REGION` and `BLIZZARD_NAMESPACE` to list the member's characters |
@@ -89,8 +89,8 @@ those members keep whatever race an officer set and show up as `unmapped race N`
 the `sync_log` message). New characters take Blizzard's surname as the
 secondary name and get role `dps` because Blizzard supplies no role; the
 sync never touches role, spec, raid team or owner after that. Main/alt follows
-`BLIZZARD_ALT_RANKS`: with it unset, new characters are alts and the sync never
-changes main/alt; with it set, members of those ranks are alts and all others are
+`BLIZZARD_ALT_RANKS`: with it unset, new characters are mains and the sync never
+changes main/alt afterwards; with it set, members of those ranks are alts and all others are
 mains, on every run, so a rank change in game moves the character. Once an officer
 sets main/alt by hand (on a new character, or by changing it on an existing one),
 `is_main_set_by_hand` is set and the sync stops changing it, whatever the rank. Rank
@@ -161,7 +161,7 @@ is no separate migrate step.
 | GET    | `/api/auth/callback` | Discord lands here; verifies state, upserts the user, sets `fuzion_session`, 302 to `/` |
 | POST   | `/api/auth/logout`   | deletes the session server-side, clears the cookie, 204 |
 | GET    | `/api/auth/me`       | `{id, username, avatarUrl}` for the cookie's user, or 401 |
-| GET    | `/api/auth/battlenet/callback` | Battle.net lands here after `/api/auth/battlenet/link`: stores the Battle.net ID and BattleTag, then reads the account's characters from `/profile/user/wow` and makes the member the owner of the roster characters with the same name and realm (ignoring case). Characters another member owns stay theirs, and ones the account no longer has are released. The token is not stored, so linking again refreshes the set. 302 to `/dashboard` |
+| GET    | `/api/auth/battlenet/callback` | Battle.net lands here after `/api/auth/battlenet/link`: stores the Battle.net ID and BattleTag, then reads the account's characters from `/profile/user/wow` and makes the member the owner of the roster characters with the same name and surname (ignoring case; Forever has no realms and the response carries none). Characters another member owns stay theirs, and ones the account no longer has are released. The token is not stored, so linking again refreshes the set. 302 to `/dashboard` |
 | DELETE | `/api/auth/battlenet` | unlinks Battle.net and releases every character the member owns, 204 |
 | GET    | `/api/me/characters` | login required: the caller's characters still in the guild, in the roster's shape, mains first (`[]` when none). Each profession carries its row `id`, for the `/api/me/professions` routes |
 | PATCH  | `/api/me/characters/{id}` | login required, owner only: `{isMain}` and nothing else (raid team and the rest stay with officers); making a character a main turns the owner's other mains into alts. Both count as set by hand, so the roster sync's rank mapping leaves them alone. 403 when someone else or nobody owns it, 404 when unknown, 400 without `isMain` |
