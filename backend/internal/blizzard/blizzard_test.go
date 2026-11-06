@@ -89,7 +89,7 @@ func TestGuildRoster_ParsesMembers_WhenBlizzardResponds(t *testing.T) {
 	want := []blizzard.RosterMember{
 		{Name: "Mosshorn", Surname: "Rebelfist", Level: 7, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 6, Race: "Tauren"},
 		{Name: "Terrorskull", Surname: "Gloomstep", Level: 14, Rank: 1, ClassID: 4, Class: "Rogue", RaceID: 5, Race: "Undead"},
-		{Name: "Kirk", Surname: "Bear", Level: 1, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 96, Race: ""},
+		{Name: "Kirk", Surname: "Bear", Level: 1, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 96, Race: "Skyborne (Windshaper)"},
 		{Name: "Kirk", Surname: "Fel", Level: 11, Rank: 3, ClassID: 9, Class: "Warlock", RaceID: 2, Race: "Orc"},
 		{Name: "Testdk", Surname: "Grave", Level: 90, Rank: 5, ClassID: 6, Class: "", RaceID: 1, Race: "Human"},
 	}

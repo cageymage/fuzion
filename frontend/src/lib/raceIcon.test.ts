@@ -12,12 +12,15 @@ describe('raceIcon', () => {
     expect(raceIcon(null)).toBeNull()
   })
 
-  it.each(['Skyborne (High Order)', 'Skyborne (Windshaper)'])(
-    'should return null when the race is %s, which has no Blizzard icon',
-    (race) => {
-      expect(raceIcon(race)).toBeNull()
-    },
-  )
+  it('should return the blood elf icon when the race is Skyborne (Windshaper)', () => {
+    expect(raceIcon('Skyborne (Windshaper)')).toBe(
+      'https://render.worldofwarcraft.com/us/icons/36/achievement_character_bloodelf_male.jpg',
+    )
+  })
+
+  it('should return null when the race is Skyborne (High Order), which has no icon yet', () => {
+    expect(raceIcon('Skyborne (High Order)')).toBeNull()
+  })
 
   it('should return null when the race is not playable', () => {
     expect(raceIcon('Murloc')).toBeNull()

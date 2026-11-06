@@ -2,7 +2,8 @@ import { isRace, type Race } from './races'
 
 const iconBaseUrl = 'https://render.worldofwarcraft.com/us/icons/36'
 
-// Blizzard has no icon for Skyborne yet, so those races have none here.
+// Blizzard has no icon for Skyborne yet. Windshaper borrows the blood elf icon as a stand-in,
+// and High Order has none.
 const iconNames: Partial<Record<Race, string>> = {
   Human: 'achievement_character_human_male',
   Dwarf: 'achievement_character_dwarf_male',
@@ -12,6 +13,7 @@ const iconNames: Partial<Record<Race, string>> = {
   Undead: 'achievement_character_undead_male',
   Tauren: 'achievement_character_tauren_male',
   Troll: 'achievement_character_troll_male',
+  'Skyborne (Windshaper)': 'achievement_character_bloodelf_male',
 }
 
 export function raceIcon(race: string | null): string | null {

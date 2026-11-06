@@ -30,11 +30,12 @@ var classNames = map[int]string{
 	7: "Shaman", 8: "Mage", 9: "Warlock", 11: "Druid",
 }
 
-// Classic race ids. Forever's Skyborne races are not here because their ids are not
-// known yet; a member with an unmapped race keeps RaceID and an empty Race.
+// Classic race ids plus the Skyborne ids seen in a real Forever roster. High Order's id is
+// not known yet; a member with an unmapped race keeps RaceID and an empty Race.
 var raceNames = map[int]string{
 	1: "Human", 2: "Orc", 3: "Dwarf", 4: "Night Elf",
 	5: "Undead", 6: "Tauren", 7: "Gnome", 8: "Troll",
+	96: "Skyborne (Windshaper)",
 }
 
 type Config struct {
