@@ -18,8 +18,8 @@ type Identity struct {
 }
 
 type AccountCharacter struct {
-	Name      string
-	RealmSlug string
+	Name    string
+	Surname string
 }
 
 type Provider interface {

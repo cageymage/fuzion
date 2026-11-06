@@ -304,9 +304,9 @@ func TestBattlenetLink_ClaimsRosterCharactersOnTheAccount(t *testing.T) {
 	insertRosterCharacter(t, db, "Stranger", "Unset", "Emberreach")
 	state := startBattleNetLink(t, srv)
 	srv.BattleNet.GrantCode("bnet-code", testutil.BattleNetUser{ID: 123456789, BattleTag: "Thunder#1234", Characters: []testutil.BattleNetCharacter{
-		{Name: "Tankard", RealmSlug: "emberreach"},
-		{Name: "HEALBOT", RealmSlug: "emberreach"},
-		{Name: "Newbie", RealmSlug: "emberreach"},
+		{Name: "Tankard", Surname: "Ironhide"},
+		{Name: "HEALBOT", Surname: "mender"},
+		{Name: "Newbie", Surname: "Rookie"},
 	}})
 
 	// when Battle.net sends the browser back with the code
@@ -324,15 +324,53 @@ func TestBattlenetLink_ClaimsRosterCharactersOnTheAccount(t *testing.T) {
 	}
 }
 
-func TestBattlenetLink_DoesNotClaimCharacter_WhenItIsOnAnotherRealm(t *testing.T) {
-	// given a roster Tankard on Emberreach and my Battle.net account's Tankard on Area 52
+func TestBattlenetLink_ClaimsOnlyTheMatchingSurname_WhenTwoRosterCharactersShareAFirstName(t *testing.T) {
+	// given roster characters Kali Pooltergeist and Kali Poolshock, and my Battle.net account listing only Kali Poolshock
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "80351110224678912", "thundermane")
+	insertRosterCharacter(t, db, "Kali", "Pooltergeist", "Emberreach")
+	insertRosterCharacter(t, db, "Kali", "Poolshock", "Emberreach")
+	state := startBattleNetLink(t, srv)
+	srv.BattleNet.GrantCode("bnet-code", testutil.BattleNetUser{ID: 123456789, BattleTag: "Thunder#1234", Characters: []testutil.BattleNetCharacter{
+		{Name: "Kali", Surname: "Poolshock"},
+	}})
+
+	// when Battle.net sends the browser back with the code
+	resp := srv.Get(t, "/api/auth/battlenet/callback?code=bnet-code&state="+state)
+
+	// then I expect only Kali Poolshock to be mine
+	resp.RequireStatus(t, 302)
+	type row struct {
+		SecondaryName string  `db:"secondary_name"`
+		Owner         *string `db:"owner"`
+	}
+	var got []row
+	err := db.Select(&got, `
+		SELECT c.secondary_name, u.discord_id AS owner
+		FROM characters c LEFT JOIN users u ON u.id = c.user_id
+		ORDER BY c.secondary_name`)
+	if err != nil {
+		t.Fatalf("select characters: %v", err)
+	}
+	want := []row{
+		{SecondaryName: "Poolshock", Owner: strPtr("80351110224678912")},
+		{SecondaryName: "Pooltergeist"},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected owners (-want +got):\n%s", diff)
+	}
+}
+
+func TestBattlenetLink_DoesNotClaimCharacter_WhenItHasADifferentSurname(t *testing.T) {
+	// given a roster Tankard Ironhide and my Battle.net account's Tankard Strongarm
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
 	srv.LoginAs(t, "80351110224678912", "thundermane")
 	insertRosterCharacter(t, db, "Tankard", "Ironhide", "Emberreach")
 	state := startBattleNetLink(t, srv)
 	srv.BattleNet.GrantCode("bnet-code", testutil.BattleNetUser{ID: 123456789, BattleTag: "Thunder#1234", Characters: []testutil.BattleNetCharacter{
-		{Name: "Tankard", RealmSlug: "area-52"},
+		{Name: "Tankard", Surname: "Strongarm"},
 	}})
 
 	// when Battle.net sends the browser back with the code
@@ -356,7 +394,7 @@ func TestBattlenetLink_LeavesCharacterWithItsOwner_WhenAnotherMemberAlreadyOwnsI
 	srv.LoginAs(t, "80351110224678912", "thundermane")
 	state := startBattleNetLink(t, srv)
 	srv.BattleNet.GrantCode("bnet-code", testutil.BattleNetUser{ID: 123456789, BattleTag: "Thunder#1234", Characters: []testutil.BattleNetCharacter{
-		{Name: "Tankard", RealmSlug: "emberreach"},
+		{Name: "Tankard", Surname: "Ironhide"},
 	}})
 
 	// when Battle.net sends the browser back with the code
@@ -381,7 +419,7 @@ func TestBattlenetLink_ReleasesCharacters_WhenTheyAreNoLongerOnTheAccount(t *tes
 	db.MustExec(`UPDATE users SET battlenet_id = '123456789', battlenet_tag = 'Thunder#1234' WHERE id = $1`, me.ID)
 	state := startBattleNetLink(t, srv)
 	srv.BattleNet.GrantCode("bnet-code", testutil.BattleNetUser{ID: 123456789, BattleTag: "Thunder#1234", Characters: []testutil.BattleNetCharacter{
-		{Name: "Tankard", RealmSlug: "emberreach"},
+		{Name: "Tankard", Surname: "Ironhide"},
 	}})
 
 	// when I link the same Battle.net account again
@@ -406,7 +444,7 @@ func TestBattlenetLink_AttachesIDAndClaimsNothing_WhenProfileLookupReturnsNotFou
 	insertRosterCharacter(t, db, "Tankard", "Ironhide", "Emberreach")
 	state := startBattleNetLink(t, srv)
 	srv.BattleNet.GrantCode("bnet-code", testutil.BattleNetUser{ID: 123456789, BattleTag: "Thunder#1234", Characters: []testutil.BattleNetCharacter{
-		{Name: "Tankard", RealmSlug: "emberreach"},
+		{Name: "Tankard", Surname: "Ironhide"},
 	}})
 	srv.BattleNet.FailProfile(404)
 
@@ -493,7 +531,7 @@ func TestBattlenetLink_LinksWithoutClaiming_WhenProfileLookupFails(t *testing.T)
 	insertRosterCharacter(t, db, "Tankard", "Ironhide", "Emberreach")
 	state := startBattleNetLink(t, srv)
 	srv.BattleNet.GrantCode("bnet-code", testutil.BattleNetUser{ID: 123456789, BattleTag: "Thunder#1234", Characters: []testutil.BattleNetCharacter{
-		{Name: "Tankard", RealmSlug: "emberreach"},
+		{Name: "Tankard", Surname: "Ironhide"},
 	}})
 	srv.BattleNet.FailProfile(500)
 

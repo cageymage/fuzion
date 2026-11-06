@@ -84,13 +84,13 @@ func (b *BattleNet) fetchCharacters(ctx context.Context, token string) ([]Accoun
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
+	// Forever has no realms: a character is its name plus a surname, which is what the
+	// roster stores, so the response carries no realm to match on.
 	var body struct {
 		WoWAccounts []struct {
 			Characters []struct {
-				Name  string `json:"name"`
-				Realm struct {
-					Slug string `json:"slug"`
-				} `json:"realm"`
+				Name    string `json:"name"`
+				Surname string `json:"surname"`
 			} `json:"characters"`
 		} `json:"wow_accounts"`
 	}
@@ -103,7 +103,7 @@ func (b *BattleNet) fetchCharacters(ctx context.Context, token string) ([]Accoun
 	var characters []AccountCharacter
 	for _, account := range body.WoWAccounts {
 		for _, c := range account.Characters {
-			characters = append(characters, AccountCharacter{Name: c.Name, RealmSlug: c.Realm.Slug})
+			characters = append(characters, AccountCharacter{Name: c.Name, Surname: c.Surname})
 		}
 	}
 	return characters, nil
