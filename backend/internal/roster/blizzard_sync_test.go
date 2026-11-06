@@ -153,8 +153,8 @@ func TestSyncBlizzardRoster_InsertsNewCharacters_WhenBlizzardListsMembersTheTabl
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Lightbringer", SecondaryName: "Brightwood", Realm: "Emberreach", Class: "Paladin", Role: "dps", Race: strPtr("Dwarf"), Level: intPtr(55), GuildRank: intPtr(4)},
-		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "dps", Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(0)},
+		{Name: "Lightbringer", SecondaryName: "Brightwood", Realm: "Emberreach", Class: "Paladin", Role: "dps", IsMain: true, Race: strPtr("Dwarf"), Level: intPtr(55), GuildRank: intPtr(4)},
+		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(0)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -284,7 +284,7 @@ func TestSyncBlizzardRoster_SkipsMembersAndRecordsIt_WhenClassIsNotSupported(t *
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Overleveled", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", Race: strPtr("Human"), GuildRank: intPtr(3)},
+		{Name: "Overleveled", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), GuildRank: intPtr(3)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -582,7 +582,7 @@ func TestSyncBlizzardRoster_KeepsMainOrAltOfOfficerEnteredCharacter_WhenAltRanks
 	}
 }
 
-func TestSyncBlizzardRoster_KeepsSyncedCharactersAsAlts_WhenNoAltRanksAreConfigured(t *testing.T) {
+func TestSyncBlizzardRoster_SyncsCharactersAsMains_WhenNoAltRanksAreConfigured(t *testing.T) {
 	// given a member-rank character an earlier sync imported without alt ranks
 	db := testutil.DB(t)
 	fake := newFakeBlizzardRoster(t, fakeMember{name: "Raider", surname: "Stoneback", class: mage, race: 1, level: 60, rank: memberRank})
@@ -593,12 +593,12 @@ func TestSyncBlizzardRoster_KeepsSyncedCharactersAsAlts_WhenNoAltRanksAreConfigu
 	// when the roster sync runs again without alt ranks
 	err := fake.runSync(db)
 
-	// then I expect the character still to be an alt, as before alt ranks existed
+	// then I expect the character to be a main, whatever its rank
 	if err != nil {
 		t.Fatalf("second sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Raider", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
+		{Name: "Raider", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -621,8 +621,8 @@ func TestSyncBlizzardRoster_TreatsSameNameWithDifferentSurnamesAsSeparateCharact
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Kirk", SecondaryName: "Fel", Realm: "Emberreach", Class: "Warrior", Role: "dps", Race: strPtr("Human"), Level: intPtr(11), GuildRank: intPtr(memberRank)},
-		{Name: "Kirk", SecondaryName: "Smash", Realm: "Emberreach", Class: "Warrior", Role: "dps", Race: strPtr("Human"), Level: intPtr(1), GuildRank: intPtr(memberRank)},
+		{Name: "Kirk", SecondaryName: "Fel", Realm: "Emberreach", Class: "Warrior", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(11), GuildRank: intPtr(memberRank)},
+		{Name: "Kirk", SecondaryName: "Smash", Realm: "Emberreach", Class: "Warrior", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(1), GuildRank: intPtr(memberRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)

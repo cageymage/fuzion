@@ -9,8 +9,8 @@ import { MyProfessions } from './MyProfessions'
 export function MyCharacters() {
   const queryClient = useQueryClient()
   const characters = useQuery({ queryKey: myCharactersQueryKey, queryFn: fetchMyCharacters })
-  const makeMain = useMutation({
-    mutationFn: (id: string) => updateMyCharacter(id, { isMain: true }),
+  const setMain = useMutation({
+    mutationFn: ({ id, isMain }: { id: string; isMain: boolean }) => updateMyCharacter(id, { isMain }),
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: myCharactersQueryKey }),
@@ -47,28 +47,27 @@ export function MyCharacters() {
                       <strong style={{ color: classColor(character.class) }}>{fullName}</strong> ·{' '}
                       <span style={{ color: classColor(character.class) }}>{character.class}</span>
                     </span>
-                    {character.isMain ? (
-                      <span className={styles.mainBadge}>Main</span>
-                    ) : (
-                      <button
-                        type="button"
-                        className={styles.button}
-                        aria-label={`Make ${fullName} your main`}
-                        onClick={() => makeMain.mutate(character.id)}
-                        disabled={makeMain.isPending}
-                      >
-                        Make main
-                      </button>
-                    )}
+                    {character.isMain && <span className={styles.mainBadge}>Main</span>}
+                    <button
+                      type="button"
+                      className={styles.button}
+                      aria-label={
+                        character.isMain ? `Make ${fullName} an alt` : `Make ${fullName} your main`
+                      }
+                      onClick={() => setMain.mutate({ id: character.id, isMain: !character.isMain })}
+                      disabled={setMain.isPending}
+                    >
+                      {character.isMain ? 'Make alt' : 'Make main'}
+                    </button>
                   </div>
                   <MyProfessions character={character} fullName={fullName} />
                 </li>
               )
             })}
           </ul>
-          {makeMain.isError && (
+          {setMain.isError && (
             <p role="alert" className={styles.error}>
-              Could not change your main, try again.
+              Could not change main or alt, try again.
             </p>
           )}
           <p className={styles.hint}>

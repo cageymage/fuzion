@@ -100,7 +100,7 @@ func TestListMyCharacters_ReturnsUnauthorized_WhenNotLoggedIn(t *testing.T) {
 	resp.RequireStatus(t, http.StatusUnauthorized)
 }
 
-func TestUpdateMyCharacter_ClearsPreviousMain_WhenNewMainIsSet(t *testing.T) {
+func TestUpdateMyCharacter_KeepsOtherMains_WhenAnotherCharacterBecomesMain(t *testing.T) {
 	// given my main and alt, and another member's main
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
@@ -113,7 +113,7 @@ func TestUpdateMyCharacter_ClearsPreviousMain_WhenNewMainIsSet(t *testing.T) {
 	// when I make my alt my main
 	resp := srv.Patch(t, "/api/me/characters/"+healbotID, map[string]any{"isMain": true})
 
-	// then I expect it returned as a main, my old main now an alt, both set by hand, and the other member's main untouched
+	// then I expect it returned as a main, my old main still a main, and the other member's main untouched
 	resp.RequireStatus(t, http.StatusOK)
 	var got characterJSON
 	resp.DecodeJSON(t, &got)
@@ -124,7 +124,7 @@ func TestUpdateMyCharacter_ClearsPreviousMain_WhenNewMainIsSet(t *testing.T) {
 	wantRows := []mainRow{
 		{Name: "Healbot", IsMain: true, IsMainSetByHand: true},
 		{Name: "Stranger", IsMain: true, IsMainSetByHand: false},
-		{Name: "Tankard", IsMain: false, IsMainSetByHand: true},
+		{Name: "Tankard", IsMain: true, IsMainSetByHand: false},
 	}
 	if diff := cmp.Diff(wantRows, mainRows(t, db)); diff != "" {
 		t.Errorf("unexpected mains (-want +got):\n%s", diff)
