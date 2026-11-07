@@ -11,3 +11,10 @@ export interface ProfessionEntry {
   skillLevel: number
   character: ProfessionCharacter
 }
+
+export interface Recipe {
+  id: number
+  name: string
+  profession: string
+  characters: ProfessionCharacter[]
+}

@@ -3,7 +3,7 @@ import type { Application, ApplicationStatus } from '../types/applications'
 import type { EditablePost, NewsPage, NewsPost } from '../types/news'
 import type { RaidProgress, RaidTier } from '../types/raidProgress'
 import type { Raid } from '../types/raids'
-import type { ProfessionEntry } from '../types/professions'
+import type { ProfessionEntry, Recipe } from '../types/professions'
 import type { Character, MyCharacter } from '../types/roster'
 import type { Submission } from '../types/submissions'
 import type { Stream } from '../types/streams'
@@ -369,6 +369,15 @@ const raidTiers: RaidTier[] = [
   },
 ]
 
+const recipes: Recipe[] = [
+  {
+    id: 1356,
+    name: 'Light Armor Kit',
+    profession: 'Leatherworking',
+    characters: [{ id: 'char-1', name: 'Aeliana', secondaryName: 'Dawnsong', class: 'Priest' }],
+  },
+]
+
 const professionEntries: ProfessionEntry[] = [
   {
     id: 'profession-1',
@@ -567,6 +576,18 @@ export const handlers = [
   ),
   http.delete('/api/news/:id', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/professions', () => HttpResponse.json(professionEntries)),
+  http.get('/api/recipes', ({ request }) => {
+    const params = new URL(request.url).searchParams
+    const q = (params.get('q') ?? '').toLowerCase()
+    const characterId = params.get('characterId')
+    return HttpResponse.json(
+      recipes.filter(
+        (recipe) =>
+          recipe.name.toLowerCase().includes(q) &&
+          (!characterId || recipe.characters.some((character) => character.id === characterId)),
+      ),
+    )
+  }),
   http.get('/api/raid-progress', () => HttpResponse.json([raidProgress])),
   http.get('/api/raid-tiers', () => HttpResponse.json(raidTiers)),
   http.post('/api/raid-tiers', () =>

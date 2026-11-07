@@ -141,6 +141,7 @@ is no separate migrate step.
 | Method | Path                | Response                                            |
 | ------ | ------------------- | --------------------------------------------------- |
 | GET    | `/api/health`       | `{"status":"ok"}`                                   |
+| GET    | `/api/recipes`      | recipes the `sync blizzard-professions` job stored, each with the characters still in the guild who can craft it, sorted by recipe name; optional `?q=` (name contains, case-insensitive) and `?characterId=` (only that character's recipes; 400 when not a UUID); at most 500 recipes, `[]` when nothing matches |
 | GET    | `/api/professions`  | crafting directory with each character embedded, sorted by profession, then skill; optional `?profession=` (case-insensitive, `[]` when nothing matches) |
 | POST   | `/api/professions`  | officer only: `{characterId, profession, skillLevel}`; 201 with the same shape the list returns; 400 for an unknown `characterId`, a blank `profession` or a negative `skillLevel`; 409 when the character already has that profession |
 | PATCH  | `/api/professions/{id}` | officer only: any of `profession`, `skillLevel`; 200 with the updated row; 404 for an unknown or malformed id; 409 when it would duplicate another of the character's professions |

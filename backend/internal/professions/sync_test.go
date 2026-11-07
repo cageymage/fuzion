@@ -16,9 +16,15 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/testutil"
 )
 
+type fakeRecipe struct {
+	id   int
+	name string
+}
+
 type fakeProfession struct {
-	name  string
-	skill int
+	name    string
+	skill   int
+	recipes []fakeRecipe
 }
 
 // newFakeBlizzardProfessions serves /profile/wow/character/{slug}/professions for the
@@ -38,9 +44,13 @@ func newFakeBlizzardProfessions(t *testing.T, bySlug map[string][]fakeProfession
 		}
 		primaries := []map[string]any{}
 		for _, p := range known {
+			recipes := []map[string]any{}
+			for _, r := range p.recipes {
+				recipes = append(recipes, map[string]any{"id": r.id, "name": r.name})
+			}
 			primaries = append(primaries, map[string]any{
 				"profession": map[string]any{"name": p.name},
-				"tiers":      []map[string]any{{"skill_points": p.skill}},
+				"tiers":      []map[string]any{{"skill_points": p.skill, "known_recipes": recipes}},
 			})
 		}
 		json.NewEncoder(w).Encode(map[string]any{"primaries": primaries, "secondaries": []any{}})
@@ -103,8 +113,8 @@ func TestSyncBlizzardProfessions_UpsertsRows_ForCharactersWithProfessions(t *tes
 	db := testutil.DB(t)
 	db.MustExec(syncCharacters)
 	srv := newFakeBlizzardProfessions(t, map[string][]fakeProfession{
-		"terrorskull-gloomstep": {{"Leatherworking", 55}, {"Skinning", 98}},
-		"swamplörd-atrocitus":   {{"Mining", 30}},
+		"terrorskull-gloomstep": {{"Leatherworking", 55, nil}, {"Skinning", 98, nil}},
+		"swamplörd-atrocitus":   {{"Mining", 30, nil}},
 	})
 
 	// when the professions sync runs
@@ -135,7 +145,7 @@ func TestSyncBlizzardProfessions_OverwritesOfficerSkillLevel_WhenBlizzardReports
 	db.MustExec(`
 		INSERT INTO professions (id, character_id, profession, skill_level)
 		VALUES ('a1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'Skinning', 10)`)
-	srv := newFakeBlizzardProfessions(t, map[string][]fakeProfession{"terrorskull-gloomstep": {{"Skinning", 98}}})
+	srv := newFakeBlizzardProfessions(t, map[string][]fakeProfession{"terrorskull-gloomstep": {{"Skinning", 98, nil}}})
 
 	// when the professions sync runs
 	err := runProfessionsSync(db, srv)
@@ -157,7 +167,7 @@ func TestSyncBlizzardProfessions_KeepsOfficerRow_WhenBlizzardDoesNotReportThePro
 	db.MustExec(`
 		INSERT INTO professions (id, character_id, profession, skill_level)
 		VALUES ('a1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'Mining', 40)`)
-	srv := newFakeBlizzardProfessions(t, map[string][]fakeProfession{"terrorskull-gloomstep": {{"Skinning", 98}}})
+	srv := newFakeBlizzardProfessions(t, map[string][]fakeProfession{"terrorskull-gloomstep": {{"Skinning", 98, nil}}})
 
 	// when the professions sync runs
 	err := runProfessionsSync(db, srv)
@@ -179,7 +189,7 @@ func TestSyncBlizzardProfessions_SkipsCharacter_WhenBlizzardReturnsNotFound(t *t
 	// given two roster characters of whom Blizzard knows only one
 	db := testutil.DB(t)
 	db.MustExec(syncCharacters)
-	srv := newFakeBlizzardProfessions(t, map[string][]fakeProfession{"swamplörd-atrocitus": {{"Mining", 30}}})
+	srv := newFakeBlizzardProfessions(t, map[string][]fakeProfession{"swamplörd-atrocitus": {{"Mining", 30, nil}}})
 
 	// when the professions sync runs
 	err := runProfessionsSync(db, srv)
@@ -207,8 +217,8 @@ func TestSyncBlizzardProfessions_SkipsCharacters_WhoLeftTheGuildOrLackASurname(t
 			('11111111-1111-1111-1111-111111111111', 'Quitter', 'Gone', 'Emberreach', 'Mage', 'dps', now()),
 			('22222222-2222-2222-2222-222222222222', 'Nameless', 'Unset', 'Emberreach', 'Mage', 'dps', NULL)`)
 	srv := newFakeBlizzardProfessions(t, map[string][]fakeProfession{
-		"quitter-gone":   {{"Mining", 30}},
-		"nameless-unset": {{"Mining", 30}},
+		"quitter-gone":   {{"Mining", 30, nil}},
+		"nameless-unset": {{"Mining", 30, nil}},
 	})
 
 	// when the professions sync runs
@@ -251,5 +261,128 @@ func TestSyncBlizzardProfessions_LogsError_WhenBlizzardFails(t *testing.T) {
 	entries := syncLogEntries(t, db)
 	if len(entries) != 1 || entries[0].Status != "error" || entries[0].Source != "blizzard-professions" {
 		t.Errorf("sync log = %+v, want one blizzard-professions error entry", entries)
+	}
+}
+
+type storedRecipe struct {
+	ID         int    `db:"id"`
+	Profession string `db:"profession"`
+	Name       string `db:"name"`
+}
+
+func storedRecipes(t *testing.T, db *sqlx.DB) []storedRecipe {
+	t.Helper()
+	var rows []storedRecipe
+	if err := db.Select(&rows, `SELECT id, profession, name FROM recipes ORDER BY id`); err != nil {
+		t.Fatalf("select recipes: %v", err)
+	}
+	return rows
+}
+
+type knownRecipe struct {
+	Character string `db:"character"`
+	RecipeID  int    `db:"recipe_id"`
+}
+
+func knownRecipes(t *testing.T, db *sqlx.DB) []knownRecipe {
+	t.Helper()
+	var rows []knownRecipe
+	err := db.Select(&rows, `
+		SELECT c.name AS character, cr.recipe_id
+		FROM character_recipes cr JOIN characters c ON c.id = cr.character_id
+		ORDER BY c.name, cr.recipe_id`)
+	if err != nil {
+		t.Fatalf("select character_recipes: %v", err)
+	}
+	return rows
+}
+
+func TestSyncBlizzardProfessions_StoresRecipesOnceAndWhoKnowsThem_WhenCharactersShareARecipe(t *testing.T) {
+	// given two characters who both know Light Armor Kit, one of whom also knows the Skinning entry
+	db := testutil.DB(t)
+	db.MustExec(syncCharacters)
+	srv := newFakeBlizzardProfessions(t, map[string][]fakeProfession{
+		"terrorskull-gloomstep": {
+			{"Leatherworking", 55, []fakeRecipe{{1356, "Light Armor Kit"}, {1353, "Handstitched Leather Boots"}}},
+			{"Skinning", 98, []fakeRecipe{{4767, "Skinning"}}},
+		},
+		"swamplörd-atrocitus": {{"Leatherworking", 20, []fakeRecipe{{1356, "Light Armor Kit"}}}},
+	})
+
+	// when the professions sync runs
+	err := runProfessionsSync(db, srv)
+
+	// then I expect each recipe stored once, none named after its own profession, and both characters linked to the shared one
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	wantRecipes := []storedRecipe{
+		{ID: 1353, Profession: "Leatherworking", Name: "Handstitched Leather Boots"},
+		{ID: 1356, Profession: "Leatherworking", Name: "Light Armor Kit"},
+	}
+	if diff := cmp.Diff(wantRecipes, storedRecipes(t, db)); diff != "" {
+		t.Errorf("unexpected recipes (-want +got):\n%s", diff)
+	}
+	wantKnown := []knownRecipe{
+		{Character: "Swamplörd", RecipeID: 1356},
+		{Character: "Terrorskull", RecipeID: 1353},
+		{Character: "Terrorskull", RecipeID: 1356},
+	}
+	if diff := cmp.Diff(wantKnown, knownRecipes(t, db)); diff != "" {
+		t.Errorf("unexpected character recipes (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncBlizzardProfessions_ForgetsRecipe_WhenBlizzardNoLongerListsItForTheCharacter(t *testing.T) {
+	// given a character whose first sync stored two Leatherworking recipes
+	db := testutil.DB(t)
+	db.MustExec(syncCharacters)
+	first := newFakeBlizzardProfessions(t, map[string][]fakeProfession{
+		"terrorskull-gloomstep": {{"Leatherworking", 55, []fakeRecipe{{1353, "Handstitched Leather Boots"}, {1356, "Light Armor Kit"}}}},
+	})
+	if err := runProfessionsSync(db, first); err != nil {
+		t.Fatalf("first sync: %v", err)
+	}
+
+	// when a later sync lists only one of them
+	second := newFakeBlizzardProfessions(t, map[string][]fakeProfession{
+		"terrorskull-gloomstep": {{"Leatherworking", 56, []fakeRecipe{{1356, "Light Armor Kit"}}}},
+	})
+	err := runProfessionsSync(db, second)
+
+	// then I expect the character linked only to the one still listed
+	if err != nil {
+		t.Fatalf("second sync: %v", err)
+	}
+	want := []knownRecipe{{Character: "Terrorskull", RecipeID: 1356}}
+	if diff := cmp.Diff(want, knownRecipes(t, db)); diff != "" {
+		t.Errorf("unexpected character recipes (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncBlizzardProfessions_KeepsRecipes_WhenBlizzardDoesNotReportTheirProfession(t *testing.T) {
+	// given a character whose first sync stored a Leatherworking recipe
+	db := testutil.DB(t)
+	db.MustExec(syncCharacters)
+	first := newFakeBlizzardProfessions(t, map[string][]fakeProfession{
+		"terrorskull-gloomstep": {{"Leatherworking", 55, []fakeRecipe{{1356, "Light Armor Kit"}}}},
+	})
+	if err := runProfessionsSync(db, first); err != nil {
+		t.Fatalf("first sync: %v", err)
+	}
+
+	// when a later sync reports only Skinning for them
+	second := newFakeBlizzardProfessions(t, map[string][]fakeProfession{
+		"terrorskull-gloomstep": {{"Skinning", 98, nil}},
+	})
+	err := runProfessionsSync(db, second)
+
+	// then I expect the Leatherworking recipe link untouched
+	if err != nil {
+		t.Fatalf("second sync: %v", err)
+	}
+	want := []knownRecipe{{Character: "Terrorskull", RecipeID: 1356}}
+	if diff := cmp.Diff(want, knownRecipes(t, db)); diff != "" {
+		t.Errorf("unexpected character recipes (-want +got):\n%s", diff)
 	}
 }

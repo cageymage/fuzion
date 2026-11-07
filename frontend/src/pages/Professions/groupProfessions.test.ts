@@ -63,3 +63,21 @@ describe('groupProfessions', () => {
     expect(groupProfessions([], '')).toEqual([])
   })
 })
+
+describe('groupProfessions with recipe crafters', () => {
+  it('should keep an entry that does not match the text when its character crafts a matched recipe in that profession', () => {
+    const crafters = new Set(['Alchemy\u0000char-Zephyrion'])
+
+    const groups = groupProfessions(rows, 'elixir', crafters)
+
+    expect(groups).toEqual([{ profession: 'Alchemy', entries: [alchemyZephyrion] }])
+  })
+
+  it('should drop an entry whose character crafts the recipe only in another profession', () => {
+    const crafters = new Set(['Alchemy\u0000char-Zephyrion'])
+
+    const groups = groupProfessions(rows, 'elixir', crafters)
+
+    expect(groups.map((group) => group.profession)).not.toContain('Blacksmithing')
+  })
+})

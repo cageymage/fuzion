@@ -52,15 +52,15 @@ func TestCharacterProfessions_ReturnsPrimariesAndSecondaries_WhenBlizzardRespond
 	// when I ask for the professions of terrorskull-gloomstep
 	got, err := client.CharacterProfessions(context.Background(), "terrorskull-gloomstep")
 
-	// then I expect each profession with its skill points, primaries first
+	// then I expect each profession with its skill points and known recipes, primaries first
 	if err != nil {
 		t.Fatalf("CharacterProfessions: %v", err)
 	}
 	want := []blizzard.CharacterProfession{
-		{Name: "Leatherworking", SkillPoints: 55},
-		{Name: "Skinning", SkillPoints: 98},
-		{Name: "Cooking", SkillPoints: 24},
-		{Name: "First Aid", SkillPoints: 71},
+		{Name: "Leatherworking", SkillPoints: 55, Recipes: []blizzard.Recipe{{ID: 1353, Name: "Handstitched Leather Boots"}, {ID: 1356, Name: "Light Armor Kit"}}},
+		{Name: "Skinning", SkillPoints: 98, Recipes: []blizzard.Recipe{{ID: 4767, Name: "Skinning"}}},
+		{Name: "Cooking", SkillPoints: 24, Recipes: []blizzard.Recipe{{ID: 8616, Name: "Crispy Bat Wing"}}},
+		{Name: "First Aid", SkillPoints: 71, Recipes: []blizzard.Recipe{{ID: 1838, Name: "Linen Bandage"}}},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("unexpected professions (-want +got):\n%s", diff)
