@@ -150,7 +150,7 @@ describe('Dashboard', () => {
     renderWithProviders(<Dashboard />, '/dashboard')
 
     expect(await characterRows()).toEqual([
-      'Thundermane Stormcaller · WarriorMain',
+      'Thundermane Stormcaller · WarriorMainMake alt',
       'Thundermend Lightward · PriestMake main',
     ])
   })
@@ -186,19 +186,19 @@ describe('Dashboard', () => {
   })
 
   it('should mark a character as main when its Make main button is clicked', async () => {
-    let mainId = 'char-a'
+    const mains = new Set(['char-a'])
     let patchBody: unknown
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
       http.get('/api/me/characters', () =>
         HttpResponse.json([
-          ownedCharacter('char-a', 'Ragefist', 'Ironjaw', mainId === 'char-a'),
-          ownedCharacter('char-b', 'Shieldwall', 'Oakheart', mainId === 'char-b'),
+          ownedCharacter('char-a', 'Ragefist', 'Ironjaw', mains.has('char-a')),
+          ownedCharacter('char-b', 'Shieldwall', 'Oakheart', mains.has('char-b')),
         ]),
       ),
       http.patch('/api/me/characters/:id', async ({ params, request }) => {
         patchBody = await request.json()
-        mainId = params.id as string
+        mains.add(params.id as string)
         return HttpResponse.json(ownedCharacter('char-b', 'Shieldwall', 'Oakheart', true))
       }),
     )
@@ -206,12 +206,35 @@ describe('Dashboard', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Make Shieldwall Oakheart your main' }))
 
-    expect(await screen.findByRole('button', { name: 'Make Ragefist Ironjaw your main' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Make Shieldwall Oakheart an alt' })).toBeInTheDocument()
     expect(await characterRows()).toEqual([
-      'Ragefist Ironjaw · WarriorMake main',
-      'Shieldwall Oakheart · WarriorMain',
+      'Ragefist Ironjaw · WarriorMainMake alt',
+      'Shieldwall Oakheart · WarriorMainMake alt',
     ])
     expect(patchBody).toEqual({ isMain: true })
+  })
+
+  it('should mark a main character as an alt when its Make alt button is clicked', async () => {
+    let isMain = true
+    let patchBody: unknown
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([ownedCharacter('char-a', 'Ragefist', 'Ironjaw', isMain)]),
+      ),
+      http.patch('/api/me/characters/:id', async ({ request }) => {
+        patchBody = await request.json()
+        isMain = false
+        return HttpResponse.json(ownedCharacter('char-a', 'Ragefist', 'Ironjaw', false))
+      }),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Make Ragefist Ironjaw an alt' }))
+
+    expect(await screen.findByRole('button', { name: 'Make Ragefist Ironjaw your main' })).toBeInTheDocument()
+    expect(await characterRows()).toEqual(['Ragefist Ironjaw · WarriorMake main'])
+    expect(patchBody).toEqual({ isMain: false })
   })
 
   it("should explain how to claim characters when none of the linked account's characters are on the roster", async () => {
@@ -252,7 +275,7 @@ describe('Dashboard', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Make Thundermend Lightward your main' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not change your main')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not change main or alt')
   })
 
   it("should show each character's professions with their skill levels", async () => {

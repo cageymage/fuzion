@@ -44,8 +44,8 @@ type UpsertResult struct {
 // matched on name and surname, ignoring case. For existing characters only class, level,
 // race, guild rank and left_guild_at are written; role, spec, raid team and owner
 // belong to officers and members. With alt ranks configured, main/alt follows the
-// guild rank until an officer sets it by hand; without them every new character is an
-// alt and main/alt is never written. A character that was seen in an earlier sync and
+// guild rank until an officer sets it by hand; without them every new character is a
+// main and main/alt is never written. A character that was seen in an earlier sync and
 // is now absent is marked as having left; one the sync has never seen is left alone.
 func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.RosterMember, altRanks []int) (UpsertResult, error) {
 	const setFromBlizzard = `
@@ -68,7 +68,7 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 
 	const insert = `
 		INSERT INTO characters (id, name, secondary_name, class, role, is_main, level, guild_rank, race)
-		VALUES ($1, $2, $3, $4, $5, COALESCE($9, false), $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, COALESCE($9, true), $6, $7, $8)
 		ON CONFLICT (name, secondary_name) DO NOTHING`
 
 	const markLeft = `

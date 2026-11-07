@@ -26,8 +26,8 @@ type BattleNetUser struct {
 }
 
 type BattleNetCharacter struct {
-	Name      string
-	RealmSlug string
+	Name    string
+	Surname string
 }
 
 // FakeBattleNet stands in for oauth.battle.net. Codes handed to GrantCode are
@@ -143,9 +143,9 @@ func (f *FakeBattleNet) profile(t *testing.T) http.HandlerFunc {
 		characters := []map[string]any{}
 		for _, c := range user.Characters {
 			characters = append(characters, map[string]any{
-				"name":  c.Name,
-				"level": 60,
-				"realm": map[string]any{"name": c.RealmSlug, "slug": c.RealmSlug},
+				"name":    c.Name,
+				"level":   60,
+				"surname": c.Surname,
 			})
 		}
 		writeJSON(w, http.StatusOK, map[string]any{

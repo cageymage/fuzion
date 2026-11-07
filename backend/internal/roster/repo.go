@@ -141,21 +141,13 @@ func (r *Repo) Create(ctx context.Context, c Character, professions []string) (C
 	return created, nil
 }
 
-// SetOwnMain changes main/alt on a character the user owns. Making it a main turns
-// the user's other mains into alts, so a member has at most one. Both count as set by
-// hand, so the roster sync's rank mapping leaves them alone.
+// SetOwnMain changes main/alt on a character the user owns. A member may have several
+// mains, so other characters are untouched. The change counts as set by hand, so the
+// roster sync's rank mapping leaves it alone.
 func (r *Repo) SetOwnMain(ctx context.Context, userID, id uuid.UUID, isMain bool) (Character, error) {
-	// Locking all of the user's characters keeps two concurrent "make main" requests
-	// from each clearing the other's old main and leaving two.
-	const lock = `SELECT id FROM characters WHERE user_id = $1 OR id = $2 FOR UPDATE`
-
 	// A character that left the guild is hidden from the member's list, so it is not
-	// theirs to promote: making it main would demote the main they can see.
+	// theirs to change.
 	const owner = `SELECT user_id FROM characters WHERE id = $1 AND left_guild_at IS NULL`
-
-	const clearOtherMains = `
-		UPDATE characters SET is_main = false, is_main_set_by_hand = true
-		WHERE user_id = $1 AND id <> $2 AND is_main`
 
 	const update = `
 		UPDATE characters SET is_main = $2, is_main_set_by_hand = true
@@ -168,9 +160,6 @@ func (r *Repo) SetOwnMain(ctx context.Context, userID, id uuid.UUID, isMain bool
 	}
 	defer func() { _ = tx.Rollback() }() // no-op once committed
 
-	if _, err := tx.ExecContext(ctx, lock, userID, id); err != nil {
-		return Character{}, fmt.Errorf("lock characters: %w", err)
-	}
 	var ownerID *uuid.UUID
 	if err := tx.GetContext(ctx, &ownerID, owner, id); errors.Is(err, sql.ErrNoRows) {
 		return Character{}, ErrNotFound
@@ -179,11 +168,6 @@ func (r *Repo) SetOwnMain(ctx context.Context, userID, id uuid.UUID, isMain bool
 	}
 	if ownerID == nil || *ownerID != userID {
 		return Character{}, ErrNotOwner
-	}
-	if isMain {
-		if _, err := tx.ExecContext(ctx, clearOtherMains, userID, id); err != nil {
-			return Character{}, fmt.Errorf("clear other mains: %w", err)
-		}
 	}
 	var updated Character
 	if err := tx.GetContext(ctx, &updated, update, id, isMain); err != nil {

@@ -120,12 +120,8 @@ func (r *Repo) UpdateUserRoles(ctx context.Context, id uuid.UUID, isOfficer, isA
 	return user.utc(), nil
 }
 
-// The roster sync's realm slug for a stored realm: lowercase, spaces to hyphens,
-// apostrophes dropped, so a link matches characters the same way the sync does.
-const characterRealmSlugSQL = `lower(replace(replace(realm, ' ', '-'), '''', ''))`
-
 // LinkBattleNet stores the Battle.net identity and makes the user the owner of the
-// roster characters on that account, matched on name and realm, ignoring case.
+// roster characters on that account, matched on name and surname, ignoring case.
 // Characters another member already owns stay theirs. Characters this user owned
 // that are no longer on the account are released, so linking again refreshes the set.
 // When the character list is unknown, only the identity is stored: an empty list
@@ -139,18 +135,18 @@ func (r *Repo) LinkBattleNet(ctx context.Context, userID uuid.UUID, identity Ide
 	const release = `
 		UPDATE characters SET user_id = NULL
 		WHERE user_id = $1
-		  AND (lower(name), ` + characterRealmSlugSQL + `) NOT IN (SELECT * FROM unnest($2::text[], $3::text[]))`
+		  AND (lower(name), lower(secondary_name)) NOT IN (SELECT * FROM unnest($2::text[], $3::text[]))`
 
 	const claim = `
 		UPDATE characters SET user_id = $1
 		WHERE user_id IS NULL
-		  AND (lower(name), ` + characterRealmSlugSQL + `) IN (SELECT * FROM unnest($2::text[], $3::text[]))`
+		  AND (lower(name), lower(secondary_name)) IN (SELECT * FROM unnest($2::text[], $3::text[]))`
 
 	names := make([]string, 0, len(identity.Characters))
-	realms := make([]string, 0, len(identity.Characters))
+	surnames := make([]string, 0, len(identity.Characters))
 	for _, c := range identity.Characters {
 		names = append(names, strings.ToLower(c.Name))
-		realms = append(realms, strings.ToLower(c.RealmSlug))
+		surnames = append(surnames, strings.ToLower(c.Surname))
 	}
 
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -168,10 +164,10 @@ func (r *Repo) LinkBattleNet(ctx context.Context, userID uuid.UUID, identity Ide
 		return fmt.Errorf("link battle.net: %w", err)
 	}
 	if identity.CharactersKnown {
-		if _, err := tx.ExecContext(ctx, release, userID, names, realms); err != nil {
+		if _, err := tx.ExecContext(ctx, release, userID, names, surnames); err != nil {
 			return fmt.Errorf("release characters no longer on the account: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx, claim, userID, names, realms); err != nil {
+		if _, err := tx.ExecContext(ctx, claim, userID, names, surnames); err != nil {
 			return fmt.Errorf("claim characters: %w", err)
 		}
 	}
