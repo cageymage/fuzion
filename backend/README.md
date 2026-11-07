@@ -106,6 +106,17 @@ Monk, Demon Hunter, Evoker exist on retail only) are skipped and counted in
 the `sync_log` message, and an empty or failed Blizzard response changes
 nothing.
 
+`sync blizzard-professions` reads each roster character's professions from Blizzard
+(`/profile/wow/character/{name}-{surname}/professions`, with the app token, so no
+Battle.net link is needed) and is off until `SYNC_BLIZZARD_PROFESSIONS_ENABLED=true`.
+It uses the same `BLIZZARD_*` settings as the roster sync and skips characters who left
+the guild or still have the `Unset` secondary name. Blizzard wins per profession: each
+profession it reports is written with its skill level and `source = 'blizzard'`,
+replacing an officer's number, while professions it does not report keep the officer's
+row (`source = 'officer'`). A character Blizzard answers 404 for is skipped and counted
+in the `sync_log` message; any other Blizzard error fails the run. The sync never
+removes a profession, so a profession a character drops stays until an officer removes it.
+
 Raid-Helper events reach the `raids` table through its webhook (Premium only).
 Point `/webhooks set` for `event.create`, `event.update` and `event.delete` at
 `https://<site>/api/webhooks/raid-helper` (one URL serves all three: the type is
