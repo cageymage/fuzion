@@ -30,11 +30,12 @@ var classNames = map[int]string{
 	7: "Shaman", 8: "Mage", 9: "Warlock", 11: "Druid",
 }
 
-// Classic race ids. Forever's Skyborne races are not here because their ids are not
-// known yet; a member with an unmapped race keeps RaceID and an empty Race.
+// Classic race ids plus the Skyborne ids seen in a real Forever roster. High Order's id is
+// not known yet; a member with an unmapped race keeps RaceID and an empty Race.
 var raceNames = map[int]string{
 	1: "Human", 2: "Orc", 3: "Dwarf", 4: "Night Elf",
 	5: "Undead", 6: "Tauren", 7: "Gnome", 8: "Troll",
+	96: "Skyborne (Windshaper)",
 }
 
 type Config struct {
@@ -187,6 +188,44 @@ func (c *Client) do(req *http.Request, out any) error {
 
 // ErrNotFound is wrapped by every call Blizzard answers with 404.
 var ErrNotFound = errors.New("not found")
+
+// CharacterGender returns "male" or "female" from the character's profile summary.
+// characterSlug is name-surname, lowercase. A character Blizzard has no profile for
+// yields an error wrapping ErrNotFound.
+func (c *Client) CharacterGender(ctx context.Context, characterSlug string) (string, error) {
+	token, err := c.appToken(ctx)
+	if err != nil {
+		return "", fmt.Errorf("fetch blizzard app token: %w", err)
+	}
+
+	q := url.Values{}
+	q.Set("namespace", c.cfg.Namespace)
+	q.Set("locale", c.cfg.Locale)
+	endpoint := fmt.Sprintf("%s/profile/wow/character/%s?%s",
+		c.cfg.BaseURL, url.PathEscape(characterSlug), q.Encode())
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	var body struct {
+		Gender struct {
+			Type string `json:"type"`
+		} `json:"gender"`
+	}
+	if err := c.do(req, &body); err != nil {
+		return "", fmt.Errorf("fetch profile of %s: %w", characterSlug, err)
+	}
+
+	switch gender := strings.ToLower(body.Gender.Type); gender {
+	case "male", "female":
+		return gender, nil
+	default:
+		return "", fmt.Errorf("profile of %s has unknown gender %q", characterSlug, body.Gender.Type)
+	}
+}
 
 // Recipe is one thing a character can craft. The id is Blizzard's own; it is not the
 // spell id Wowhead uses.

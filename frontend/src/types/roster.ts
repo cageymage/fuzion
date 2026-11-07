@@ -46,6 +46,7 @@ export interface Character {
   race: string | null
   level: number | null
   faction: string | null
+  gender: 'male' | 'female' | null
   createdAt: string
   professions: CharacterProfession[]
 }

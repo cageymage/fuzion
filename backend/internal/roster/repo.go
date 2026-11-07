@@ -26,7 +26,8 @@ type Character struct {
 	RaidTeam      *string               `db:"raid_team"      json:"raidTeam"`
 	Race          *string               `db:"race"           json:"race"`
 	Level         *int                  `db:"level"          json:"level"`
-	Faction       *string               `db:"-"              json:"faction"`
+	Gender        *string               `db:"gender"         json:"gender"`
+	Faction      *string               `db:"-"              json:"faction"`
 	CreatedAt     time.Time             `db:"created_at"     json:"createdAt"`
 	Professions   []CharacterProfession `db:"-" json:"professions"`
 }
@@ -55,7 +56,7 @@ func (r *Repo) ListOwnedBy(ctx context.Context, userID uuid.UUID) ([]Character, 
 
 func (r *Repo) list(ctx context.Context, owner *uuid.UUID) ([]Character, error) {
 	const query = `
-		SELECT id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, created_at
+		SELECT id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, gender, created_at
 		FROM characters
 		WHERE left_guild_at IS NULL AND ($1::uuid IS NULL OR user_id = $1)
 		ORDER BY is_main DESC, name ASC, secondary_name ASC`
@@ -105,7 +106,7 @@ func (r *Repo) professionsByCharacter(ctx context.Context, only *uuid.UUID) (map
 	return byCharacter, nil
 }
 
-const returningColumns = `id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, created_at`
+const returningColumns = `id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, gender, created_at`
 
 const uniqueViolationCode = "23505"
 

@@ -22,6 +22,7 @@ const ragnok: Character = {
   race: null,
   level: null,
   faction: null,
+  gender: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   professions: [],
 }
@@ -287,6 +288,22 @@ describe('Roster race and level', () => {
       'https://render.worldofwarcraft.com/us/icons/36/achievement_character_orc_male.jpg',
     )
     expect(within(row).queryByText('Orc')).not.toBeInTheDocument()
+  })
+
+  it('should show the female race icon when the character is female', async () => {
+    server.use(
+      http.get('/api/roster', () =>
+        HttpResponse.json([{ ...ragnok, race: 'Orc', level: 60, faction: 'Horde', gender: 'female' }]),
+      ),
+    )
+
+    renderWithProviders(<Roster />)
+
+    const row = (await screen.findByText('Ragnok')).closest('tr') as HTMLElement
+    expect(within(row).getByRole('img', { name: 'Orc' })).toHaveAttribute(
+      'src',
+      'https://render.worldofwarcraft.com/us/icons/36/achievement_character_orc_female.jpg',
+    )
   })
 
   it('should show a generic badge with the race name as its accessible name when the race has no icon', async () => {

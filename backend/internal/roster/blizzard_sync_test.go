@@ -30,6 +30,10 @@ type fakeBlizzardRoster struct {
 
 	members []fakeMember
 	status  int
+	// genders is keyed by the lowercase name-surname slug; a character missing from it is male.
+	genders map[string]string
+	// noProfile lists slugs Blizzard answers 404 for.
+	noProfile map[string]bool
 }
 
 func newFakeBlizzardRoster(t *testing.T, members ...fakeMember) *fakeBlizzardRoster {
@@ -59,6 +63,18 @@ func newFakeBlizzardRoster(t *testing.T, members ...fakeMember) *fakeBlizzardRos
 			})
 		}
 		json.NewEncoder(w).Encode(map[string]any{"members": list})
+	})
+	mux.HandleFunc("GET /profile/wow/character/{slug}", func(w http.ResponseWriter, r *http.Request) {
+		slug := r.PathValue("slug")
+		if f.noProfile[slug] {
+			http.Error(w, "no such character", http.StatusNotFound)
+			return
+		}
+		gender := "MALE"
+		if g, ok := f.genders[slug]; ok {
+			gender = g
+		}
+		json.NewEncoder(w).Encode(map[string]any{"gender": map[string]any{"type": gender}})
 	})
 	f.Server = httptest.NewServer(mux)
 	t.Cleanup(f.Close)
@@ -678,5 +694,91 @@ func TestSyncBlizzardRoster_MarksOnlyTheMissingSurnameAsLeft_WhenAnotherCharacte
 	}
 	if diff := cmp.Diff([]string{"Kirk Smash"}, left); diff != "" {
 		t.Errorf("unexpected characters marked as left (-want +got):\n%s", diff)
+	}
+}
+
+func gendersByName(t *testing.T, db *sqlx.DB) map[string]*string {
+	t.Helper()
+	var rows []struct {
+		Name   string  `db:"name"`
+		Gender *string `db:"gender"`
+	}
+	if err := db.Select(&rows, `SELECT name, gender FROM characters`); err != nil {
+		t.Fatalf("select genders: %v", err)
+	}
+	genders := map[string]*string{}
+	for _, row := range rows {
+		genders[row.Name] = row.Gender
+	}
+	return genders
+}
+
+func TestSyncBlizzardRoster_StoresGenderFromProfile_WhenCharacterHasNone(t *testing.T) {
+	// given a Blizzard guild with a male and a female character
+	db := testutil.DB(t)
+	fake := newFakeBlizzardRoster(t,
+		fakeMember{name: "Tankard", surname: "Ironhide", class: warrior, race: 1, level: 60, rank: 0},
+		fakeMember{name: "Lightbringer", surname: "Brightwood", class: paladin, race: 3, level: 55, rank: 4},
+	)
+	fake.genders = map[string]string{"lightbringer-brightwood": "FEMALE"}
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect each character to carry the gender its profile reports
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := map[string]*string{"Tankard": strPtr("male"), "Lightbringer": strPtr("female")}
+	if diff := cmp.Diff(want, gendersByName(t, db)); diff != "" {
+		t.Errorf("unexpected genders (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncBlizzardRoster_KeepsStoredGender_WhenProfileSaysOtherwise(t *testing.T) {
+	// given a character that already has a stored gender
+	db := testutil.DB(t)
+	fake := newFakeBlizzardRoster(t, fakeMember{name: "Tankard", surname: "Ironhide", class: warrior, race: 1, level: 60, rank: 0})
+	if err := fake.runSync(db); err != nil {
+		t.Fatalf("first sync: %v", err)
+	}
+	fake.genders = map[string]string{"tankard-ironhide": "FEMALE"}
+
+	// when the roster sync runs again
+	err := fake.runSync(db)
+
+	// then I expect the stored gender to stay, since only characters without one are asked about
+	if err != nil {
+		t.Fatalf("second sync: %v", err)
+	}
+	want := map[string]*string{"Tankard": strPtr("male")}
+	if diff := cmp.Diff(want, gendersByName(t, db)); diff != "" {
+		t.Errorf("unexpected genders (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncBlizzardRoster_LeavesGenderEmptyAndLogsIt_WhenBlizzardHasNoProfile(t *testing.T) {
+	// given a guild member Blizzard has no profile for
+	db := testutil.DB(t)
+	fake := newFakeBlizzardRoster(t,
+		fakeMember{name: "Tankard", surname: "Ironhide", class: warrior, race: 1, level: 60, rank: 0},
+		fakeMember{name: "Ghost", surname: "Walker", class: mage, race: 1, level: 10, rank: 4},
+	)
+	fake.noProfile = map[string]bool{"ghost-walker": true}
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect the run to succeed, the ghost to have no gender and the log to count it
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := map[string]*string{"Tankard": strPtr("male"), "Ghost": nil}
+	if diff := cmp.Diff(want, gendersByName(t, db)); diff != "" {
+		t.Errorf("unexpected genders (-want +got):\n%s", diff)
+	}
+	wantLog := []syncLogEntry{{Source: "blizzard-roster", Status: "ok", Message: "2 members: 2 added, 0 updated, 0 left, 0 skipped, 1 without a Blizzard profile"}}
+	if diff := cmp.Diff(wantLog, syncLogEntries(t, db)); diff != "" {
+		t.Errorf("unexpected sync log (-want +got):\n%s", diff)
 	}
 }

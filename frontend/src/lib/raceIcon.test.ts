@@ -8,16 +8,31 @@ describe('raceIcon', () => {
     )
   })
 
+  it('should return the female icon when the gender is female', () => {
+    expect(raceIcon('Night Elf', 'female')).toBe(
+      'https://render.worldofwarcraft.com/us/icons/36/achievement_character_nightelf_female.jpg',
+    )
+  })
+
+  it('should return the male icon when the gender is unknown', () => {
+    expect(raceIcon('Troll', null)).toBe(
+      'https://render.worldofwarcraft.com/us/icons/36/achievement_character_troll_male.jpg',
+    )
+  })
+
   it('should return null when the race is not set', () => {
     expect(raceIcon(null)).toBeNull()
   })
 
-  it.each(['Skyborne (High Order)', 'Skyborne (Windshaper)'])(
-    'should return null when the race is %s, which has no Blizzard icon',
-    (race) => {
-      expect(raceIcon(race)).toBeNull()
-    },
-  )
+  it('should return the blood elf icon when the race is Skyborne (Windshaper)', () => {
+    expect(raceIcon('Skyborne (Windshaper)')).toBe(
+      'https://render.worldofwarcraft.com/us/icons/36/achievement_character_bloodelf_male.jpg',
+    )
+  })
+
+  it('should return null when the race is Skyborne (High Order), which has no icon yet', () => {
+    expect(raceIcon('Skyborne (High Order)')).toBeNull()
+  })
 
   it('should return null when the race is not playable', () => {
     expect(raceIcon('Murloc')).toBeNull()

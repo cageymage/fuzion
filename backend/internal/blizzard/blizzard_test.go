@@ -3,6 +3,7 @@ package blizzard_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -89,7 +90,7 @@ func TestGuildRoster_ParsesMembers_WhenBlizzardResponds(t *testing.T) {
 	want := []blizzard.RosterMember{
 		{Name: "Mosshorn", Surname: "Rebelfist", Level: 7, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 6, Race: "Tauren"},
 		{Name: "Terrorskull", Surname: "Gloomstep", Level: 14, Rank: 1, ClassID: 4, Class: "Rogue", RaceID: 5, Race: "Undead"},
-		{Name: "Kirk", Surname: "Bear", Level: 1, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 96, Race: ""},
+		{Name: "Kirk", Surname: "Bear", Level: 1, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 96, Race: "Skyborne (Windshaper)"},
 		{Name: "Kirk", Surname: "Fel", Level: 11, Rank: 3, ClassID: 9, Class: "Warlock", RaceID: 2, Race: "Orc"},
 		{Name: "Testdk", Surname: "Grave", Level: 90, Rank: 5, ClassID: 6, Class: "", RaceID: 1, Race: "Human"},
 	}
@@ -198,5 +199,67 @@ func TestGuildRoster_ReturnsError_WhenTokenRequestFails(t *testing.T) {
 	// then I expect the token failure to be reported
 	if err == nil || !strings.Contains(err.Error(), "app token") {
 		t.Errorf("err = %v, want an app token error", err)
+	}
+}
+
+func TestCharacterGender_ReturnsLowercaseGender_WhenProfileReportsFemale(t *testing.T) {
+	// given a Blizzard whose profile summary says the character is female
+	mux := http.NewServeMux()
+	var gotPath, gotQuery, gotAuth string
+	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"access_token": "app-token"})
+	})
+	mux.HandleFunc("GET /profile/wow/character/{slug}", func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotQuery, gotAuth = r.URL.EscapedPath(), r.URL.RawQuery, r.Header.Get("Authorization")
+		json.NewEncoder(w).Encode(map[string]any{"gender": map[string]any{"type": "FEMALE", "name": "Female"}})
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	client := blizzard.NewClient(blizzard.Config{
+		ClientID: "id", ClientSecret: "secret", BaseURL: server.URL, AuthURL: server.URL, Namespace: "profile-forever-us",
+	}, nil)
+
+	// when I ask for the gender of a character
+	gender, err := client.CharacterGender(context.Background(), "kirk-bear")
+
+	// then I expect "female" from the profile summary, fetched with the app token
+	if err != nil {
+		t.Fatalf("CharacterGender: %v", err)
+	}
+	if gender != "female" {
+		t.Errorf("gender = %q, want %q", gender, "female")
+	}
+	if gotPath != "/profile/wow/character/kirk-bear" {
+		t.Errorf("path = %q, want /profile/wow/character/kirk-bear", gotPath)
+	}
+	if gotQuery != "locale=en_US&namespace=profile-forever-us" {
+		t.Errorf("query = %q", gotQuery)
+	}
+	if gotAuth != "Bearer app-token" {
+		t.Errorf("authorization = %q, want Bearer app-token", gotAuth)
+	}
+}
+
+func TestCharacterGender_ReturnsNotFound_WhenBlizzardHasNoProfile(t *testing.T) {
+	// given a Blizzard that answers 404 for the character
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"access_token": "app-token"})
+	})
+	mux.HandleFunc("GET /profile/wow/character/{slug}", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "nope", http.StatusNotFound)
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	client := blizzard.NewClient(blizzard.Config{
+		ClientID: "id", ClientSecret: "secret", BaseURL: server.URL, AuthURL: server.URL, Namespace: "profile-forever-us",
+	}, nil)
+
+	// when I ask for the gender of that character
+	_, err := client.CharacterGender(context.Background(), "ghost-walker")
+
+	// then I expect an error wrapping ErrNotFound
+	if !errors.Is(err, blizzard.ErrNotFound) {
+		t.Errorf("err = %v, want one wrapping ErrNotFound", err)
 	}
 }
