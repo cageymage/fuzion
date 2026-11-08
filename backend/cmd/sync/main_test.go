@@ -101,6 +101,24 @@ func TestLoadConfig_Succeeds_WhenBlizzardAltRanksHasANonNumber(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_DefaultsBlizzardNamespaceToTheRegionsForeverProfile_WhenNamespaceIsNotSet(t *testing.T) {
+	// given the eu region with no namespace
+	t.Setenv("DATABASE_URL", unreachableDatabase)
+	t.Setenv("BLIZZARD_REGION", "eu")
+	t.Setenv("BLIZZARD_NAMESPACE", "")
+
+	// when the config shared by every sync job loads
+	cfg, err := loadConfig()
+
+	// then I expect Forever's eu profile namespace
+	if err != nil {
+		t.Fatalf("loadConfig = %v, want nil", err)
+	}
+	if cfg.blizzard.namespace != "profile-forever-eu" {
+		t.Errorf("namespace = %q, want %q", cfg.blizzard.namespace, "profile-forever-eu")
+	}
+}
+
 func TestRunBlizzardRoster_ReturnsError_WhenAltRanksHaveANonNumber(t *testing.T) {
 	// given the roster sync switched on and fully configured, but with an alt rank written as a name
 	cfg := config{databaseURL: unreachableDatabase, blizzard: blizzardConfig{

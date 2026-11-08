@@ -104,8 +104,7 @@ services:
       - key: BLIZZARD_CLIENT_SECRET
         sync: false
       # The game API that lists a linked member's characters; the same values as the
-      # roster sync's. BLIZZARD_NAMESPACE defaults to profile-<region>; Forever's is
-      # not known yet.
+      # roster sync's. BLIZZARD_NAMESPACE defaults to Forever's profile-forever-<region>.
       - key: BLIZZARD_REGION
         value: us
       - key: BLIZZARD_NAMESPACE
