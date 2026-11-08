@@ -36,7 +36,7 @@ Environment:
 | `BLIZZARD_CLIENT_ID`    | when enabled | from a develop.battle.net client |
 | `BLIZZARD_CLIENT_SECRET` | when enabled | same place; never commit it |
 | `BLIZZARD_REGION`       | `us` | API host region |
-| `BLIZZARD_NAMESPACE`    | `profile-<region>` | the game version's profile namespace, e.g. `profile-forever-us` |
+| `BLIZZARD_NAMESPACE`    | `profile-forever-<region>` | the game version's profile namespace; set it only to point at another game version, e.g. `profile-us` for retail |
 | `GUILD_NAME_SLUG`       | when enabled | the guild name as a slug (lowercase, spaces to hyphens), e.g. `my-guild` |
 | `BLIZZARD_ALT_RANKS`    | optional | comma-separated guild rank numbers that hold alts, e.g. `4,5` (0 is the guild master). When set, the roster sync marks members of those ranks as alts and every other rank as mains; unset, every new character is a main |
 | `SUBMISSIONS_ENABLED`   | `true` | emergency switch for art and screenshot submissions: `false` makes uploads return 503 and the submission page show a closed message, while officers keep reviewing, downloading and deleting. Unset means on. Needs a restart or redeploy to change |

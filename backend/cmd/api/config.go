@@ -131,7 +131,7 @@ func loadConfig() (config, error) {
 	}
 	namespace := os.Getenv("BLIZZARD_NAMESPACE")
 	if namespace == "" {
-		namespace = "profile-" + region
+		namespace = "profile-forever-" + region
 	}
 	battleNet := battleNetConfig{
 		clientID:     os.Getenv("BLIZZARD_CLIENT_ID"),
