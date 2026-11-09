@@ -1413,29 +1413,71 @@ func TestUpdateCharacter_ReturnsBadRequest_WhenRaceIsNotPlayable(t *testing.T) {
 }
 
 func TestListRoster_ReturnsTheGuildRankName_WhenTheSyncHasSeenTheCharacter(t *testing.T) {
-	// given an Officer Alt, a Member, a character in a rank the site does not know, and one entered by hand
+	// given a Member and an Officer Alt the sync has placed in known ranks
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
 	db.MustExec(`
 		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main, guild_rank, created_at)
 		VALUES
 			('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'healer', false, 3, '2026-09-01T12:00:00Z'),
-			('22222222-2222-2222-2222-222222222222', 'Brannock', 'Ironhide', 'Emberreach', 'Warrior', 'tank', true, 6, '2026-09-01T12:00:00Z'),
-			('33333333-3333-3333-3333-333333333333', 'Corwin', 'Ashfall', 'Emberreach', 'Mage', 'dps', true, 7, '2026-09-01T12:00:00Z'),
-			('44444444-4444-4444-4444-444444444444', 'Dunstan', 'Oakheart', 'Emberreach', 'Druid', 'healer', true, NULL, '2026-09-01T12:00:00Z')`)
+			('22222222-2222-2222-2222-222222222222', 'Brannock', 'Ironhide', 'Emberreach', 'Warrior', 'tank', true, 6, '2026-09-01T12:00:00Z')`)
 
 	// when I ask for the roster
 	resp := srv.Get(t, "/api/roster")
 
-	// then I expect each rank's in-game name, a numbered stand-in for the unknown rank, and no rank for the hand-entered character
+	// then I expect each character's in-game rank name
 	resp.RequireStatus(t, http.StatusOK)
 	var characters []characterJSON
 	resp.DecodeJSON(t, &characters)
 	want := []characterJSON{
 		{ID: "22222222-2222-2222-2222-222222222222", Name: "Brannock", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: strPtr("tank"), IsMain: true, Rank: strPtr("Member"), CreatedAt: "2026-09-01T12:00:00Z"},
-		{ID: "33333333-3333-3333-3333-333333333333", Name: "Corwin", SecondaryName: "Ashfall", Realm: "Emberreach", Class: "Mage", Role: strPtr("dps"), IsMain: true, Rank: strPtr("Rank 7"), CreatedAt: "2026-09-01T12:00:00Z"},
-		{ID: "44444444-4444-4444-4444-444444444444", Name: "Dunstan", SecondaryName: "Oakheart", Realm: "Emberreach", Class: "Druid", Role: strPtr("healer"), IsMain: true, CreatedAt: "2026-09-01T12:00:00Z"},
 		{ID: "11111111-1111-1111-1111-111111111111", Name: "Aeliana", SecondaryName: "Dawnsong", Realm: "Emberreach", Class: "Priest", Role: strPtr("healer"), IsMain: false, Rank: strPtr("Officer Alt"), CreatedAt: "2026-09-01T12:00:00Z"},
+	}
+	if diff := cmp.Diff(want, characters); diff != "" {
+		t.Errorf("unexpected roster (-want +got):\n%s", diff)
+	}
+}
+
+func TestListRoster_ReturnsANumberedRank_WhenTheGuildRankIsOneTheSiteHasNoNameFor(t *testing.T) {
+	// given a character in rank 7, which the site has no name for
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main, guild_rank, created_at)
+		VALUES ('33333333-3333-3333-3333-333333333333', 'Corwin', 'Ashfall', 'Emberreach', 'Mage', 'dps', true, 7, '2026-09-01T12:00:00Z')`)
+
+	// when I ask for the roster
+	resp := srv.Get(t, "/api/roster")
+
+	// then I expect the numbered stand-in "Rank 7"
+	resp.RequireStatus(t, http.StatusOK)
+	var characters []characterJSON
+	resp.DecodeJSON(t, &characters)
+	want := []characterJSON{
+		{ID: "33333333-3333-3333-3333-333333333333", Name: "Corwin", SecondaryName: "Ashfall", Realm: "Emberreach", Class: "Mage", Role: strPtr("dps"), IsMain: true, Rank: strPtr("Rank 7"), CreatedAt: "2026-09-01T12:00:00Z"},
+	}
+	if diff := cmp.Diff(want, characters); diff != "" {
+		t.Errorf("unexpected roster (-want +got):\n%s", diff)
+	}
+}
+
+func TestListRoster_ReturnsNoRank_WhenTheCharacterWasEnteredByHand(t *testing.T) {
+	// given a character entered by hand, so the sync has never seen it
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, role, is_main, guild_rank, created_at)
+		VALUES ('44444444-4444-4444-4444-444444444444', 'Dunstan', 'Oakheart', 'Emberreach', 'Druid', 'healer', true, NULL, '2026-09-01T12:00:00Z')`)
+
+	// when I ask for the roster
+	resp := srv.Get(t, "/api/roster")
+
+	// then I expect no rank on it
+	resp.RequireStatus(t, http.StatusOK)
+	var characters []characterJSON
+	resp.DecodeJSON(t, &characters)
+	want := []characterJSON{
+		{ID: "44444444-4444-4444-4444-444444444444", Name: "Dunstan", SecondaryName: "Oakheart", Realm: "Emberreach", Class: "Druid", Role: strPtr("healer"), IsMain: true, CreatedAt: "2026-09-01T12:00:00Z"},
 	}
 	if diff := cmp.Diff(want, characters); diff != "" {
 		t.Errorf("unexpected roster (-want +got):\n%s", diff)
