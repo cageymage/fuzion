@@ -102,7 +102,7 @@ func TestLoadConfig_ReadsDiscordGuildID_WhenItIsSet(t *testing.T) {
 	}
 }
 
-func TestLoadConfig_DefaultsBattleNetNamespaceToTheRegionsProfile_WhenNamespaceIsNotSet(t *testing.T) {
+func TestLoadConfig_DefaultsBattleNetNamespaceToTheRegionsForeverProfile_WhenNamespaceIsNotSet(t *testing.T) {
 	// given Battle.net linking in the eu region with no namespace
 	setRequiredConfig(t)
 	t.Setenv("BATTLENET_REDIRECT_URL", "http://localhost/battlenet/callback")
@@ -113,12 +113,12 @@ func TestLoadConfig_DefaultsBattleNetNamespaceToTheRegionsProfile_WhenNamespaceI
 	// when I load the config
 	cfg, err := loadConfig()
 
-	// then I expect the eu region with the eu profile namespace, as the roster sync defaults it
+	// then I expect the eu region with Forever's eu profile namespace, as the roster sync defaults it
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if cfg.battleNet.region != "eu" || cfg.battleNet.namespace != "profile-eu" {
-		t.Errorf("region, namespace = %q, %q, want %q, %q", cfg.battleNet.region, cfg.battleNet.namespace, "eu", "profile-eu")
+	if cfg.battleNet.region != "eu" || cfg.battleNet.namespace != "profile-forever-eu" {
+		t.Errorf("region, namespace = %q, %q, want %q, %q", cfg.battleNet.region, cfg.battleNet.namespace, "eu", "profile-forever-eu")
 	}
 }
 

@@ -98,7 +98,7 @@ func loadConfig() (config, error) {
 			clientID:           os.Getenv("BLIZZARD_CLIENT_ID"),
 			clientSecret:       os.Getenv("BLIZZARD_CLIENT_SECRET"),
 			region:             region,
-			namespace:          envOr("BLIZZARD_NAMESPACE", "profile-"+region),
+			namespace:          envOr("BLIZZARD_NAMESPACE", "profile-forever-"+region),
 			guildSlug:          os.Getenv("GUILD_NAME_SLUG"),
 			altRanks:           os.Getenv("BLIZZARD_ALT_RANKS"),
 		},

@@ -15,7 +15,7 @@ const (
 	BattleNetClientID     = "battlenet-client-id"
 	BattleNetClientSecret = "battlenet-client-secret"
 	BattleNetRedirectURL  = "http://localhost:5173/api/auth/battlenet/callback"
-	BattleNetNamespace    = "profile-us"
+	BattleNetNamespace    = "profile-forever-us"
 )
 
 type BattleNetUser struct {
