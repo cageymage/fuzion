@@ -157,7 +157,7 @@ describe('Dashboard', () => {
     ])
   })
 
-  it('should not offer to change main or alt when the characters are listed', async () => {
+  it("should not offer a main or alt toggle on the user's characters", async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json(linkedMember)))
 
     renderWithProviders(<Dashboard />, '/dashboard')
@@ -165,7 +165,15 @@ describe('Dashboard', () => {
     const section = await screen.findByRole('region', { name: 'Your characters' })
     await within(section).findByText('Thundermane Stormcaller')
     expect(within(section).queryByRole('button', { name: /your main|an alt/ })).not.toBeInTheDocument()
-    expect(within(section).getByText(/Main or alt follows your guild rank in game/)).toBeInTheDocument()
+  })
+
+  it('should explain that main or alt follows the in-game guild rank', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(linkedMember)))
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    const section = await screen.findByRole('region', { name: 'Your characters' })
+    expect(await within(section).findByText(/Main or alt follows your guild rank in game/)).toBeInTheDocument()
   })
 
   it("should color each character's name and class with its class color", async () => {
