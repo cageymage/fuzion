@@ -27,20 +27,6 @@ func insertOwnedCharacter(t *testing.T, db *sqlx.DB, id, name string, isMain boo
 		id, name, isMain, owner)
 }
 
-type mainRow struct {
-	Name   string `db:"name"`
-	IsMain bool   `db:"is_main"`
-}
-
-func mainRows(t *testing.T, db *sqlx.DB) []mainRow {
-	t.Helper()
-	var rows []mainRow
-	if err := db.Select(&rows, `SELECT name, is_main FROM characters ORDER BY name`); err != nil {
-		t.Fatalf("select characters: %v", err)
-	}
-	return rows
-}
-
 func TestListMyCharacters_ReturnsOnlyCharactersTheCallerOwns(t *testing.T) {
 	// given my main and alt, another member's character, an unowned one, and one of mine that left the guild
 	db := testutil.DB(t)
@@ -62,8 +48,8 @@ func TestListMyCharacters_ReturnsOnlyCharactersTheCallerOwns(t *testing.T) {
 	var got []characterJSON
 	resp.DecodeJSON(t, &got)
 	want := []characterJSON{
-		{ID: tankardID, Name: "Tankard", SecondaryName: "Unset", Realm: "Emberreach", Class: "Warrior", Role: "tank", IsMain: true, CreatedAt: "2026-10-01T12:00:00Z"},
-		{ID: healbotID, Name: "Healbot", SecondaryName: "Unset", Realm: "Emberreach", Class: "Warrior", Role: "tank", IsMain: false, CreatedAt: "2026-10-01T12:00:00Z"},
+		{ID: tankardID, Name: "Tankard", SecondaryName: "Unset", Realm: "Emberreach", Class: "Warrior", Role: strPtr("tank"), IsMain: true, CreatedAt: "2026-10-01T12:00:00Z"},
+		{ID: healbotID, Name: "Healbot", SecondaryName: "Unset", Realm: "Emberreach", Class: "Warrior", Role: strPtr("tank"), IsMain: false, CreatedAt: "2026-10-01T12:00:00Z"},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -99,20 +85,163 @@ func TestListMyCharacters_ReturnsUnauthorized_WhenNotLoggedIn(t *testing.T) {
 	resp.RequireStatus(t, http.StatusUnauthorized)
 }
 
-func TestUpdateMyCharacter_ReturnsNotFound_WhenAMemberTriesToChangeMainOrAlt(t *testing.T) {
-	// given my alt; main or alt now follows the guild rank in game
+func TestUpdateMyCharacter_SetsSpecAndRole_WhenOwner(t *testing.T) {
+	// given my warrior with no spec chosen
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	me := srv.LoginAs(t, "80351110224678912", "thundermane")
+	insertOwnedCharacter(t, db, tankardID, "Tankard", true, &me.ID)
+
+	// when I set a primary and a secondary spec and role
+	resp := srv.Patch(t, "/api/me/characters/"+tankardID, map[string]any{
+		"spec": "Protection", "role": "tank", "spec2": "Fury", "role2": "dps",
+	})
+
+	// then I expect the character back with both specs and roles
+	resp.RequireStatus(t, http.StatusOK)
+	var got characterJSON
+	resp.DecodeJSON(t, &got)
+	want := characterJSON{
+		ID: tankardID, Name: "Tankard", SecondaryName: "Unset", Realm: "Emberreach", Class: "Warrior",
+		Spec: strPtr("Protection"), Role: strPtr("tank"), Spec2: strPtr("Fury"), Role2: strPtr("dps"),
+		IsMain: true, CreatedAt: "2026-10-01T12:00:00Z",
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected character (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateMyCharacter_ClearsTheRole_WhenTheRoleIsAnEmptyString(t *testing.T) {
+	// given my warrior set to tank
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	me := srv.LoginAs(t, "80351110224678912", "thundermane")
+	insertOwnedCharacter(t, db, tankardID, "Tankard", true, &me.ID)
+
+	// when I set its role back to none
+	resp := srv.Patch(t, "/api/me/characters/"+tankardID, map[string]any{"role": ""})
+
+	// then I expect the character back with no role
+	resp.RequireStatus(t, http.StatusOK)
+	var got characterJSON
+	resp.DecodeJSON(t, &got)
+	want := characterJSON{
+		ID: tankardID, Name: "Tankard", SecondaryName: "Unset", Realm: "Emberreach", Class: "Warrior",
+		IsMain: true, CreatedAt: "2026-10-01T12:00:00Z",
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected character (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateMyCharacter_ReturnsForbidden_WhenNotOwner(t *testing.T) {
+	// given another member's tank
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	other := srv.LoginAs(t, "11111111111111111", "someoneelse")
+	srv.LoginAs(t, "80351110224678912", "thundermane")
+	insertOwnedCharacter(t, db, strangerID, "Stranger", true, &other.ID)
+
+	// when I try to set its role
+	resp := srv.Patch(t, "/api/me/characters/"+strangerID, map[string]any{"role": "healer"})
+
+	// then I expect a 403 and the role unchanged
+	resp.RequireStatus(t, http.StatusForbidden)
+	if diff := cmp.Diff(`{"error":"character is not yours"}`+"\n", string(resp.Body)); diff != "" {
+		t.Errorf("unexpected body (-want +got):\n%s", diff)
+	}
+	var role string
+	if err := db.Get(&role, `SELECT role FROM characters WHERE id = $1`, strangerID); err != nil {
+		t.Fatalf("select role: %v", err)
+	}
+	if role != "tank" {
+		t.Errorf("expected role tank, got %q", role)
+	}
+}
+
+func TestUpdateMyCharacter_ReturnsNotFound_WhenTheCharacterDoesNotExist(t *testing.T) {
+	// given a logged-in member and no such character
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "80351110224678912", "thundermane")
+
+	// when I try to set its role
+	resp := srv.Patch(t, "/api/me/characters/"+tankardID, map[string]any{"role": "healer"})
+
+	// then I expect a 404
+	resp.RequireStatus(t, http.StatusNotFound)
+	if diff := cmp.Diff(`{"error":"character not found"}`+"\n", string(resp.Body)); diff != "" {
+		t.Errorf("unexpected body (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateMyCharacter_ReturnsBadRequest_WhenSecondSpecWithoutSecondRole(t *testing.T) {
+	// given my warrior
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	me := srv.LoginAs(t, "80351110224678912", "thundermane")
+	insertOwnedCharacter(t, db, tankardID, "Tankard", true, &me.ID)
+
+	// when I set a second spec without a second role
+	resp := srv.Patch(t, "/api/me/characters/"+tankardID, map[string]any{"spec2": "Fury"})
+
+	// then I expect a 400 naming the missing field
+	resp.RequireStatus(t, http.StatusBadRequest)
+	if diff := cmp.Diff(`{"error":"role2: must be set together with spec2"}`+"\n", string(resp.Body)); diff != "" {
+		t.Errorf("unexpected body (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateMyCharacter_ReturnsBadRequest_WhenTheSpecIsNotOneOfTheClasses(t *testing.T) {
+	// given my warrior
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	me := srv.LoginAs(t, "80351110224678912", "thundermane")
+	insertOwnedCharacter(t, db, tankardID, "Tankard", true, &me.ID)
+
+	// when I set a priest spec
+	resp := srv.Patch(t, "/api/me/characters/"+tankardID, map[string]any{"spec": "Shadow"})
+
+	// then I expect a 400 listing the warrior specs
+	resp.RequireStatus(t, http.StatusBadRequest)
+	if diff := cmp.Diff(`{"error":"spec: must be one of Arms, Fury, Protection"}`+"\n", string(resp.Body)); diff != "" {
+		t.Errorf("unexpected body (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateMyCharacter_IgnoresOfficerFields_WhenTheBodyIncludesThem(t *testing.T) {
+	// given my alt; main or alt follows the guild rank, and raid teams belong to officers
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
 	me := srv.LoginAs(t, "80351110224678912", "thundermane")
 	insertOwnedCharacter(t, db, healbotID, "Healbot", false, &me.ID)
 
-	// when I try to make it my main
-	resp := srv.Patch(t, "/api/me/characters/"+healbotID, map[string]any{"isMain": true})
+	// when I send a role along with main, raid team and name changes
+	resp := srv.Patch(t, "/api/me/characters/"+healbotID, map[string]any{
+		"role": "healer", "isMain": true, "raidTeam": "Team 1", "name": "Renamed",
+	})
 
-	// then I expect a 404, since members can no longer change it, and the character still an alt
-	resp.RequireStatus(t, http.StatusNotFound)
-	want := []mainRow{{Name: "Healbot", IsMain: false}}
-	if diff := cmp.Diff(want, mainRows(t, db)); diff != "" {
-		t.Errorf("unexpected main/alt (-want +got):\n%s", diff)
+	// then I expect only the role changed
+	resp.RequireStatus(t, http.StatusOK)
+	var got characterJSON
+	resp.DecodeJSON(t, &got)
+	want := characterJSON{
+		ID: healbotID, Name: "Healbot", SecondaryName: "Unset", Realm: "Emberreach", Class: "Warrior",
+		Role: strPtr("healer"), IsMain: false, CreatedAt: "2026-10-01T12:00:00Z",
 	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected character (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateMyCharacter_ReturnsUnauthorized_WhenNotLoggedIn(t *testing.T) {
+	// given nobody is logged in
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+
+	// when I try to set a character's role
+	resp := srv.Patch(t, "/api/me/characters/"+tankardID, map[string]any{"role": "healer"})
+
+	// then I expect a 401
+	resp.RequireStatus(t, http.StatusUnauthorized)
 }

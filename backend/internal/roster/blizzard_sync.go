@@ -16,14 +16,9 @@ import (
 
 const blizzardSyncSource = "blizzard-roster"
 
-// Blizzard supplies a surname but not a role, and the table requires one, so new
-// characters get a placeholder role for an officer to correct; the sync never writes
-// it again. The secondary name placeholder marks characters imported before the sync
-// read surnames; the sync fills it in on first sight.
-const (
-	placeholderSecondaryName = "Unset"
-	placeholderRole          = "dps"
-)
+// The secondary name placeholder marks characters imported before the sync read
+// surnames; the sync fills it in on first sight.
+const placeholderSecondaryName = "Unset"
 
 type UpsertResult struct {
 	Inserted int
@@ -38,14 +33,19 @@ type UpsertResult struct {
 	// UnmappedRaces counts imported members whose race id the sync cannot name, so their
 	// race is left as it was.
 	UnmappedRaces map[int]int
+	// RankRequestsClosed counts open rank change requests the run found already carried
+	// out in game.
+	RankRequestsClosed int
 }
 
 // UpsertFromBlizzard makes the guild's members match Blizzard's list. Characters are
 // matched on name and surname, ignoring case. For existing characters only class, level,
 // race, guild rank and left_guild_at are written; role, spec, raid team and owner
-// belong to officers and members. Main/alt always follows the guild rank, so a rank
-// change in game moves the character. A character that was seen in an earlier sync and
-// is now absent is marked as having left; one the sync has never seen is left alone.
+// belong to officers and members, and new characters start with no role or spec for
+// their owner to choose. Main/alt always follows the guild rank, so a rank change in
+// game moves the character and closes an open rank change request it carries out. A
+// character that was seen in an earlier sync and is now absent is marked as having
+// left; one the sync has never seen is left alone.
 func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.RosterMember) (UpsertResult, error) {
 	const setFromBlizzard = `
 			class         = $3,
@@ -66,9 +66,16 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 		)`
 
 	const insert = `
-		INSERT INTO characters (id, name, secondary_name, class, role, is_main, level, guild_rank, race)
-		VALUES ($1, $2, $3, $4, $5, $9, $6, $7, $8)
+		INSERT INTO characters (id, name, secondary_name, class, is_main, level, guild_rank, race)
+		VALUES ($1, $2, $3, $4, $8, $5, $6, $7)
 		ON CONFLICT (name, secondary_name) DO NOTHING`
+
+	const closeCarriedOutRequests = `
+		UPDATE rank_change_requests r SET status = 'done', resolved_at = now()
+		FROM characters c
+		WHERE r.character_id = c.id AND r.status = 'open'
+		  AND c.guild_rank IS NOT NULL
+		  AND c.is_main = (r.direction = 'to_main')`
 
 	const markLeft = `
 		UPDATE characters SET left_guild_at = now()
@@ -122,7 +129,7 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 			continue
 		}
 
-		inserted, err := tx.ExecContext(ctx, insert, uuid.New(), m.Name, m.Surname, m.Class, placeholderRole, level, m.Rank, race, isMain)
+		inserted, err := tx.ExecContext(ctx, insert, uuid.New(), m.Name, m.Surname, m.Class, level, m.Rank, race, isMain)
 		if err != nil {
 			return UpsertResult{}, fmt.Errorf("insert character %s %s: %w", m.Name, m.Surname, err)
 		}
@@ -144,6 +151,16 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 		return UpsertResult{}, fmt.Errorf("count characters marked as left: %w", err)
 	}
 	result.Left = int(n)
+
+	closed, err := tx.ExecContext(ctx, closeCarriedOutRequests)
+	if err != nil {
+		return UpsertResult{}, fmt.Errorf("close carried out rank requests: %w", err)
+	}
+	n, err = closed.RowsAffected()
+	if err != nil {
+		return UpsertResult{}, fmt.Errorf("count closed rank requests: %w", err)
+	}
+	result.RankRequestsClosed = int(n)
 
 	if err := tx.Commit(); err != nil {
 		return UpsertResult{}, fmt.Errorf("commit blizzard upsert: %w", err)
@@ -244,9 +261,13 @@ func (j *SyncBlizzardRoster) sync(ctx context.Context) (string, error) {
 	if noProfile > 0 {
 		genderNote = fmt.Sprintf(", %d without a Blizzard profile", noProfile)
 	}
-	return fmt.Sprintf("%d members: %d added, %d updated, %d left, %d skipped%s%s%s",
+	requestsNote := ""
+	if result.RankRequestsClosed > 0 {
+		requestsNote = fmt.Sprintf(", %d rank requests closed", result.RankRequestsClosed)
+	}
+	return fmt.Sprintf("%d members: %d added, %d updated, %d left, %d skipped%s%s%s%s",
 		len(members), result.Inserted, result.Updated, result.Left, result.Skipped,
-		describeCounts("class", result.UnsupportedClasses), describeCounts("unmapped race", result.UnmappedRaces), genderNote), nil
+		describeCounts("class", result.UnsupportedClasses), describeCounts("unmapped race", result.UnmappedRaces), genderNote, requestsNote), nil
 }
 
 func raceOrNil(m blizzard.RosterMember) *string {

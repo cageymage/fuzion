@@ -217,7 +217,7 @@ func (h *Handler) battleNetCallback(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard?battlenet=characters-unavailable", http.StatusFound)
 		return
 	}
-	http.Redirect(w, r, "/dashboard", http.StatusFound)
+	http.Redirect(w, r, "/dashboard?battlenet=linked", http.StatusFound)
 }
 
 func (h *Handler) battleNetUnlink(w http.ResponseWriter, r *http.Request) {

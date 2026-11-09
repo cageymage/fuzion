@@ -25,6 +25,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/raidhelper"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
 	"github.com/cageymage/fuzion/backend/internal/raids"
+	"github.com/cageymage/fuzion/backend/internal/rankrequests"
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
@@ -129,6 +130,13 @@ func run() error {
 		slog.Info("news announcements disabled: DISCORD_ANNOUNCEMENTS_WEBHOOK_URL is not set")
 	}
 
+	var rankRequests rankrequests.Notifier
+	if cfg.rankRequestsWebhookURL != "" {
+		rankRequests = idiscord.NewWebhook(cfg.rankRequestsWebhookURL, &http.Client{Timeout: 5 * time.Second})
+	} else {
+		slog.Info("rank request notifications disabled: DISCORD_RANK_REQUESTS_WEBHOOK_URL is not set")
+	}
+
 	if cfg.raidHelperWebhookKey == "" {
 		slog.Info("raid-helper webhook disabled: RAID_HELPER_WEBHOOK_SECRET is not set")
 	}
@@ -142,6 +150,7 @@ func run() error {
 		RaidHelper:     raidhelper.NewHandler(raidhelper.NewService(raidhelper.NewRepo(db)), cfg.raidHelperWebhookKey),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.System{})),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
+		RankRequests:   rankrequests.NewHandler(rankrequests.NewService(rankrequests.NewRepo(db), clock.System{}, rankRequests, cfg.siteBaseURL)),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), streams.NewSuggestedVideos(youTube, playlistID, clock.System{})),
 		Submissions:    submissions.NewHandler(submissions.NewService(submissions.NewRepo(db), clock.System{}, cfg.submissions.enabled, cfg.submissions.storageLimitBytes), submissions.DefaultUploadSlots),

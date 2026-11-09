@@ -519,3 +519,23 @@ describe('Roster management main and alt', () => {
     expect(dialog.getByRole('checkbox', { name: 'Main character' })).toBeChecked()
   })
 })
+
+describe('Roster management unset role', () => {
+  it('should show the role as not set when editing a character whose owner has not picked one', async () => {
+    signInAs(officer)
+    serveRoster([{ ...ragnok, spec: null, role: null }])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    const role = dialog.getByRole('combobox', { name: 'Role' })
+    expect(role).toHaveValue('')
+    expect(within(role).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Not set',
+      'Tank',
+      'Healer',
+      'DPS',
+    ])
+  })
+})

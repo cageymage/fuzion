@@ -83,10 +83,10 @@ func TestBattlenetLink_AttachesIDToCurrentUser(t *testing.T) {
 	// when Battle.net sends the browser back with the code and matching state
 	resp := srv.Get(t, "/api/auth/battlenet/callback?code=bnet-code&state="+state)
 
-	// then I expect a redirect to the dashboard and the Battle.net identity stored on my row
+	// then I expect a redirect to the dashboard saying it linked, and the Battle.net identity stored on my row
 	resp.RequireStatus(t, 302)
-	if got := resp.Header.Get("Location"); got != "/dashboard" {
-		t.Errorf("expected redirect to /dashboard, got %q", got)
+	if got := resp.Header.Get("Location"); got != "/dashboard?battlenet=linked" {
+		t.Errorf("expected redirect to /dashboard?battlenet=linked, got %q", got)
 	}
 	var row battleNetRow
 	if err := db.Get(&row, `SELECT battlenet_id, battlenet_tag FROM users WHERE discord_id = '80351110224678912'`); err != nil {

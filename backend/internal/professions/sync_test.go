@@ -71,14 +71,13 @@ type syncedProfession struct {
 	Name       string `db:"name"`
 	Profession string `db:"profession"`
 	SkillLevel int    `db:"skill_level"`
-	Source     string `db:"source"`
 }
 
 func syncedProfessions(t *testing.T, db *sqlx.DB) []syncedProfession {
 	t.Helper()
 	var rows []syncedProfession
 	err := db.Select(&rows, `
-		SELECT c.name, p.profession, p.skill_level, p.source
+		SELECT c.name, p.profession, p.skill_level
 		FROM professions p JOIN characters c ON c.id = p.character_id
 		ORDER BY c.name, p.profession`)
 	if err != nil {
@@ -125,9 +124,9 @@ func TestSyncBlizzardProfessions_UpsertsRows_ForCharactersWithProfessions(t *tes
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedProfession{
-		{Name: "Swamplörd", Profession: "Mining", SkillLevel: 30, Source: "blizzard"},
-		{Name: "Terrorskull", Profession: "Leatherworking", SkillLevel: 55, Source: "blizzard"},
-		{Name: "Terrorskull", Profession: "Skinning", SkillLevel: 98, Source: "blizzard"},
+		{Name: "Swamplörd", Profession: "Mining", SkillLevel: 30},
+		{Name: "Terrorskull", Profession: "Leatherworking", SkillLevel: 55},
+		{Name: "Terrorskull", Profession: "Skinning", SkillLevel: 98},
 	}
 	if diff := cmp.Diff(want, syncedProfessions(t, db)); diff != "" {
 		t.Errorf("unexpected professions (-want +got):\n%s", diff)
@@ -154,7 +153,7 @@ func TestSyncBlizzardProfessions_OverwritesOfficerSkillLevel_WhenBlizzardReports
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
-	want := []syncedProfession{{Name: "Terrorskull", Profession: "Skinning", SkillLevel: 98, Source: "blizzard"}}
+	want := []syncedProfession{{Name: "Terrorskull", Profession: "Skinning", SkillLevel: 98}}
 	if diff := cmp.Diff(want, syncedProfessions(t, db)); diff != "" {
 		t.Errorf("unexpected professions (-want +got):\n%s", diff)
 	}
@@ -177,8 +176,8 @@ func TestSyncBlizzardProfessions_KeepsOfficerRow_WhenBlizzardDoesNotReportThePro
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedProfession{
-		{Name: "Terrorskull", Profession: "Mining", SkillLevel: 40, Source: "officer"},
-		{Name: "Terrorskull", Profession: "Skinning", SkillLevel: 98, Source: "blizzard"},
+		{Name: "Terrorskull", Profession: "Mining", SkillLevel: 40},
+		{Name: "Terrorskull", Profession: "Skinning", SkillLevel: 98},
 	}
 	if diff := cmp.Diff(want, syncedProfessions(t, db)); diff != "" {
 		t.Errorf("unexpected professions (-want +got):\n%s", diff)
@@ -198,7 +197,7 @@ func TestSyncBlizzardProfessions_SkipsCharacter_WhenBlizzardReturnsNotFound(t *t
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
-	want := []syncedProfession{{Name: "Swamplörd", Profession: "Mining", SkillLevel: 30, Source: "blizzard"}}
+	want := []syncedProfession{{Name: "Swamplörd", Profession: "Mining", SkillLevel: 30}}
 	if diff := cmp.Diff(want, syncedProfessions(t, db)); diff != "" {
 		t.Errorf("unexpected professions (-want +got):\n%s", diff)
 	}

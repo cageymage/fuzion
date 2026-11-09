@@ -94,9 +94,9 @@ func (r *Repo) syncableCharacters(ctx context.Context) ([]syncableCharacter, err
 // does not report are left as an officer set them.
 func (r *Repo) upsertFromBlizzard(ctx context.Context, characterID uuid.UUID, known []blizzard.CharacterProfession) error {
 	const upsert = `
-		INSERT INTO professions (id, character_id, profession, skill_level, source)
-		VALUES ($1, $2, $3, $4, 'blizzard')
-		ON CONFLICT (character_id, profession) DO UPDATE SET skill_level = EXCLUDED.skill_level, source = 'blizzard'`
+		INSERT INTO professions (id, character_id, profession, skill_level)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (character_id, profession) DO UPDATE SET skill_level = EXCLUDED.skill_level`
 
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {

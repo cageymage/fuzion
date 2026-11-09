@@ -93,7 +93,7 @@ type syncedCharacter struct {
 	SecondaryName string  `db:"secondary_name"`
 	Realm         string  `db:"realm"`
 	Class         string  `db:"class"`
-	Role          string  `db:"role"`
+	Role          *string `db:"role"`
 	Spec          *string `db:"spec"`
 	IsMain        bool    `db:"is_main"`
 	RaidTeam      *string `db:"raid_team"`
@@ -169,8 +169,8 @@ func TestSyncBlizzardRoster_InsertsNewCharacters_WhenBlizzardListsMembersTheTabl
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Lightbringer", SecondaryName: "Brightwood", Realm: "Emberreach", Class: "Paladin", Role: "dps", IsMain: true, Race: strPtr("Dwarf"), Level: intPtr(55), GuildRank: intPtr(4)},
-		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(0)},
+		{Name: "Lightbringer", SecondaryName: "Brightwood", Realm: "Emberreach", Class: "Paladin", IsMain: true, Race: strPtr("Dwarf"), Level: intPtr(55), GuildRank: intPtr(4)},
+		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(0)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -195,7 +195,7 @@ func TestSyncBlizzardRoster_PreservesOfficerOwnedFields_WhenUpdatingExistingChar
 	protection := "Protection"
 	team1 := "Team 1"
 	want := []syncedCharacter{
-		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "tank", Spec: &protection, IsMain: true, RaidTeam: &team1, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(2)},
+		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: strPtr("tank"), Spec: &protection, IsMain: true, RaidTeam: &team1, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(2)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -300,7 +300,7 @@ func TestSyncBlizzardRoster_SkipsMembersAndRecordsIt_WhenClassIsNotSupported(t *
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Overleveled", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), GuildRank: intPtr(memberRank)},
+		{Name: "Overleveled", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", IsMain: true, Race: strPtr("Human"), GuildRank: intPtr(memberRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -470,13 +470,13 @@ func TestSyncBlizzardRoster_ImportsAltAndOfficerAltRanksAsAlts_WhenBlizzardLists
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Greeter", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(recruiterRank)},
-		{Name: "Guildlord", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Warrior", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(guildMasterRank)},
-		{Name: "Oldguard", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Paladin", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(veteranRank)},
-		{Name: "Raider", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
-		{Name: "Shotcaller", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(officerRank)},
-		{Name: "Spareboots", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Druid", Role: "dps", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(officerAltRank)},
-		{Name: "Twinkalt", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Druid", Role: "dps", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(altRank)},
+		{Name: "Greeter", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(recruiterRank)},
+		{Name: "Guildlord", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Warrior", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(guildMasterRank)},
+		{Name: "Oldguard", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Paladin", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(veteranRank)},
+		{Name: "Raider", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
+		{Name: "Shotcaller", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(officerRank)},
+		{Name: "Spareboots", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Druid", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(officerAltRank)},
+		{Name: "Twinkalt", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Druid", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(altRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -496,7 +496,7 @@ func TestSyncBlizzardRoster_ImportsCharacterAsAMain_WhenItsRankIsNotInTheRankLis
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Newcomer", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(10), GuildRank: intPtr(7)},
+		{Name: "Newcomer", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", IsMain: true, Race: strPtr("Human"), Level: intPtr(10), GuildRank: intPtr(7)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -518,7 +518,7 @@ func TestSyncBlizzardRoster_MakesCharacterAMain_WhenItMovesOutOfAnAltRank(t *tes
 		t.Fatalf("second sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Raider", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
+		{Name: "Raider", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -540,7 +540,7 @@ func TestSyncBlizzardRoster_MakesCharacterAnAlt_WhenItMovesIntoTheOfficerAltRank
 		t.Fatalf("second sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Shotcaller", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(officerAltRank)},
+		{Name: "Shotcaller", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(officerAltRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -565,7 +565,7 @@ func TestSyncBlizzardRoster_MakesOfficerEnteredMainAnAlt_WhenBlizzardListsItInTh
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "tank", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(altRank)},
+		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: strPtr("tank"), IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(altRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -588,8 +588,8 @@ func TestSyncBlizzardRoster_TreatsSameNameWithDifferentSurnamesAsSeparateCharact
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Kirk", SecondaryName: "Fel", Realm: "Emberreach", Class: "Warrior", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(11), GuildRank: intPtr(memberRank)},
-		{Name: "Kirk", SecondaryName: "Smash", Realm: "Emberreach", Class: "Warrior", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(1), GuildRank: intPtr(memberRank)},
+		{Name: "Kirk", SecondaryName: "Fel", Realm: "Emberreach", Class: "Warrior", IsMain: true, Race: strPtr("Human"), Level: intPtr(11), GuildRank: intPtr(memberRank)},
+		{Name: "Kirk", SecondaryName: "Smash", Realm: "Emberreach", Class: "Warrior", IsMain: true, Race: strPtr("Human"), Level: intPtr(1), GuildRank: intPtr(memberRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -613,7 +613,7 @@ func TestSyncBlizzardRoster_FillsInSurname_WhenCharacterHasThePlaceholderSeconda
 	}
 	team1 := "Team 1"
 	want := []syncedCharacter{
-		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "tank", IsMain: true, RaidTeam: &team1, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
+		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: strPtr("tank"), IsMain: true, RaidTeam: &team1, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -731,5 +731,106 @@ func TestSyncBlizzardRoster_LeavesGenderEmptyAndLogsIt_WhenBlizzardHasNoProfile(
 	wantLog := []syncLogEntry{{Source: "blizzard-roster", Status: "ok", Message: "2 members: 2 added, 0 updated, 0 left, 0 skipped, 1 without a Blizzard profile"}}
 	if diff := cmp.Diff(wantLog, syncLogEntries(t, db)); diff != "" {
 		t.Errorf("unexpected sync log (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncRoster_KeepsSpecAndRole_WhenSetByMember(t *testing.T) {
+	// given a synced character whose owner picked both specs and roles on the site
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, level, guild_rank)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Tankard', 'Ironhide', 'Emberreach', 'Warrior', 'Protection', 'tank', 'Fury', 'dps', true, 60, $1)`, memberRank)
+	fake := newFakeBlizzardRoster(t, fakeMember{name: "Tankard", surname: "Ironhide", class: warrior, race: 1, level: 60, rank: memberRank})
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect both specs and roles exactly as the member left them
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	type specs struct {
+		Spec  *string `db:"spec"`
+		Role  *string `db:"role"`
+		Spec2 *string `db:"spec2"`
+		Role2 *string `db:"role2"`
+	}
+	var got []specs
+	if err := db.Select(&got, `SELECT spec, role, spec2, role2 FROM characters`); err != nil {
+		t.Fatalf("select specs: %v", err)
+	}
+	want := []specs{{Spec: strPtr("Protection"), Role: strPtr("tank"), Spec2: strPtr("Fury"), Role2: strPtr("dps")}}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected specs (-want +got):\n%s", diff)
+	}
+}
+
+type rankRequestRow struct {
+	Direction  string  `db:"direction"`
+	Status     string  `db:"status"`
+	ResolvedBy *string `db:"resolved_by"`
+	Resolved   bool    `db:"resolved"`
+}
+
+func rankRequestRows(t *testing.T, db *sqlx.DB) []rankRequestRow {
+	t.Helper()
+	var rows []rankRequestRow
+	if err := db.Select(&rows, `
+		SELECT direction, status, resolved_by::text, resolved_at IS NOT NULL AS resolved
+		FROM rank_change_requests ORDER BY created_at`); err != nil {
+		t.Fatalf("select rank_change_requests: %v", err)
+	}
+	return rows
+}
+
+func insertRankRequest(t *testing.T, db *sqlx.DB, characterID, direction string) {
+	t.Helper()
+	db.MustExec(`INSERT INTO users (id, discord_id, username) VALUES ('99999999-9999-9999-9999-999999999999', 'requester', 'requester') ON CONFLICT DO NOTHING`)
+	db.MustExec(`
+		INSERT INTO rank_change_requests (id, character_id, requested_by, direction, created_at)
+		VALUES (gen_random_uuid(), $1, '99999999-9999-9999-9999-999999999999', $2, now())`, characterID, direction)
+}
+
+func TestSyncRoster_ClosesOpenRankRequest_WhenTheCharacterMovedIntoTheRequestedRank(t *testing.T) {
+	// given a main whose owner asked to be moved to an alt rank, and an officer who moved it in game
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, class, is_main, guild_rank)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Tankard', 'Ironhide', 'Warrior', true, $1)`, memberRank)
+	insertRankRequest(t, db, "11111111-1111-1111-1111-111111111111", "to_alt")
+	fake := newFakeBlizzardRoster(t, fakeMember{name: "Tankard", surname: "Ironhide", class: warrior, race: 1, level: 60, rank: altRank})
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect the request done, with no officer named
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := []rankRequestRow{{Direction: "to_alt", Status: "done", Resolved: true}}
+	if diff := cmp.Diff(want, rankRequestRows(t, db)); diff != "" {
+		t.Errorf("unexpected rank requests (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncRoster_LeavesRankRequestOpen_WhenTheCharacterIsStillInItsOldRank(t *testing.T) {
+	// given an alt whose owner asked for a main rank that has not been given yet
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, class, is_main, guild_rank)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Tankard', 'Ironhide', 'Warrior', false, $1)`, altRank)
+	insertRankRequest(t, db, "11111111-1111-1111-1111-111111111111", "to_main")
+	fake := newFakeBlizzardRoster(t, fakeMember{name: "Tankard", surname: "Ironhide", class: warrior, race: 1, level: 60, rank: altRank})
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect the request still open
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := []rankRequestRow{{Direction: "to_main", Status: "open"}}
+	if diff := cmp.Diff(want, rankRequestRows(t, db)); diff != "" {
+		t.Errorf("unexpected rank requests (-want +got):\n%s", diff)
 	}
 }

@@ -4,7 +4,8 @@ import type { EditablePost, NewsPage, NewsPost } from '../types/news'
 import type { RaidProgress, RaidTier } from '../types/raidProgress'
 import type { Raid } from '../types/raids'
 import type { ProfessionEntry, Recipe } from '../types/professions'
-import type { Character, MyCharacter } from '../types/roster'
+import type { RankRequest } from '../types/rankRequests'
+import type { Character, UpdateMyCharacterRequest } from '../types/roster'
 import type { Submission } from '../types/submissions'
 import type { Stream } from '../types/streams'
 import type { OfficerSurveyResponse, Survey, SurveyResults } from '../types/surveys'
@@ -188,7 +189,7 @@ const submissions: Submission[] = [
   },
 ]
 
-const myCharacters: MyCharacter[] = [
+const myCharacters: Character[] = [
   {
     id: 'mine-1',
     name: 'Thundermane',
@@ -207,7 +208,7 @@ const myCharacters: MyCharacter[] = [
     faction: 'Horde',
     gender: null,
     createdAt: '2026-10-01T12:00:00Z',
-    professions: [{ id: 'mine-1-mining', profession: 'Mining', skillLevel: 300 }],
+    professions: [{ profession: 'Mining', skillLevel: 300 }],
   },
   {
     id: 'mine-2',
@@ -228,6 +229,39 @@ const myCharacters: MyCharacter[] = [
     gender: null,
     createdAt: '2026-10-01T12:00:00Z',
     professions: [],
+  },
+]
+
+export const officerRankRequests: RankRequest[] = [
+  {
+    id: 'rank-request-1',
+    characterId: 'mine-1',
+    characterName: 'Thundermane',
+    characterSecondaryName: 'Stormcaller',
+    characterClass: 'Warrior',
+    direction: 'to_alt',
+    status: 'open',
+    note: 'Levelling a new main',
+    resolutionNote: '',
+    requestedBy: 'Thundermane',
+    createdAt: '2026-10-20T12:00:00Z',
+    resolvedAt: null,
+    resolvedBy: null,
+  },
+  {
+    id: 'rank-request-2',
+    characterId: 'char-2',
+    characterName: 'Sylvara',
+    characterSecondaryName: 'Moonwhisper',
+    characterClass: 'Priest',
+    direction: 'to_main',
+    status: 'declined',
+    note: '',
+    resolutionNote: 'Raid needs your main',
+    requestedBy: 'Sylvara',
+    createdAt: '2026-10-01T12:00:00Z',
+    resolvedAt: '2026-10-02T12:00:00Z',
+    resolvedBy: 'OfficerBob',
   },
 ]
 
@@ -624,19 +658,53 @@ export const handlers = [
   http.get('/api/raids', () => HttpResponse.json(upcomingRaids)),
   http.get('/api/raids/next', () => HttpResponse.json(nextRaid)),
   http.get('/api/me/characters', () => HttpResponse.json(myCharacters)),
-  http.post('/api/me/characters/:id/professions', async ({ params, request }) => {
-    const body = (await request.json()) as { profession: string; skillLevel: number }
+  http.patch('/api/me/characters/:id', async ({ params, request }) => {
+    const body = (await request.json()) as UpdateMyCharacterRequest
     const character = myCharacters.find((candidate) => candidate.id === params.id)
-    return HttpResponse.json(
-      { id: 'new-profession', ...body, character: { id: character?.id, name: character?.name, secondaryName: character?.secondaryName, class: character?.class } },
-      { status: 201 },
-    )
+    return HttpResponse.json({
+      ...character,
+      ...body,
+      spec2: body.spec2 === '' ? null : (body.spec2 ?? character?.spec2),
+      role2: body.role2 === '' ? null : (body.role2 ?? character?.role2),
+    })
   }),
-  http.patch('/api/me/professions/:id', async ({ params, request }) => {
-    const body = (await request.json()) as { skillLevel?: number }
-    return HttpResponse.json({ id: params.id, profession: 'Mining', skillLevel: body.skillLevel ?? 300 })
+  http.get('/api/me/rank-requests', () => HttpResponse.json([])),
+  http.post('/api/me/characters/:id/rank-requests', async ({ params, request }) => {
+    const body = (await request.json()) as { note: string }
+    const character = myCharacters.find((candidate) => candidate.id === params.id)
+    const created: RankRequest = {
+      id: 'new-rank-request',
+      characterId: String(params.id),
+      characterName: character?.name ?? '',
+      characterSecondaryName: character?.secondaryName ?? '',
+      characterClass: character?.class ?? '',
+      direction: character?.isMain ? 'to_alt' : 'to_main',
+      status: 'open',
+      note: body.note.trim(),
+      resolutionNote: '',
+      requestedBy: 'Thundermane',
+      createdAt: '2026-11-01T12:00:00Z',
+      resolvedAt: null,
+      resolvedBy: null,
+    }
+    return HttpResponse.json(created, { status: 201 })
   }),
-  http.delete('/api/me/professions/:id', () => new HttpResponse(null, { status: 204 })),
+  http.delete('/api/me/rank-requests/:id', () => new HttpResponse(null, { status: 204 })),
+  http.get('/api/rank-requests', () => HttpResponse.json(officerRankRequests)),
+  http.get('/api/rank-requests/count', () =>
+    HttpResponse.json({ open: officerRankRequests.filter((request) => request.status === 'open').length }),
+  ),
+  http.patch('/api/rank-requests/:id', async ({ params, request }) => {
+    const body = (await request.json()) as { status: 'done' | 'declined'; note: string }
+    const found = officerRankRequests.find((candidate) => candidate.id === params.id)
+    return HttpResponse.json({
+      ...found,
+      status: body.status,
+      resolutionNote: body.note,
+      resolvedAt: '2026-11-02T12:00:00Z',
+      resolvedBy: 'OfficerBob',
+    })
+  }),
   http.get('/api/roster', () => HttpResponse.json(rosterCharacters)),
   http.post('/api/roster', () => HttpResponse.json(rosterCharacters[0], { status: 201 })),
   http.patch('/api/roster/:id', () => HttpResponse.json(rosterCharacters[0])),
