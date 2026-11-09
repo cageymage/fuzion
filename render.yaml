@@ -104,13 +104,14 @@ services:
       - key: BLIZZARD_CLIENT_SECRET
         sync: false
       # The game API that lists a linked member's characters; the same values as the
-      # roster sync's. BLIZZARD_NAMESPACE defaults to Forever's profile-forever-<region>.
+      # roster sync's.
       - key: BLIZZARD_REGION
         value: us
       - key: BLIZZARD_NAMESPACE
-        sync: false
-      # Emergency switch for art submissions: set to false to close uploads during a
-      # spam flood (officers keep reviewing and deleting). Unset means on.
+        value: profile-forever-us
+      # Emergency switch for art submissions: set to false here to close uploads
+      # during a spam flood (officers keep reviewing and deleting). A dashboard
+      # edit only lasts until the next Blueprint sync puts this value back.
       - key: SUBMISSIONS_ENABLED
         value: "true"
       # Total MiB all submission originals may hold before new ones are refused.
@@ -188,8 +189,9 @@ services:
       - key: YOUTUBE_API_KEY
         sync: false
 
-  # Pulls the guild roster from Blizzard. Off until SYNC_BLIZZARD_ROSTER_ENABLED is
-  # set to true, so it can be deployed before we know Blizzard serves Forever.
+  # Pulls the guild roster from Blizzard. To pause it, set
+  # SYNC_BLIZZARD_ROSTER_ENABLED to false here; a dashboard edit is undone by the
+  # next Blueprint sync.
   - type: cron
     name: fuzion-sync-blizzard-roster
     runtime: docker
@@ -203,22 +205,22 @@ services:
           name: fuzion-db
           property: connectionString
       - key: SYNC_BLIZZARD_ROSTER_ENABLED
-        value: "false"
+        value: "true"
       - key: BLIZZARD_CLIENT_ID
         sync: false
       - key: BLIZZARD_CLIENT_SECRET
         sync: false
       - key: BLIZZARD_REGION
         value: us
-      # The game version's profile namespace; Forever's is profile-forever-us.
       - key: BLIZZARD_NAMESPACE
-        sync: false
+        value: profile-forever-us
       - key: GUILD_NAME_SLUG
-        sync: false
+        value: fuzion
 
   # Pulls each roster character's professions from Blizzard, half an hour after the
-  # roster sync so new characters are already in the table. Off until
-  # SYNC_BLIZZARD_PROFESSIONS_ENABLED is set to true.
+  # roster sync so new characters are already in the table. To pause it, set
+  # SYNC_BLIZZARD_PROFESSIONS_ENABLED to false here; a dashboard edit is undone by
+  # the next Blueprint sync.
   - type: cron
     name: fuzion-sync-blizzard-professions
     runtime: docker
@@ -232,16 +234,15 @@ services:
           name: fuzion-db
           property: connectionString
       - key: SYNC_BLIZZARD_PROFESSIONS_ENABLED
-        value: "false"
+        value: "true"
       - key: BLIZZARD_CLIENT_ID
         sync: false
       - key: BLIZZARD_CLIENT_SECRET
         sync: false
       - key: BLIZZARD_REGION
         value: us
-      # The game version's profile namespace; Forever's is profile-forever-us.
       - key: BLIZZARD_NAMESPACE
-        sync: false
+        value: profile-forever-us
 
 databases:
   # Deliberately not the free plan: a free database expires after 30 days, and
