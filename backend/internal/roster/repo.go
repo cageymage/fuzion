@@ -23,11 +23,13 @@ type Character struct {
 	Spec2         *string               `db:"spec2"          json:"spec2"`
 	Role2         *string               `db:"role2"          json:"role2"`
 	IsMain        bool                  `db:"is_main"        json:"isMain"`
+	GuildRank     *int                  `db:"guild_rank"     json:"-"`
+	Rank          *string               `db:"-"              json:"rank"`
 	RaidTeam      *string               `db:"raid_team"      json:"raidTeam"`
 	Race          *string               `db:"race"           json:"race"`
 	Level         *int                  `db:"level"          json:"level"`
 	Gender        *string               `db:"gender"         json:"gender"`
-	Faction      *string               `db:"-"              json:"faction"`
+	Faction       *string               `db:"-"              json:"faction"`
 	CreatedAt     time.Time             `db:"created_at"     json:"createdAt"`
 	Professions   []CharacterProfession `db:"-" json:"professions"`
 }
@@ -56,7 +58,7 @@ func (r *Repo) ListOwnedBy(ctx context.Context, userID uuid.UUID) ([]Character, 
 
 func (r *Repo) list(ctx context.Context, owner *uuid.UUID) ([]Character, error) {
 	const query = `
-		SELECT id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, gender, created_at
+		SELECT ` + returningColumns + `
 		FROM characters
 		WHERE left_guild_at IS NULL AND ($1::uuid IS NULL OR user_id = $1)
 		ORDER BY is_main DESC, name ASC, secondary_name ASC`
@@ -106,14 +108,14 @@ func (r *Repo) professionsByCharacter(ctx context.Context, only *uuid.UUID) (map
 	return byCharacter, nil
 }
 
-const returningColumns = `id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, gender, created_at`
+const returningColumns = `id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, guild_rank, raid_team, race, level, gender, created_at`
 
 const uniqueViolationCode = "23505"
 
 func (r *Repo) Create(ctx context.Context, c Character, professions []string) (Character, error) {
 	const query = `
-		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level, is_main_set_by_hand)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, raid_team, race, level)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING ` + returningColumns
 
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -142,51 +144,6 @@ func (r *Repo) Create(ctx context.Context, c Character, professions []string) (C
 	return created, nil
 }
 
-// SetOwnMain changes main/alt on a character the user owns. A member may have several
-// mains, so other characters are untouched. The change counts as set by hand, so the
-// roster sync's rank mapping leaves it alone.
-func (r *Repo) SetOwnMain(ctx context.Context, userID, id uuid.UUID, isMain bool) (Character, error) {
-	// A character that left the guild is hidden from the member's list, so it is not
-	// theirs to change.
-	const owner = `SELECT user_id FROM characters WHERE id = $1 AND left_guild_at IS NULL`
-
-	const update = `
-		UPDATE characters SET is_main = $2, is_main_set_by_hand = true
-		WHERE id = $1
-		RETURNING ` + returningColumns
-
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return Character{}, fmt.Errorf("begin set own main: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }() // no-op once committed
-
-	var ownerID *uuid.UUID
-	if err := tx.GetContext(ctx, &ownerID, owner, id); errors.Is(err, sql.ErrNoRows) {
-		return Character{}, ErrNotFound
-	} else if err != nil {
-		return Character{}, fmt.Errorf("select character owner: %w", err)
-	}
-	if ownerID == nil || *ownerID != userID {
-		return Character{}, ErrNotOwner
-	}
-	var updated Character
-	if err := tx.GetContext(ctx, &updated, update, id, isMain); err != nil {
-		return Character{}, fmt.Errorf("update main: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return Character{}, fmt.Errorf("commit set own main: %w", err)
-	}
-
-	updated.CreatedAt = updated.CreatedAt.UTC()
-	stored, err := r.professionsByCharacter(ctx, &updated.ID)
-	if err != nil {
-		return Character{}, err
-	}
-	updated.Professions = append([]CharacterProfession{}, stored[updated.ID]...)
-	return updated, nil
-}
-
 // secondSpec carries the resolved second spec and role for a PATCH, where nil
 // fields mean "clear" rather than "leave unchanged".
 type secondSpec struct {
@@ -210,7 +167,8 @@ func (r *Repo) Get(ctx context.Context, id uuid.UUID) (Character, error) {
 
 // Update applies req with COALESCE semantics; second, when non-nil, overwrites
 // spec2 and role2 outright so they can be cleared. professions, when non-nil,
-// replaces the character's whole profession set.
+// replaces the character's whole profession set. isMain applies only to characters
+// with no guild rank: for the rest the rank decides, and the next sync would undo it.
 func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, second *secondSpec, professions *[]string) (Character, error) {
 	const query = `
 		UPDATE characters SET
@@ -220,8 +178,7 @@ func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, seco
 			class          = COALESCE($5, class),
 			spec           = COALESCE($6, spec),
 			role           = COALESCE($7, role),
-			is_main        = COALESCE($8, is_main),
-			is_main_set_by_hand = is_main_set_by_hand OR $8::boolean IS NOT NULL,
+			is_main        = CASE WHEN guild_rank IS NULL THEN COALESCE($8, is_main) ELSE is_main END,
 			raid_team      = COALESCE($9, raid_team),
 			spec2          = CASE WHEN $10::boolean THEN $11::text ELSE spec2 END,
 			role2          = CASE WHEN $10::boolean THEN $12::text ELSE role2 END,

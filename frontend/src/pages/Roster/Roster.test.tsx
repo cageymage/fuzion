@@ -18,6 +18,7 @@ const ragnok: Character = {
   spec2: null,
   role2: null,
   isMain: true,
+  rank: null,
   raidTeam: 'Team Alpha',
   race: null,
   level: null,
@@ -44,6 +45,7 @@ const zaldrix: Character = {
   spec: 'Affliction',
   role: 'dps',
   isMain: false,
+  rank: null,
   raidTeam: null,
 }
 
@@ -355,9 +357,27 @@ describe('Roster race and level', () => {
       'Spec',
       'Role',
       'Raid Team',
-      'Main/Alt',
+      'Rank',
       'Professions',
     ])
+  })
+
+  it("should show each character's guild rank when the roster sync has placed it", async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, rank: 'Officer Alt' }])))
+
+    renderWithProviders(<Roster />)
+
+    const row = (await screen.findByText('Ragnok')).closest('tr') as HTMLElement
+    expect(within(row).getByRole('cell', { name: 'Officer Alt' })).toBeInTheDocument()
+  })
+
+  it('should show a dash for the rank when the character has no guild rank', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, rank: null }])))
+
+    renderWithProviders(<Roster />)
+
+    const row = (await screen.findByText('Ragnok')).closest('tr') as HTMLElement
+    expect(within(row).getByRole('cell', { name: '—' })).toBeInTheDocument()
   })
 })
 

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -40,17 +39,6 @@ type blizzardConfig struct {
 	region             string
 	namespace          string
 	guildSlug          string
-	// altRanks is BLIZZARD_ALT_RANKS as set; validate parses it, so a typo fails only
-	// this job and only when it is switched on, never the Twitch or YouTube syncs.
-	altRanks string
-}
-
-func (c blizzardConfig) parsedAltRanks() ([]int, error) {
-	ranks, err := parseRanks(c.altRanks)
-	if err != nil {
-		return nil, fmt.Errorf("BLIZZARD_ALT_RANKS: %w", err)
-	}
-	return ranks, nil
 }
 
 // The job is flagged off until Blizzard's API is known to serve Forever. Once it is
@@ -69,9 +57,6 @@ func (c blizzardConfig) validate() error {
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("SYNC_BLIZZARD_ROSTER_ENABLED is true but these are not set: %s", strings.Join(missing, ", "))
-	}
-	if _, err := c.parsedAltRanks(); err != nil {
-		return err
 	}
 	return nil
 }
@@ -100,26 +85,8 @@ func loadConfig() (config, error) {
 			region:             region,
 			namespace:          envOr("BLIZZARD_NAMESPACE", "profile-forever-"+region),
 			guildSlug:          os.Getenv("GUILD_NAME_SLUG"),
-			altRanks:           os.Getenv("BLIZZARD_ALT_RANKS"),
 		},
 	}, nil
-}
-
-// "4, 5" becomes [4 5]; an empty value means no alt ranks.
-func parseRanks(value string) ([]int, error) {
-	var ranks []int
-	for _, field := range strings.Split(value, ",") {
-		field = strings.TrimSpace(field)
-		if field == "" {
-			continue
-		}
-		rank, err := strconv.Atoi(field)
-		if err != nil || rank < 0 {
-			return nil, fmt.Errorf("%q is not a guild rank number", field)
-		}
-		ranks = append(ranks, rank)
-	}
-	return ranks, nil
 }
 
 func envOr(key, fallback string) string {

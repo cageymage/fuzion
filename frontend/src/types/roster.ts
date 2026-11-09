@@ -21,11 +21,6 @@ export type UpdateCharacterRequest = Partial<Omit<CreateCharacterRequest, 'role2
   role2?: Role | ''
 }
 
-// A member may change only main/alt on their own characters.
-export interface UpdateMyCharacterRequest {
-  isMain: boolean
-}
-
 export interface CharacterProfession {
   profession: string
   skillLevel: number
@@ -42,6 +37,8 @@ export interface Character {
   spec2: string | null
   role2: Role | null
   isMain: boolean
+  // The in-game guild rank's name; null for characters the roster sync has never seen.
+  rank: string | null
   raidTeam: string | null
   race: string | null
   level: number | null

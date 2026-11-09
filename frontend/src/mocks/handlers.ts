@@ -200,6 +200,7 @@ const myCharacters: MyCharacter[] = [
     spec2: null,
     role2: null,
     isMain: true,
+    rank: 'Officer',
     raidTeam: 'Team Alpha',
     race: 'Orc',
     level: 60,
@@ -219,6 +220,7 @@ const myCharacters: MyCharacter[] = [
     spec2: null,
     role2: null,
     isMain: false,
+    rank: 'Alt',
     raidTeam: null,
     race: 'Undead',
     level: 52,
@@ -241,6 +243,7 @@ const rosterCharacters: Character[] = [
     spec2: null,
     role2: null,
     isMain: true,
+    rank: 'Member',
     raidTeam: 'Team Alpha',
     race: 'Orc',
     level: 60,
@@ -260,6 +263,7 @@ const rosterCharacters: Character[] = [
     spec2: null,
     role2: null,
     isMain: true,
+    rank: 'Member',
     raidTeam: 'Team Beta',
     race: 'Tauren',
     level: 58,
@@ -279,6 +283,7 @@ const rosterCharacters: Character[] = [
     spec2: null,
     role2: null,
     isMain: true,
+    rank: 'Member',
     raidTeam: 'Team Alpha',
     race: 'Undead',
     level: 60,
@@ -298,6 +303,7 @@ const rosterCharacters: Character[] = [
     spec2: null,
     role2: null,
     isMain: true,
+    rank: 'Member',
     raidTeam: 'Team Beta',
     race: null,
     level: null,
@@ -317,6 +323,7 @@ const rosterCharacters: Character[] = [
     spec2: null,
     role2: null,
     isMain: true,
+    rank: 'Member',
     raidTeam: 'Team Alpha',
     race: null,
     level: null,
@@ -336,6 +343,7 @@ const rosterCharacters: Character[] = [
     spec2: null,
     role2: null,
     isMain: false,
+    rank: 'Alt',
     raidTeam: null,
     race: null,
     level: null,
@@ -616,11 +624,6 @@ export const handlers = [
   http.get('/api/raids', () => HttpResponse.json(upcomingRaids)),
   http.get('/api/raids/next', () => HttpResponse.json(nextRaid)),
   http.get('/api/me/characters', () => HttpResponse.json(myCharacters)),
-  http.patch('/api/me/characters/:id', async ({ params, request }) => {
-    const body = (await request.json()) as { isMain: boolean }
-    const character = myCharacters.find((candidate) => candidate.id === params.id)
-    return HttpResponse.json({ ...character, isMain: body.isMain })
-  }),
   http.post('/api/me/characters/:id/professions', async ({ params, request }) => {
     const body = (await request.json()) as { profession: string; skillLevel: number }
     const character = myCharacters.find((candidate) => candidate.id === params.id)

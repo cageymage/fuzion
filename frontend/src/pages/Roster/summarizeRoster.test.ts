@@ -13,6 +13,7 @@ const base: Character = {
   spec2: null,
   role2: null,
   isMain: true,
+  rank: null,
   raidTeam: null,
   race: null,
   level: null,

@@ -38,7 +38,6 @@ Environment:
 | `BLIZZARD_REGION`       | `us` | API host region |
 | `BLIZZARD_NAMESPACE`    | `profile-forever-<region>` | the game version's profile namespace; set it only to point at another game version, e.g. `profile-us` for retail |
 | `GUILD_NAME_SLUG`       | when enabled | the guild name as a slug (lowercase, spaces to hyphens), e.g. `my-guild` |
-| `BLIZZARD_ALT_RANKS`    | optional | comma-separated guild rank numbers that hold alts, e.g. `4,5` (0 is the guild master). When set, the roster sync marks members of those ranks as alts and every other rank as mains; unset, every new character is a main |
 | `SUBMISSIONS_ENABLED`   | `true` | emergency switch for art and screenshot submissions: `false` makes uploads return 503 and the submission page show a closed message, while officers keep reviewing, downloading and deleting. Unset means on. Needs a restart or redeploy to change |
 | `SUBMISSIONS_STORAGE_LIMIT_MB` | `512` | total MiB all submission originals may hold; past it, new submissions are refused (503) and the page shows the closed message |
 | `BATTLENET_REDIRECT_URL` | optional | enables Battle.net account linking on `/dashboard`; must be registered on the Blizzard client, `http://localhost:5173/api/auth/battlenet/callback` in dev. Needs `BLIZZARD_CLIENT_ID` and `BLIZZARD_CLIENT_SECRET` on the API too, and the API reads `BLIZZARD_REGION` and `BLIZZARD_NAMESPACE` to list the member's characters |
@@ -94,18 +93,15 @@ for its profile (`/profile/wow/character/{name}-{surname}`, with the app token) 
 stores `male` or `female`, which `GET /api/roster` returns as `gender` and the roster
 page uses to pick the race icon. It asks once per character; a profile Blizzard answers
 404 for is counted in the `sync_log` message as `N without a Blizzard profile` and tried
-again next run, and any other Blizzard error fails the run. Main/alt follows
-`BLIZZARD_ALT_RANKS`: with it unset, new characters are mains and the sync never
-changes main/alt afterwards; with it set, members of those ranks are alts and all others are
-mains, on every run, so a rank change in game moves the character. Once an officer
-sets main/alt by hand (on a new character, or by changing it on an existing one),
-`is_main_set_by_hand` is set and the sync stops changing it, whatever the rank. Rank
-numbers for Forever are not known until the first real sync: read them from
-`characters.guild_rank`, then set the variable. Alts the sync created before migration
-`000025` and alts an officer demoted on purpose look the same (`is_main = false`, a
-`guild_rank`), so the backfill locks neither. Re-set any deliberate alt by hand first,
-or the next sync makes it a main if its rank is not an alt rank. A
-character the sync saw before and no longer sees gets `left_guild_at` and
+again next run, and any other Blizzard error fails the run. Main/alt
+always follows the guild rank: Officer Alt (3) and Alt (5) are alts and every other
+rank is a main, on every run, so a rank change in game moves the character. The rank
+numbers and their names live in `internal/roster/ranks.go`; Blizzard's roster gives only
+the number, so add, remove or rename a rank there when the guild changes it in game. A
+rank missing from that list syncs as a main and shows as `Rank N`. `GET /api/roster` and
+`GET /api/me/characters` return the name as `rank` (`null` for characters the sync has
+never seen). Officers can set main/alt only on those unranked, hand-entered characters.
+A character the sync saw before and no longer sees gets `left_guild_at` and
 drops off `GET /api/roster`; characters entered by hand that Blizzard never
 listed are left alone. Members with a class the site lacks (Death Knight,
 Monk, Demon Hunter, Evoker exist on retail only) are skipped and counted in
@@ -170,7 +166,6 @@ is no separate migrate step.
 | GET    | `/api/auth/battlenet/callback` | Battle.net lands here after `/api/auth/battlenet/link`: stores the Battle.net ID and BattleTag, then reads the account's characters from `/profile/user/wow` and makes the member the owner of the roster characters with the same name and surname (ignoring case; Forever has no realms and the response carries none). Characters another member owns stay theirs, and ones the account no longer has are released. The token is not stored, so linking again refreshes the set. 302 to `/dashboard` |
 | DELETE | `/api/auth/battlenet` | unlinks Battle.net and releases every character the member owns, 204 |
 | GET    | `/api/me/characters` | login required: the caller's characters still in the guild, in the roster's shape, mains first (`[]` when none). Each profession carries its row `id`, for the `/api/me/professions` routes |
-| PATCH  | `/api/me/characters/{id}` | login required, owner only: `{isMain}` and nothing else (raid team and the rest stay with officers); making a character a main turns the owner's other mains into alts. Both count as set by hand, so the roster sync's rank mapping leaves them alone. 403 when someone else or nobody owns it, 404 when unknown, 400 without `isMain` |
 | GET    | `/api/submissions/status` | public: `{open, attestationVersion}`; `open` is false when `SUBMISSIONS_ENABLED=false` or storage is full |
 | POST   | `/api/submissions`   | guild members only: multipart, a `metadata` JSON part (`{attestationAccepted, attestationVersion, descriptions}`) first, then up to 10 `files` parts (PNG, JPEG, WebP or GIF, sniffed from the bytes, at most 20 MiB each, 50 MiB in total, 25 megapixels). `descriptions[i]` belongs to the i-th file, at most 500 characters. 201 with `{results: [{filename, submission?, error?}]}` when any file was stored; 400 or 409 (all duplicates) when none were. 400 without the attestation or with an out-of-date `attestationVersion`; 413 over 50 MiB; 429 over 20 files or 100 MiB per member per rolling 24 hours; 503 when closed or storage is full, or when two uploads are already in progress (with `Retry-After: 10`). The quota and storage checks and the inserts run under one advisory lock, so parallel uploads cannot overshoot them |
 | GET    | `/api/submissions`   | officer only: `{total, limit, offset, items}`, newest first, metadata and URLs only (never image bytes); `?limit=` 1 to 100 (default 48), `?offset=` |

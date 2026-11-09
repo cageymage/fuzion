@@ -21,6 +21,7 @@ const ragnok: Character = {
   spec2: null,
   role2: null,
   isMain: true,
+  rank: null,
   raidTeam: 'Team Alpha',
   race: null,
   level: null,
@@ -51,6 +52,7 @@ const zaldrix: Character = {
   spec: 'Affliction',
   role: 'dps',
   isMain: false,
+  rank: null,
   raidTeam: null,
 }
 
@@ -492,3 +494,28 @@ describe('Roster management', () => {
 async function waitForDialogToClose() {
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 }
+
+describe('Roster management main and alt', () => {
+  it('should replace the main character checkbox with a rank note when the character has a guild rank', async () => {
+    signInAs(officer)
+    serveRoster([{ ...ragnok, rank: 'Veteran' }])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    expect(dialog.queryByRole('checkbox', { name: 'Main character' })).not.toBeInTheDocument()
+    expect(dialog.getByText('Main or alt follows the guild rank in game (Veteran).')).toBeInTheDocument()
+  })
+
+  it('should offer the main character checkbox when the character has no guild rank', async () => {
+    signInAs(officer)
+    serveRoster([{ ...ragnok, rank: null }])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    expect(dialog.getByRole('checkbox', { name: 'Main character' })).toBeChecked()
+  })
+})

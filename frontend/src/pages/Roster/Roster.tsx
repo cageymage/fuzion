@@ -254,7 +254,7 @@ export function Roster() {
                     <th scope="col">Spec</th>
                     <SortHeader label="Role" sortKey="role" sort={sort} onSort={toggleSort} />
                     <SortHeader label="Raid Team" sortKey="raidTeam" sort={sort} onSort={toggleSort} />
-                    <th scope="col">Main/Alt</th>
+                    <th scope="col">Rank</th>
                     <th scope="col">Professions</th>
                     {canManage && (
                       <th scope="col">
@@ -280,7 +280,7 @@ export function Roster() {
                       <td>{specLabel(character)}</td>
                       <td>{roleLabel(character)}</td>
                       <td>{character.raidTeam ?? '—'}</td>
-                      <td>{character.isMain ? 'Main' : 'Alt'}</td>
+                      <td>{character.rank ?? '—'}</td>
                       <td>
                         <span className={styles.professionIcons}>
                           {primaryProfessionIcons(character.professions).map(({ profession, iconUrl }) => (

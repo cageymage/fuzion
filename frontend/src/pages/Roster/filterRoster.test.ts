@@ -13,6 +13,7 @@ const main: Character = {
   spec2: null,
   role2: null,
   isMain: true,
+  rank: null,
   raidTeam: 'Team Alpha',
   race: null,
   level: null,
@@ -39,6 +40,7 @@ const alt: Character = {
   spec: 'Affliction',
   role: 'dps',
   isMain: false,
+  rank: null,
 }
 
 const roster = [main, healer, alt]
