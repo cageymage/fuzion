@@ -204,7 +204,7 @@ services:
           name: fuzion-db
           property: connectionString
       - key: SYNC_BLIZZARD_ROSTER_ENABLED
-        value: "false"
+        sync: false
       - key: BLIZZARD_CLIENT_ID
         sync: false
       - key: BLIZZARD_CLIENT_SECRET
@@ -237,7 +237,7 @@ services:
           name: fuzion-db
           property: connectionString
       - key: SYNC_BLIZZARD_PROFESSIONS_ENABLED
-        value: "false"
+        sync: false
       - key: BLIZZARD_CLIENT_ID
         sync: false
       - key: BLIZZARD_CLIENT_SECRET
