@@ -81,11 +81,11 @@ func newFakeBlizzardRoster(t *testing.T, members ...fakeMember) *fakeBlizzardRos
 	return f
 }
 
-func (f *fakeBlizzardRoster) runSync(db *sqlx.DB, altRanks ...int) error {
+func (f *fakeBlizzardRoster) runSync(db *sqlx.DB) error {
 	client := blizzard.NewClient(blizzard.Config{
 		ClientID: "id", ClientSecret: "secret", BaseURL: f.URL, AuthURL: f.URL, Namespace: "profile-classic1x-us",
 	}, nil)
-	return roster.NewSyncBlizzardRoster(roster.NewRepo(db), client, synclog.NewRepo(db), "fuzion", altRanks).Run(context.Background())
+	return roster.NewSyncBlizzardRoster(roster.NewRepo(db), client, synclog.NewRepo(db), "fuzion").Run(context.Background())
 }
 
 type syncedCharacter struct {
@@ -288,8 +288,8 @@ func TestSyncBlizzardRoster_SkipsMembersAndRecordsIt_WhenClassIsNotSupported(t *
 	// given a guild with a retail-only Death Knight and a level beyond the site's cap
 	db := testutil.DB(t)
 	fake := newFakeBlizzardRoster(t,
-		fakeMember{name: "Grimblade", surname: "Stoneback", class: deathKnight, race: 1, level: 90, rank: 3},
-		fakeMember{name: "Overleveled", surname: "Stoneback", class: mage, race: 1, level: 90, rank: 3},
+		fakeMember{name: "Grimblade", surname: "Stoneback", class: deathKnight, race: 1, level: 90, rank: memberRank},
+		fakeMember{name: "Overleveled", surname: "Stoneback", class: mage, race: 1, level: 90, rank: memberRank},
 	)
 
 	// when the roster sync runs
@@ -300,7 +300,7 @@ func TestSyncBlizzardRoster_SkipsMembersAndRecordsIt_WhenClassIsNotSupported(t *
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Overleveled", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), GuildRank: intPtr(3)},
+		{Name: "Overleveled", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), GuildRank: intPtr(memberRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -438,36 +438,65 @@ func TestSyncBlizzardRoster_KeepsExistingRaceAndLogsIt_WhenRaceIdIsNotMapped(t *
 	}
 }
 
-// Guild rank numbers for these tests; Forever's real ones are not known yet.
+// The guild's real rank numbers, as listed in roster/ranks.go.
 const (
 	guildMasterRank = 0
-	memberRank      = 1
-	altRank         = 4
-	bankAltRank     = 5
+	officerRank     = 1
+	recruiterRank   = 2
+	officerAltRank  = 3
+	veteranRank     = 4
+	altRank         = 5
+	memberRank      = 6
 )
 
-func TestSyncBlizzardRoster_SetsMainOrAltFromGuildRank_WhenAltRanksAreConfigured(t *testing.T) {
-	// given an empty roster and a Blizzard guild with a guild master, a member, an alt and a bank alt
+func TestSyncBlizzardRoster_ImportsAltAndOfficerAltRanksAsAlts_WhenBlizzardListsEveryRank(t *testing.T) {
+	// given an empty roster and a Blizzard guild with one member in each rank
 	db := testutil.DB(t)
 	fake := newFakeBlizzardRoster(t,
 		fakeMember{name: "Guildlord", surname: "Stoneback", class: warrior, race: 1, level: 60, rank: guildMasterRank},
-		fakeMember{name: "Raider", surname: "Stoneback", class: mage, race: 1, level: 60, rank: memberRank},
+		fakeMember{name: "Shotcaller", surname: "Stoneback", class: mage, race: 1, level: 60, rank: officerRank},
+		fakeMember{name: "Greeter", surname: "Stoneback", class: mage, race: 1, level: 60, rank: recruiterRank},
+		fakeMember{name: "Spareboots", surname: "Stoneback", class: druid, race: 1, level: 60, rank: officerAltRank},
+		fakeMember{name: "Oldguard", surname: "Stoneback", class: paladin, race: 1, level: 60, rank: veteranRank},
 		fakeMember{name: "Twinkalt", surname: "Stoneback", class: druid, race: 1, level: 60, rank: altRank},
-		fakeMember{name: "Vaultkeep", surname: "Stoneback", class: paladin, race: 1, level: 1, rank: bankAltRank},
+		fakeMember{name: "Raider", surname: "Stoneback", class: mage, race: 1, level: 60, rank: memberRank},
 	)
 
-	// when the roster sync runs with ranks 4 and 5 as alt ranks
-	err := fake.runSync(db, altRank, bankAltRank)
+	// when the roster sync runs
+	err := fake.runSync(db)
 
-	// then I expect alt-rank members imported as alts and every other rank as mains
+	// then I expect the Officer Alt and Alt ranks imported as alts and every other rank as mains
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
+		{Name: "Greeter", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(recruiterRank)},
 		{Name: "Guildlord", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Warrior", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(guildMasterRank)},
+		{Name: "Oldguard", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Paladin", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(veteranRank)},
 		{Name: "Raider", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
+		{Name: "Shotcaller", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(officerRank)},
+		{Name: "Spareboots", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Druid", Role: "dps", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(officerAltRank)},
 		{Name: "Twinkalt", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Druid", Role: "dps", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(altRank)},
-		{Name: "Vaultkeep", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Paladin", Role: "dps", IsMain: false, Race: strPtr("Human"), Level: intPtr(1), GuildRank: intPtr(bankAltRank)},
+	}
+	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
+		t.Errorf("unexpected characters (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncBlizzardRoster_ImportsCharacterAsAMain_WhenItsRankIsNotInTheRankList(t *testing.T) {
+	// given a Blizzard guild member in a rank added in game after the site's rank list
+	db := testutil.DB(t)
+	fake := newFakeBlizzardRoster(t, fakeMember{name: "Newcomer", surname: "Stoneback", class: mage, race: 1, level: 10, rank: 7})
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect the character imported as a main
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := []syncedCharacter{
+		{Name: "Newcomer", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(10), GuildRank: intPtr(7)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
@@ -475,14 +504,14 @@ func TestSyncBlizzardRoster_SetsMainOrAltFromGuildRank_WhenAltRanksAreConfigured
 }
 
 func TestSyncBlizzardRoster_MakesCharacterAMain_WhenItMovesOutOfAnAltRank(t *testing.T) {
-	// given a character an earlier sync imported as an alt from the alt rank
+	// given a character an earlier sync imported as an alt from the Alt rank
 	db := testutil.DB(t)
-	if err := newFakeBlizzardRoster(t, fakeMember{name: "Raider", surname: "Stoneback", class: mage, race: 1, level: 60, rank: altRank}).runSync(db, altRank); err != nil {
+	if err := newFakeBlizzardRoster(t, fakeMember{name: "Raider", surname: "Stoneback", class: mage, race: 1, level: 60, rank: altRank}).runSync(db); err != nil {
 		t.Fatalf("first sync: %v", err)
 	}
 
-	// when a sync lists the character in a member rank
-	err := newFakeBlizzardRoster(t, fakeMember{name: "Raider", surname: "Stoneback", class: mage, race: 1, level: 60, rank: memberRank}).runSync(db, altRank)
+	// when a sync lists the character in the Member rank
+	err := newFakeBlizzardRoster(t, fakeMember{name: "Raider", surname: "Stoneback", class: mage, race: 1, level: 60, rank: memberRank}).runSync(db)
 
 	// then I expect the character to become a main
 	if err != nil {
@@ -496,84 +525,29 @@ func TestSyncBlizzardRoster_MakesCharacterAMain_WhenItMovesOutOfAnAltRank(t *tes
 	}
 }
 
-func TestSyncBlizzardRoster_KeepsMainAnOfficerSet_WhenCharacterIsInAnAltRank(t *testing.T) {
-	// given a synced alt-rank character an officer has promoted to main
+func TestSyncBlizzardRoster_MakesCharacterAnAlt_WhenItMovesIntoTheOfficerAltRank(t *testing.T) {
+	// given a character an earlier sync imported as a main from the Officer rank
 	db := testutil.DB(t)
-	fake := newFakeBlizzardRoster(t, fakeMember{name: "Twinkalt", surname: "Stoneback", class: druid, race: 1, level: 60, rank: altRank})
-	if err := fake.runSync(db, altRank); err != nil {
+	if err := newFakeBlizzardRoster(t, fakeMember{name: "Shotcaller", surname: "Stoneback", class: mage, race: 1, level: 60, rank: officerRank}).runSync(db); err != nil {
 		t.Fatalf("first sync: %v", err)
 	}
-	srv := testutil.NewServer(t, db)
-	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
-	srv.Patch(t, "/api/roster/"+characterID(t, db, "Twinkalt"), map[string]any{"isMain": true}).RequireStatus(t, http.StatusOK)
 
-	// when the roster sync runs again with the character still in the alt rank
-	err := fake.runSync(db, altRank)
+	// when a sync lists the character in the Officer Alt rank
+	err := newFakeBlizzardRoster(t, fakeMember{name: "Shotcaller", surname: "Stoneback", class: mage, race: 1, level: 60, rank: officerAltRank}).runSync(db)
 
-	// then I expect the officer's choice of main kept
+	// then I expect the character to become an alt
 	if err != nil {
 		t.Fatalf("second sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Twinkalt", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Druid", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(altRank)},
+		{Name: "Shotcaller", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(officerAltRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)
 	}
 }
 
-func TestSyncBlizzardRoster_KeepsAltAnOfficerSet_WhenCharacterIsInAMemberRank(t *testing.T) {
-	// given a synced member-rank character an officer has marked as an alt
-	db := testutil.DB(t)
-	fake := newFakeBlizzardRoster(t, fakeMember{name: "Raider", surname: "Stoneback", class: mage, race: 1, level: 60, rank: memberRank})
-	if err := fake.runSync(db, altRank); err != nil {
-		t.Fatalf("first sync: %v", err)
-	}
-	srv := testutil.NewServer(t, db)
-	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
-	srv.Patch(t, "/api/roster/"+characterID(t, db, "Raider"), map[string]any{"isMain": false}).RequireStatus(t, http.StatusOK)
-
-	// when the roster sync runs again with the character still in the member rank
-	err := fake.runSync(db, altRank)
-
-	// then I expect the officer's choice of alt kept
-	if err != nil {
-		t.Fatalf("second sync: %v", err)
-	}
-	want := []syncedCharacter{
-		{Name: "Raider", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
-	}
-	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
-		t.Errorf("unexpected characters (-want +got):\n%s", diff)
-	}
-}
-
-func TestSyncBlizzardRoster_KeepsMainOrAltFollowingRank_WhenAnOfficerEditLeftItUnchanged(t *testing.T) {
-	// given a synced alt-rank character whose raid team, but not main/alt, an officer has changed
-	db := testutil.DB(t)
-	if err := newFakeBlizzardRoster(t, fakeMember{name: "Raider", surname: "Stoneback", class: mage, race: 1, level: 60, rank: altRank}).runSync(db, altRank); err != nil {
-		t.Fatalf("first sync: %v", err)
-	}
-	srv := testutil.NewServer(t, db)
-	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
-	srv.Patch(t, "/api/roster/"+characterID(t, db, "Raider"), map[string]any{"raidTeam": "Team 1"}).RequireStatus(t, http.StatusOK)
-
-	// when a sync lists the character in a member rank
-	err := newFakeBlizzardRoster(t, fakeMember{name: "Raider", surname: "Stoneback", class: mage, race: 1, level: 60, rank: memberRank}).runSync(db, altRank)
-
-	// then I expect the character to become a main
-	if err != nil {
-		t.Fatalf("second sync: %v", err)
-	}
-	want := []syncedCharacter{
-		{Name: "Raider", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, RaidTeam: strPtr("Team 1"), Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
-	}
-	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
-		t.Errorf("unexpected characters (-want +got):\n%s", diff)
-	}
-}
-
-func TestSyncBlizzardRoster_KeepsMainOrAltOfOfficerEnteredCharacter_WhenAltRanksAreConfigured(t *testing.T) {
+func TestSyncBlizzardRoster_MakesOfficerEnteredMainAnAlt_WhenBlizzardListsItInTheAltRank(t *testing.T) {
 	// given a main an officer entered by hand
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
@@ -583,38 +557,15 @@ func TestSyncBlizzardRoster_KeepsMainOrAltOfOfficerEnteredCharacter_WhenAltRanks
 	}).RequireStatus(t, http.StatusCreated)
 	fake := newFakeBlizzardRoster(t, fakeMember{name: "Tankard", surname: "Ironhide", class: warrior, race: 1, level: 60, rank: altRank})
 
-	// when the roster sync lists the character in an alt rank
-	err := fake.runSync(db, altRank)
+	// when the roster sync lists the character in the Alt rank
+	err := fake.runSync(db)
 
-	// then I expect the character to stay a main
+	// then I expect the rank to win and the character to become an alt
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
 	want := []syncedCharacter{
-		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "tank", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(altRank)},
-	}
-	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
-		t.Errorf("unexpected characters (-want +got):\n%s", diff)
-	}
-}
-
-func TestSyncBlizzardRoster_SyncsCharactersAsMains_WhenNoAltRanksAreConfigured(t *testing.T) {
-	// given a member-rank character an earlier sync imported without alt ranks
-	db := testutil.DB(t)
-	fake := newFakeBlizzardRoster(t, fakeMember{name: "Raider", surname: "Stoneback", class: mage, race: 1, level: 60, rank: memberRank})
-	if err := fake.runSync(db); err != nil {
-		t.Fatalf("first sync: %v", err)
-	}
-
-	// when the roster sync runs again without alt ranks
-	err := fake.runSync(db)
-
-	// then I expect the character to be a main, whatever its rank
-	if err != nil {
-		t.Fatalf("second sync: %v", err)
-	}
-	want := []syncedCharacter{
-		{Name: "Raider", SecondaryName: "Stoneback", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(memberRank)},
+		{Name: "Tankard", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "tank", IsMain: false, Race: strPtr("Human"), Level: intPtr(60), GuildRank: intPtr(altRank)},
 	}
 	if diff := cmp.Diff(want, syncedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected characters (-want +got):\n%s", diff)

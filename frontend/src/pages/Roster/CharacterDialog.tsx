@@ -229,14 +229,18 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
             </label>
           ))}
         </fieldset>
-        <label className={styles.toggle}>
-          <input
-            type="checkbox"
-            checked={values.isMain}
-            onChange={(event) => change({ isMain: event.target.checked })}
-          />
-          <span>Main character</span>
-        </label>
+        {character?.rank ? (
+          <p>Main or alt follows the guild rank in game ({character.rank}).</p>
+        ) : (
+          <label className={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={values.isMain}
+              onChange={(event) => change({ isMain: event.target.checked })}
+            />
+            <span>Main character</span>
+          </label>
+        )}
 
         {mutation.isError && (
           <p role="alert" className={styles.error}>

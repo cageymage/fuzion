@@ -26,7 +26,6 @@ const (
 var (
 	ErrNotFound = errors.New("character not found")
 	ErrConflict = errors.New("character with this name and secondary name already exists")
-	ErrNotOwner = errors.New("character belongs to someone else")
 
 	// Mirrors the CHECK constraint on characters.class.
 	classes = []string{"Warrior", "Paladin", "Hunter", "Rogue", "Priest", "Shaman", "Mage", "Warlock", "Druid"}
@@ -114,6 +113,7 @@ func (s *Service) Roster(ctx context.Context) ([]Character, error) {
 	}
 	for i := range characters {
 		characters[i].Faction = factionOf(characters[i].Race)
+		characters[i].Rank = rankName(characters[i].GuildRank)
 	}
 	return characters, nil
 }
@@ -125,26 +125,9 @@ func (s *Service) MyCharacters(ctx context.Context, userID uuid.UUID) ([]Charact
 	}
 	for i := range characters {
 		characters[i].Faction = factionOf(characters[i].Race)
+		characters[i].Rank = rankName(characters[i].GuildRank)
 	}
 	return characters, nil
-}
-
-// UpdateMyCharacterRequest is all a member may change on their own character; raid
-// team and the rest stay with officers.
-type UpdateMyCharacterRequest struct {
-	IsMain *bool `json:"isMain"`
-}
-
-func (s *Service) UpdateMyCharacter(ctx context.Context, userID, id uuid.UUID, req UpdateMyCharacterRequest) (Character, error) {
-	if req.IsMain == nil {
-		return Character{}, &ValidationError{Field: "isMain", Problem: "is required"}
-	}
-	updated, err := s.repo.SetOwnMain(ctx, userID, id, *req.IsMain)
-	if err != nil {
-		return Character{}, fmt.Errorf("update my character: %w", err)
-	}
-	updated.Faction = factionOf(updated.Race)
-	return updated, nil
 }
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, error) {
@@ -202,6 +185,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, err
 		return Character{}, fmt.Errorf("create character: %w", err)
 	}
 	created.Faction = factionOf(created.Race)
+	created.Rank = rankName(created.GuildRank)
 	return created, nil
 }
 
@@ -269,6 +253,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateRequest) (
 		return Character{}, fmt.Errorf("update character %s: %w", id, err)
 	}
 	updated.Faction = factionOf(updated.Race)
+	updated.Rank = rankName(updated.GuildRank)
 	return updated, nil
 }
 

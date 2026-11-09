@@ -19,6 +19,7 @@ const aeliana: Character = {
   spec2: null,
   role2: null,
   isMain: true,
+  rank: null,
   raidTeam: 'Team 1',
   race: null,
   level: null,

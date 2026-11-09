@@ -215,10 +215,6 @@ services:
         sync: false
       - key: GUILD_NAME_SLUG
         sync: false
-      # Guild rank numbers that hold alts, e.g. "4,5". Leave unset until the first
-      # sync shows Forever's rank numbers in characters.guild_rank.
-      - key: BLIZZARD_ALT_RANKS
-        sync: false
 
   # Pulls each roster character's professions from Blizzard, half an hour after the
   # roster sync so new characters are already in the table. Off until

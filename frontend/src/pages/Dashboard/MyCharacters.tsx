@@ -1,22 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { battlenetLinkUrl } from '../../api/auth'
-import { fetchMyCharacters, updateMyCharacter } from '../../api/roster'
+import { fetchMyCharacters } from '../../api/roster'
 import { classColor } from '../../lib/classColor'
 import styles from './Dashboard.module.css'
 import { myCharactersQueryKey } from './myCharactersQueryKey'
 import { MyProfessions } from './MyProfessions'
 
 export function MyCharacters() {
-  const queryClient = useQueryClient()
   const characters = useQuery({ queryKey: myCharactersQueryKey, queryFn: fetchMyCharacters })
-  const setMain = useMutation({
-    mutationFn: ({ id, isMain }: { id: string; isMain: boolean }) => updateMyCharacter(id, { isMain }),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: myCharactersQueryKey }),
-        queryClient.invalidateQueries({ queryKey: ['roster'] }),
-      ]),
-  })
 
   return (
     <section aria-labelledby="characters-heading" className={styles.section}>
@@ -47,32 +38,17 @@ export function MyCharacters() {
                       <strong style={{ color: classColor(character.class) }}>{fullName}</strong> ·{' '}
                       <span style={{ color: classColor(character.class) }}>{character.class}</span>
                     </span>
-                    {character.isMain && <span className={styles.mainBadge}>Main</span>}
-                    <button
-                      type="button"
-                      className={styles.button}
-                      aria-label={
-                        character.isMain ? `Make ${fullName} an alt` : `Make ${fullName} your main`
-                      }
-                      onClick={() => setMain.mutate({ id: character.id, isMain: !character.isMain })}
-                      disabled={setMain.isPending}
-                    >
-                      {character.isMain ? 'Make alt' : 'Make main'}
-                    </button>
+                    {character.rank && <span className={styles.rankBadge}>{character.rank}</span>}
                   </div>
                   <MyProfessions character={character} fullName={fullName} />
                 </li>
               )
             })}
           </ul>
-          {setMain.isError && (
-            <p role="alert" className={styles.error}>
-              Could not change main or alt, try again.
-            </p>
-          )}
           <p className={styles.hint}>
             Missing a character? <a href={battlenetLinkUrl}>Link Battle.net again</a> to pick up
-            ones added to the roster since you linked. Raid teams are set by officers.
+            ones added to the roster since you linked. Main or alt follows your guild rank in game,
+            so ask an officer to change it. Raid teams are set by officers.
           </p>
         </>
       )}

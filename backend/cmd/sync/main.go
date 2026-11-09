@@ -113,18 +113,13 @@ func runBlizzardRoster(ctx context.Context, cfg config) error {
 	if err := cfg.blizzard.validate(); err != nil {
 		return err
 	}
-	altRanks, err := cfg.blizzard.parsedAltRanks()
-	if err != nil {
-		return err
-	}
-
 	db, err := sqlx.ConnectContext(ctx, "pgx", cfg.databaseURL)
 	if err != nil {
 		return fmt.Errorf("connect to database: %w", err)
 	}
 	defer db.Close()
 
-	return roster.NewSyncBlizzardRoster(roster.NewRepo(db), newBlizzardClient(cfg.blizzard), synclog.NewRepo(db), cfg.blizzard.guildSlug, altRanks).Run(ctx)
+	return roster.NewSyncBlizzardRoster(roster.NewRepo(db), newBlizzardClient(cfg.blizzard), synclog.NewRepo(db), cfg.blizzard.guildSlug).Run(ctx)
 }
 
 func runBlizzardProfessions(ctx context.Context, cfg config) error {
