@@ -39,7 +39,7 @@
 }
 
 .groupTitle {
-  margin: 0 0 8px;
+  margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-label);
   letter-spacing: 0.08em;
@@ -110,6 +110,35 @@
 
 .entryButton:hover {
   background: var(--surface);
+}
+
+.groupButton,
+.expandAll {
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.groupButton {
+  width: 100%;
+  padding: 8px 0;
+  text-align: left;
+}
+
+.groupButton:disabled {
+  cursor: default;
+}
+
+.expandAll {
+  margin-bottom: 16px;
+  padding: 0;
+  color: var(--gold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .chevron {

@@ -20,11 +20,19 @@ function respondWith(entries: ProfessionEntry[]) {
   server.use(http.get('/api/professions', () => HttpResponse.json(entries)))
 }
 
+async function expandGroups(user: ReturnType<typeof userEvent.setup>, ...names: string[]) {
+  for (const name of names) {
+    await user.click(await screen.findByRole('button', { name }))
+  }
+}
+
 describe('Professions', () => {
   it('should group characters under their profession', async () => {
     respondWith(professions)
 
+    const user = userEvent.setup()
     renderWithProviders(<Professions />)
+    await expandGroups(user, 'Alchemy', 'Blacksmithing')
 
     const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
     expect(within(alchemy).getAllByRole('listitem')).toHaveLength(2)
@@ -38,7 +46,9 @@ describe('Professions', () => {
   it('should name the group after the whole profession when the profession has several words', async () => {
     respondWith([{ id: 'p9', profession: 'First Aid', skillLevel: 150, character: aeliana }])
 
+    const user = userEvent.setup()
     renderWithProviders(<Professions />)
+    await expandGroups(user, 'First Aid')
 
     const firstAid = await screen.findByRole('region', { name: 'First Aid' })
     expect(within(firstAid).getByText('Aeliana')).toBeInTheDocument()
@@ -47,7 +57,9 @@ describe('Professions', () => {
   it("should show each character's skill level in the order the api returned them", async () => {
     respondWith(professions)
 
+    const user = userEvent.setup()
     renderWithProviders(<Professions />)
+    await expandGroups(user, 'Alchemy')
 
     const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
     const [first, second] = within(alchemy).getAllByRole('listitem')
@@ -89,7 +101,9 @@ describe('Professions', () => {
     respondWith([{ id: 'p2', profession: 'Alchemy', skillLevel: 225, character: zephyrion }])
 
     // when the page renders the entry
+    const user = userEvent.setup()
     renderWithProviders(<Professions />)
+    await expandGroups(user, 'Alchemy')
 
     // then both halves of the name use the Warrior class color
     const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
@@ -100,7 +114,9 @@ describe('Professions', () => {
   it('should show a dash instead of a skill level when none is recorded', async () => {
     respondWith([{ id: 'p8', profession: 'Cooking', skillLevel: 0, character: aeliana }])
 
+    const user = userEvent.setup()
     renderWithProviders(<Professions />)
+    await expandGroups(user, 'Cooking')
 
     const cooking = await screen.findByRole('region', { name: 'Cooking' })
     expect(within(cooking).getByRole('listitem')).toHaveTextContent('—')
@@ -117,6 +133,63 @@ describe('Professions', () => {
 
     expect(screen.getByText('No matches for "tailoring".')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Alchemy' })).not.toBeInTheDocument()
+  })
+
+  it('should keep every group collapsed until its heading is clicked when the page loads', async () => {
+    respondWith(professions)
+
+    renderWithProviders(<Professions />)
+
+    const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    expect(within(alchemy).getByRole('button', { name: 'Alchemy' })).toHaveAttribute('aria-expanded', 'false')
+    expect(within(alchemy).queryByText('Aeliana')).not.toBeInTheDocument()
+  })
+
+  it('should hide the characters again when an open group heading is clicked', async () => {
+    respondWith(professions)
+    const user = userEvent.setup()
+    renderWithProviders(<Professions />)
+    await expandGroups(user, 'Alchemy')
+
+    await user.click(screen.getByRole('button', { name: 'Alchemy' }))
+
+    expect(screen.queryByText('Aeliana')).not.toBeInTheDocument()
+  })
+
+  it('should open every group when Expand all is clicked', async () => {
+    respondWith(professions)
+    const user = userEvent.setup()
+    renderWithProviders(<Professions />)
+
+    await user.click(await screen.findByRole('button', { name: 'Expand all' }))
+
+    expect(screen.getByRole('button', { name: 'Alchemy' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Blacksmithing' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('should close every group when Collapse all is clicked after Expand all', async () => {
+    respondWith(professions)
+    const user = userEvent.setup()
+    renderWithProviders(<Professions />)
+    await user.click(await screen.findByRole('button', { name: 'Expand all' }))
+
+    await user.click(screen.getByRole('button', { name: 'Collapse all' }))
+
+    expect(screen.getByRole('button', { name: 'Alchemy' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: 'Blacksmithing' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('should show matching groups open and hide Expand all when the search box has text', async () => {
+    respondWith(professions)
+    const user = userEvent.setup()
+    renderWithProviders(<Professions />)
+    await screen.findByRole('region', { name: 'Alchemy' })
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'alch')
+
+    const alchemy = screen.getByRole('region', { name: 'Alchemy' })
+    expect(within(alchemy).getByText('Aeliana')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Expand all' })).not.toBeInTheDocument()
   })
 
   it('should show an empty message when nobody has recorded a profession', async () => {

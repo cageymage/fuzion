@@ -153,6 +153,7 @@ describe('Professions character recipes', () => {
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
     const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    await user.click(within(alchemy).getByRole('button', { name: 'Alchemy' }))
 
     await user.click(within(alchemy).getByRole('button', { name: /Aeliana/ }))
 
@@ -167,6 +168,7 @@ describe('Professions character recipes', () => {
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
     const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    await user.click(within(alchemy).getByRole('button', { name: 'Alchemy' }))
     const row = within(alchemy).getByRole('button', { name: /Aeliana/ })
     await user.click(row)
     await within(alchemy).findByText("Elixir of Lion's Strength")
@@ -183,6 +185,7 @@ describe('Professions character recipes', () => {
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
     const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    await user.click(within(alchemy).getByRole('button', { name: 'Alchemy' }))
 
     await user.click(within(alchemy).getByRole('button', { name: /Aeliana/ }))
 
@@ -201,6 +204,7 @@ describe('Professions character recipes', () => {
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
     const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    await user.click(within(alchemy).getByRole('button', { name: 'Alchemy' }))
     await user.click(within(alchemy).getByRole('button', { name: /Aeliana/ }))
     await within(alchemy).findByText('Elixir 1')
     expect(within(alchemy).queryByText('Elixir 9')).not.toBeInTheDocument()
@@ -216,6 +220,7 @@ describe('Professions character recipes', () => {
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
     const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    await user.click(within(alchemy).getByRole('button', { name: 'Alchemy' }))
 
     await user.click(within(alchemy).getByRole('button', { name: /Aeliana/ }))
 
