@@ -28,6 +28,7 @@ type characterJSON struct {
 	Role2         *string `json:"role2"`
 	IsMain        bool    `json:"isMain"`
 	Rank          *string `json:"rank"`
+	RankOrder     *int    `json:"rankOrder"`
 	RaidTeam      *string `json:"raidTeam"`
 	Race          *string `json:"race"`
 	Level         *int    `json:"level"`
@@ -1399,8 +1400,8 @@ func TestListRoster_ReturnsTheGuildRankName_WhenTheSyncHasSeenTheCharacter(t *te
 	var characters []characterJSON
 	resp.DecodeJSON(t, &characters)
 	want := []characterJSON{
-		{ID: "22222222-2222-2222-2222-222222222222", Name: "Brannock", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "tank", IsMain: true, Rank: strPtr("Member"), CreatedAt: "2026-09-01T12:00:00Z"},
-		{ID: "11111111-1111-1111-1111-111111111111", Name: "Aeliana", SecondaryName: "Dawnsong", Realm: "Emberreach", Class: "Priest", Role: "healer", IsMain: false, Rank: strPtr("Officer Alt"), CreatedAt: "2026-09-01T12:00:00Z"},
+		{ID: "22222222-2222-2222-2222-222222222222", Name: "Brannock", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "tank", IsMain: true, Rank: strPtr("Member"), RankOrder: intPtr(6), CreatedAt: "2026-09-01T12:00:00Z"},
+		{ID: "11111111-1111-1111-1111-111111111111", Name: "Aeliana", SecondaryName: "Dawnsong", Realm: "Emberreach", Class: "Priest", Role: "healer", IsMain: false, Rank: strPtr("Officer Alt"), RankOrder: intPtr(3), CreatedAt: "2026-09-01T12:00:00Z"},
 	}
 	if diff := cmp.Diff(want, characters); diff != "" {
 		t.Errorf("unexpected roster (-want +got):\n%s", diff)
@@ -1423,7 +1424,7 @@ func TestListRoster_ReturnsANumberedRank_WhenTheGuildRankIsOneTheSiteHasNoNameFo
 	var characters []characterJSON
 	resp.DecodeJSON(t, &characters)
 	want := []characterJSON{
-		{ID: "33333333-3333-3333-3333-333333333333", Name: "Corwin", SecondaryName: "Ashfall", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Rank: strPtr("Rank 7"), CreatedAt: "2026-09-01T12:00:00Z"},
+		{ID: "33333333-3333-3333-3333-333333333333", Name: "Corwin", SecondaryName: "Ashfall", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Rank: strPtr("Rank 7"), RankOrder: intPtr(7), CreatedAt: "2026-09-01T12:00:00Z"},
 	}
 	if diff := cmp.Diff(want, characters); diff != "" {
 		t.Errorf("unexpected roster (-want +got):\n%s", diff)
@@ -1471,7 +1472,7 @@ func TestUpdateCharacter_KeepsMainOrAltFromTheRank_WhenTheCharacterHasAGuildRank
 	resp.DecodeJSON(t, &updated)
 	want := characterJSON{
 		ID: "11111111-1111-1111-1111-111111111111", Name: "Aeliana", SecondaryName: "Dawnsong", Realm: "Emberreach",
-		Class: "Priest", Role: "healer", IsMain: false, Rank: strPtr("Alt"), CreatedAt: "2026-09-01T12:00:00Z",
+		Class: "Priest", Role: "healer", IsMain: false, Rank: strPtr("Alt"), RankOrder: intPtr(5), CreatedAt: "2026-09-01T12:00:00Z",
 	}
 	if diff := cmp.Diff(want, updated); diff != "" {
 		t.Errorf("unexpected updated character (-want +got):\n%s", diff)

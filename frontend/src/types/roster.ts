@@ -39,6 +39,8 @@ export interface Character {
   isMain: boolean
   // The in-game guild rank's name; null for characters the roster sync has never seen.
   rank: string | null
+  // The in-game guild rank number (0 is the guild master); null when rank is null.
+  rankOrder: number | null
   raidTeam: string | null
   race: string | null
   level: number | null

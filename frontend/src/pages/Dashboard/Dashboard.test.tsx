@@ -37,6 +37,7 @@ function ownedCharacter(id: string, name: string, secondaryName: string, isMain:
     role2: null,
     isMain,
     rank: null,
+    rankOrder: null,
     raidTeam: null,
     race: null,
     level: 60,

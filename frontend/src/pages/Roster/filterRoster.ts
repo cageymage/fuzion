@@ -10,7 +10,7 @@ export interface RosterFilters {
   search: string
 }
 
-export type SortKey = 'name' | 'race' | 'level' | 'class' | 'role' | 'raidTeam'
+export type SortKey = 'name' | 'race' | 'level' | 'class' | 'role' | 'raidTeam' | 'rank'
 export type SortDirection = 'asc' | 'desc'
 
 export interface RosterSort {
@@ -56,6 +56,8 @@ function sortValue(character: Character, key: SortKey): string | number | null {
       return character.role
     case 'raidTeam':
       return character.raidTeam
+    case 'rank':
+      return character.rankOrder
   }
 }
 

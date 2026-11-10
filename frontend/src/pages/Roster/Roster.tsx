@@ -248,13 +248,12 @@ export function Roster() {
                   <tr>
                     <SortHeader label="Race" sortKey="race" sort={sort} onSort={toggleSort} />
                     <SortHeader label="Name" sortKey="name" sort={sort} onSort={toggleSort} />
-                    <th scope="col">Secondary name</th>
                     <SortHeader label="Level" sortKey="level" sort={sort} onSort={toggleSort} />
                     <SortHeader label="Class" sortKey="class" sort={sort} onSort={toggleSort} />
                     <th scope="col">Spec</th>
                     <SortHeader label="Role" sortKey="role" sort={sort} onSort={toggleSort} />
                     <SortHeader label="Raid Team" sortKey="raidTeam" sort={sort} onSort={toggleSort} />
-                    <th scope="col">Rank</th>
+                    <SortHeader label="Rank" sortKey="rank" sort={sort} onSort={toggleSort} />
                     <th scope="col">Professions</th>
                     {canManage && (
                       <th scope="col">
@@ -271,8 +270,7 @@ export function Roster() {
                       </td>
                       <td>
                         <ArmoryLink character={character}>{character.name}</ArmoryLink>
-                      </td>
-                      <td>
+                        {character.secondaryName && ' '}
                         <ArmoryLink character={character}>{character.secondaryName}</ArmoryLink>
                       </td>
                       <td>{character.level}</td>

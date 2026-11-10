@@ -22,6 +22,7 @@ const ragnok: Character = {
   role2: null,
   isMain: true,
   rank: null,
+  rankOrder: null,
   raidTeam: 'Team Alpha',
   race: null,
   level: null,
@@ -53,6 +54,7 @@ const zaldrix: Character = {
   role: 'dps',
   isMain: false,
   rank: null,
+  rankOrder: null,
   raidTeam: null,
 }
 
