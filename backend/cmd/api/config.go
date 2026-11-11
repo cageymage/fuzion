@@ -23,6 +23,9 @@ type config struct {
 	// Optional: empty disables the Discord cross-post when a news post is published.
 	announcementsWebhookURL string
 
+	// Optional: empty disables the Discord ping to officers for new rank change requests.
+	rankRequestsWebhookURL string
+
 	// Optional: empty disables the Turnstile bot check on new applications.
 	turnstileSecretKey string
 
@@ -156,7 +159,7 @@ func loadConfig() (config, error) {
 		return config{}, err
 	}
 
-	for _, webhook := range []string{"DISCORD_ANNOUNCEMENTS_WEBHOOK_URL", "DISCORD_RECRUITING_WEBHOOK_URL"} {
+	for _, webhook := range []string{"DISCORD_ANNOUNCEMENTS_WEBHOOK_URL", "DISCORD_RECRUITING_WEBHOOK_URL", "DISCORD_RANK_REQUESTS_WEBHOOK_URL"} {
 		if os.Getenv(webhook) != "" && os.Getenv("SITE_BASE_URL") == "" {
 			return config{}, fmt.Errorf("SITE_BASE_URL is required when %s is set", webhook)
 		}
@@ -174,6 +177,7 @@ func loadConfig() (config, error) {
 		},
 		recruitingWebhookURL:    os.Getenv("DISCORD_RECRUITING_WEBHOOK_URL"),
 		announcementsWebhookURL: os.Getenv("DISCORD_ANNOUNCEMENTS_WEBHOOK_URL"),
+		rankRequestsWebhookURL:  os.Getenv("DISCORD_RANK_REQUESTS_WEBHOOK_URL"),
 		turnstileSecretKey:      os.Getenv("TURNSTILE_SECRET_KEY"),
 		siteBaseURL:             os.Getenv("SITE_BASE_URL"),
 		raidHelperWebhookKey:    os.Getenv("RAID_HELPER_WEBHOOK_SECRET"),

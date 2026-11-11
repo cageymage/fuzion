@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest'
 import { server } from '../../mocks/server'
 import { renderWithProviders } from '../../testUtils'
 import type { AuthUser } from '../../types/auth'
-import type { MyCharacter } from '../../types/roster'
+import type { RankRequest } from '../../types/rankRequests'
+import type { Character } from '../../types/roster'
 import { Dashboard } from './Dashboard'
 
 const unlinkedMember: AuthUser = {
@@ -24,7 +25,9 @@ const linkedMember: AuthUser = {
   battletag: 'Thunder#1234',
 }
 
-function ownedCharacter(id: string, name: string, secondaryName: string, isMain: boolean): MyCharacter {
+const officer: AuthUser = { ...linkedMember, isOfficer: true }
+
+function ownedCharacter(id: string, name: string, secondaryName: string, isMain: boolean): Character {
   return {
     id,
     name,
@@ -32,7 +35,7 @@ function ownedCharacter(id: string, name: string, secondaryName: string, isMain:
     realm: 'Emberreach',
     class: 'Warrior',
     spec: null,
-    role: 'tank',
+    role: null,
     spec2: null,
     role2: null,
     isMain,
@@ -48,7 +51,26 @@ function ownedCharacter(id: string, name: string, secondaryName: string, isMain:
   }
 }
 
-// Each character's own line (name, class, guild rank), without its profession editor.
+function rankRequest(overrides: Partial<RankRequest>): RankRequest {
+  return {
+    id: 'request-1',
+    characterId: 'char-a',
+    characterName: 'Ragefist',
+    characterSecondaryName: 'Ironjaw',
+    characterClass: 'Warrior',
+    direction: 'to_alt',
+    status: 'open',
+    note: '',
+    resolutionNote: '',
+    requestedBy: 'thundermane',
+    createdAt: '2026-10-20T12:00:00Z',
+    resolvedAt: null,
+    resolvedBy: null,
+    ...overrides,
+  }
+}
+
+// Each character's own line (name, class, guild rank), without its specs or requests.
 async function characterRows() {
   const list = await screen.findByRole('list', { name: 'Characters' })
   return within(list)
@@ -116,6 +138,16 @@ describe('Dashboard', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'already linked to another member',
+    )
+  })
+
+  it('should say the characters were refreshed when the callback redirects with battlenet=linked', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(linkedMember)))
+
+    renderWithProviders(<Dashboard />, '/dashboard?battlenet=linked')
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Battle.net is linked and your characters are refreshed.',
     )
   })
 
@@ -207,7 +239,24 @@ describe('Dashboard', () => {
     expect(screen.queryByRole('heading', { name: 'Your characters' })).not.toBeInTheDocument()
   })
 
-  it("should explain how to claim characters when none of the linked account's characters are on the roster", async () => {
+  it('should offer a Refresh characters button linking to Battle.net when characters are listed', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(linkedMember)))
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    const section = await screen.findByRole('region', { name: 'Your characters' })
+    expect(within(section).getByRole('link', { name: 'Refresh characters' })).toHaveAttribute(
+      'href',
+      'http://localhost:3000/api/auth/battlenet/link',
+    )
+    expect(
+      within(section).getByText(
+        'Refreshing picks up characters added to the guild roster since you linked Battle.net.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("should offer the Refresh characters button when none of the linked account's characters are on the roster", async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
       http.get('/api/me/characters', () => HttpResponse.json([])),
@@ -217,9 +266,11 @@ describe('Dashboard', () => {
 
     const section = await screen.findByRole('region', { name: 'Your characters' })
     expect(
-      await within(section).findByText(/None of the characters on your Battle.net account are on the guild roster yet/),
+      await within(section).findByText(
+        'None of the characters on your Battle.net account are on the guild roster yet. Once they are, refresh your characters to claim them.',
+      ),
     ).toBeInTheDocument()
-    expect(within(section).getByRole('link', { name: 'link Battle.net again' })).toHaveAttribute(
+    expect(within(section).getByRole('link', { name: 'Refresh characters' })).toHaveAttribute(
       'href',
       'http://localhost:3000/api/auth/battlenet/link',
     )
@@ -236,139 +287,352 @@ describe('Dashboard', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your characters')
   })
 
-  it("should show each character's professions with their skill levels", async () => {
+  it("should show each character's professions with their skill levels without edit controls", async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json(linkedMember)))
 
     renderWithProviders(<Dashboard />, '/dashboard')
 
-    const professions = await screen.findByRole('list', { name: 'Professions of Thundermane Stormcaller' })
-    expect(within(professions).getByRole('spinbutton', { name: 'Mining skill for Thundermane Stormcaller' })).toHaveValue(300)
-    expect(screen.getByText('No professions yet.')).toBeInTheDocument()
+    const section = await screen.findByRole('region', { name: 'Your characters' })
+    expect(await within(section).findByText('Mining 300')).toBeInTheDocument()
+    expect(within(section).queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(within(section).queryByRole('button', { name: /^(Add|Remove)/ })).not.toBeInTheDocument()
   })
 
-  it('should not offer a profession the character already knows when adding one', async () => {
-    server.use(http.get('/api/auth/me', () => HttpResponse.json(linkedMember)))
-
-    renderWithProviders(<Dashboard />, '/dashboard')
-
-    const select = await screen.findByRole('combobox', { name: 'Profession to add to Thundermane Stormcaller' })
-    const options = within(select)
-      .getAllByRole('option')
-      .map((option) => option.textContent)
-    expect(options).toEqual([
-      'Add a profession…',
-      'Alchemy',
-      'Blacksmithing',
-      'Enchanting',
-      'Engineering',
-      'Herbalism',
-      'Leatherworking',
-      'Skinning',
-      'Tailoring',
-      'Cooking',
-      'Fishing',
-      'First Aid',
-    ])
-  })
-
-  it('should add a profession to a character when the Add form is submitted', async () => {
-    const professions: MyCharacter['professions'] = []
-    let postBody: unknown
+  it('should show the specs as not set when the owner has not picked any', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
       http.get('/api/me/characters', () =>
-        HttpResponse.json([{ ...ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true), professions }]),
+        HttpResponse.json([ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true)]),
       ),
-      http.post('/api/me/characters/char-a/professions', async ({ request }) => {
-        postBody = await request.json()
-        professions.push({ id: 'prof-1', profession: 'Tailoring', skillLevel: 150 })
-        return HttpResponse.json({ id: 'prof-1', profession: 'Tailoring', skillLevel: 150 }, { status: 201 })
-      }),
     )
+
     renderWithProviders(<Dashboard />, '/dashboard')
 
-    await userEvent.selectOptions(
-      await screen.findByRole('combobox', { name: 'Profession to add to Ragefist Ironjaw' }),
-      'Tailoring',
-    )
-    const skill = screen.getByRole('spinbutton', { name: 'Skill for the new profession on Ragefist Ironjaw' })
-    await userEvent.clear(skill)
-    await userEvent.type(skill, '150')
-    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
-
-    expect(
-      await screen.findByRole('spinbutton', { name: 'Tailoring skill for Ragefist Ironjaw' }),
-    ).toHaveValue(150)
-    expect(postBody).toEqual({ profession: 'Tailoring', skillLevel: 150 })
+    const section = await screen.findByRole('region', { name: 'Your characters' })
+    await within(section).findByText('Ragefist Ironjaw')
+    const specs = within(section)
+      .getAllByRole('definition')
+      .map((item) => item.textContent)
+    expect(specs).toEqual(['Not set'])
   })
 
-  it('should save a new skill level when it is changed and Save is clicked', async () => {
-    let skillLevel = 300
-    let patchBody: unknown
+  it('should show the primary and secondary specs with their roles when both are set', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
       http.get('/api/me/characters', () =>
         HttpResponse.json([
           {
             ...ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true),
-            professions: [{ id: 'prof-1', profession: 'Mining', skillLevel }],
+            spec: 'Protection',
+            role: 'tank',
+            spec2: 'Fury',
+            role2: 'dps',
           },
         ]),
       ),
-      http.patch('/api/me/professions/prof-1', async ({ request }) => {
+    )
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    const section = await screen.findByRole('region', { name: 'Your characters' })
+    await within(section).findByText('Ragefist Ironjaw')
+    const terms = within(section)
+      .getAllByRole('term')
+      .map((item) => item.textContent)
+    const specs = within(section)
+      .getAllByRole('definition')
+      .map((item) => item.textContent)
+    expect(terms).toEqual(['Primary spec', 'Secondary spec'])
+    expect(specs).toEqual(['Protection (Tank)', 'Fury (DPS)'])
+  })
+
+  it('should save the primary spec and role when the specs form is submitted', async () => {
+    let character = ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true)
+    let patchBody: unknown
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () => HttpResponse.json([character])),
+      http.patch('/api/me/characters/char-a', async ({ request }) => {
         patchBody = await request.json()
-        skillLevel = 310
-        return HttpResponse.json({ id: 'prof-1', profession: 'Mining', skillLevel })
+        character = { ...character, spec: 'Protection', role: 'tank' }
+        return HttpResponse.json(character)
       }),
     )
     renderWithProviders(<Dashboard />, '/dashboard')
 
-    const skill = await screen.findByRole('spinbutton', { name: 'Mining skill for Ragefist Ironjaw' })
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    await userEvent.clear(skill)
-    await userEvent.type(skill, '310')
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit specs for Ragefist Ironjaw' }))
+    const form = screen.getByRole('form', { name: 'Specs for Ragefist Ironjaw' })
+    await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Primary spec' }), 'Protection')
+    await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Primary role' }), 'Tank')
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }))
 
-    expect(patchBody).toEqual({ skillLevel: 310 })
-    expect(await screen.findByRole('spinbutton', { name: 'Mining skill for Ragefist Ironjaw' })).toHaveValue(310)
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(await screen.findByText('Protection (Tank)')).toBeInTheDocument()
+    expect(patchBody).toEqual({ spec: 'Protection', role: 'tank' })
   })
 
-  it('should remove a profession when its Remove button is clicked', async () => {
-    let professions = [{ id: 'prof-1', profession: 'Mining', skillLevel: 300 }]
+  it('should send the secondary spec with a role when one is chosen', async () => {
+    let patchBody: unknown
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
       http.get('/api/me/characters', () =>
-        HttpResponse.json([{ ...ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true), professions }]),
+        HttpResponse.json([
+          { ...ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true), spec: 'Protection', role: 'tank' },
+        ]),
       ),
-      http.delete('/api/me/professions/prof-1', () => {
-        professions = []
+      http.patch('/api/me/characters/char-a', async ({ request }) => {
+        patchBody = await request.json()
+        return HttpResponse.json(ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true))
+      }),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit specs for Ragefist Ironjaw' }))
+    const form = screen.getByRole('form', { name: 'Specs for Ragefist Ironjaw' })
+    await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Secondary spec' }), 'Fury')
+    await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Secondary role' }), 'DPS')
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }))
+
+    await screen.findByRole('button', { name: 'Edit specs for Ragefist Ironjaw' })
+    expect(patchBody).toEqual({ spec2: 'Fury', role2: 'dps' })
+  })
+
+  it('should send an empty role when the owner sets the primary role back to Not set', async () => {
+    let character: Character = { ...ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true), role: 'tank' }
+    let patchBody: unknown
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () => HttpResponse.json([character])),
+      http.patch('/api/me/characters/char-a', async ({ request }) => {
+        patchBody = await request.json()
+        character = { ...character, role: null }
+        return HttpResponse.json(character)
+      }),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit specs for Ragefist Ironjaw' }))
+    const form = screen.getByRole('form', { name: 'Specs for Ragefist Ironjaw' })
+    await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Primary role' }), 'Not set')
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Not set')).toBeInTheDocument()
+    expect(patchBody).toEqual({ role: '' })
+  })
+
+  it("should show the server's message when saving the specs fails", async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true)]),
+      ),
+      http.patch('/api/me/characters/char-a', () =>
+        HttpResponse.json({ error: 'spec: must be one of Arms, Fury, Protection' }, { status: 400 }),
+      ),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit specs for Ragefist Ironjaw' }))
+    const form = screen.getByRole('form', { name: 'Specs for Ragefist Ironjaw' })
+    await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Primary spec' }), 'Arms')
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }))
+
+    expect(await within(form).findByRole('alert')).toHaveTextContent(
+      'spec: must be one of Arms, Fury, Protection',
+    )
+  })
+
+  it('should offer an alt rank request when the character is a main', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true)]),
+      ),
+    )
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    expect(await screen.findByRole('button', { name: 'Request alt rank for Ragefist Ironjaw' })).toBeInTheDocument()
+  })
+
+  it('should offer a main rank request when the character is an alt', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([ownedCharacter('char-b', 'Shieldwall', 'Ironjaw', false)]),
+      ),
+    )
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    expect(
+      await screen.findByRole('button', { name: 'Request main rank for Shieldwall Ironjaw' }),
+    ).toBeInTheDocument()
+  })
+
+  it('should file a rank request with the note when Send request is clicked', async () => {
+    let requests: RankRequest[] = []
+    let postBody: unknown
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true)]),
+      ),
+      http.get('/api/me/rank-requests', () => HttpResponse.json(requests)),
+      http.post('/api/me/characters/char-a/rank-requests', async ({ request }) => {
+        postBody = await request.json()
+        requests = [rankRequest({ note: 'Levelling a new main' })]
+        return HttpResponse.json(requests[0], { status: 201 })
+      }),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Request alt rank for Ragefist Ironjaw' }))
+    const form = screen.getByRole('form', { name: 'Rank request for Ragefist Ironjaw' })
+    await userEvent.type(
+      within(form).getByRole('textbox', { name: 'Note for officers (optional)' }),
+      'Levelling a new main',
+    )
+    await userEvent.click(within(form).getByRole('button', { name: 'Send request' }))
+
+    expect(
+      await screen.findByText('You asked for a move to an alt rank. An officer will change it in game.'),
+    ).toBeInTheDocument()
+    expect(postBody).toEqual({ note: 'Levelling a new main' })
+  })
+
+  it("should show the server's message when filing a rank request fails", async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true)]),
+      ),
+      http.post('/api/me/characters/char-a/rank-requests', () =>
+        HttpResponse.json({ error: 'this character already has an open rank request' }, { status: 409 }),
+      ),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Request alt rank for Ragefist Ironjaw' }))
+    const form = screen.getByRole('form', { name: 'Rank request for Ragefist Ironjaw' })
+    await userEvent.click(within(form).getByRole('button', { name: 'Send request' }))
+
+    expect(await within(form).findByRole('alert')).toHaveTextContent(
+      'this character already has an open rank request',
+    )
+  })
+
+  it('should cancel an open rank request when Cancel request is clicked', async () => {
+    let requests = [rankRequest({})]
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true)]),
+      ),
+      http.get('/api/me/rank-requests', () => HttpResponse.json(requests)),
+      http.delete('/api/me/rank-requests/request-1', () => {
+        requests = []
         return new HttpResponse(null, { status: 204 })
       }),
     )
     renderWithProviders(<Dashboard />, '/dashboard')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Remove Mining from Ragefist Ironjaw' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel rank request for Ragefist Ironjaw' }))
 
-    expect(await screen.findByText('No professions yet.')).toBeInTheDocument()
-    expect(screen.queryByRole('spinbutton', { name: 'Mining skill for Ragefist Ironjaw' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Request alt rank for Ragefist Ironjaw' })).toBeInTheDocument()
+    expect(screen.queryByText(/You asked for a move/)).not.toBeInTheDocument()
   })
 
-  it("should show the server's message when adding a profession the character already has", async () => {
+  it("should show the officer's note when a rank request was declined", async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
-      http.post('/api/me/characters/:id/professions', () =>
-        HttpResponse.json({ error: 'character already has this profession' }, { status: 409 }),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true)]),
+      ),
+      http.get('/api/me/rank-requests', () =>
+        HttpResponse.json([
+          rankRequest({ status: 'declined', resolutionNote: 'Raid needs your main', resolvedBy: 'officerbob' }),
+        ]),
       ),
     )
     renderWithProviders(<Dashboard />, '/dashboard')
 
-    await userEvent.selectOptions(
-      await screen.findByRole('combobox', { name: 'Profession to add to Thundermend Lightward' }),
-      'Alchemy',
-    )
-    await userEvent.click(within(screen.getByRole('form', { name: 'Add a profession to Thundermend Lightward' })).getByRole('button', { name: 'Add' }))
+    expect(
+      await screen.findByText('Your request for a move to an alt rank was declined: Raid needs your main'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Request alt rank for Ragefist Ironjaw' })).toBeInTheDocument()
+  })
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('character already has this profession')
+  it('should say the rank request is done when an officer marked it done', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true)]),
+      ),
+      http.get('/api/me/rank-requests', () =>
+        HttpResponse.json([
+          rankRequest({ status: 'done', resolvedAt: '2026-10-21T12:00:00Z', resolvedBy: 'officerbob' }),
+        ]),
+      ),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    expect(await screen.findByText('Your request for a move to an alt rank is done.')).toBeInTheDocument()
+  })
+
+  it('should show officers a rank requests link with the pending count', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(officer)),
+      http.get('/api/rank-requests/count', () => HttpResponse.json({ open: 3 })),
+    )
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    const section = await screen.findByRole('region', { name: 'Officer' })
+    expect(within(section).getByRole('link', { name: 'Rank requests' })).toHaveAttribute(
+      'href',
+      '/officer/rank-requests',
+    )
+    expect(await within(section).findByText('3 pending')).toBeInTheDocument()
+  })
+
+  it("should update the officer's pending count when they file a rank request for their own character", async () => {
+    let open = 0
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(officer)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true)]),
+      ),
+      http.get('/api/rank-requests/count', () => HttpResponse.json({ open })),
+      http.post('/api/me/characters/char-a/rank-requests', () => {
+        open = 1
+        return HttpResponse.json(rankRequest({}), { status: 201 })
+      }),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    const section = await screen.findByRole('region', { name: 'Officer' })
+    expect(await within(section).findByText('none pending')).toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('button', { name: 'Request alt rank for Ragefist Ironjaw' }))
+    const form = screen.getByRole('form', { name: 'Rank request for Ragefist Ironjaw' })
+    await userEvent.click(within(form).getByRole('button', { name: 'Send request' }))
+
+    expect(await within(section).findByText('1 pending')).toBeInTheDocument()
+  })
+
+  it('should not show the rank requests link when the user is not an officer', async () => {
+    let countRequested = false
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/rank-requests/count', () => {
+        countRequested = true
+        return HttpResponse.json({ open: 3 })
+      }),
+    )
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    await screen.findByRole('region', { name: 'Your characters' })
+    expect(screen.queryByRole('link', { name: 'Rank requests' })).not.toBeInTheDocument()
+    expect(countRequested).toBe(false)
   })
 })

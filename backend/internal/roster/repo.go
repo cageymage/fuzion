@@ -19,11 +19,12 @@ type Character struct {
 	Realm         string                `db:"realm"          json:"realm"`
 	Class         string                `db:"class"          json:"class"`
 	Spec          *string               `db:"spec"           json:"spec"`
-	Role          string                `db:"role"           json:"role"`
+	Role          *string               `db:"role"           json:"role"`
 	Spec2         *string               `db:"spec2"          json:"spec2"`
 	Role2         *string               `db:"role2"          json:"role2"`
 	IsMain        bool                  `db:"is_main"        json:"isMain"`
 	GuildRank     *int                  `db:"guild_rank"     json:"rankOrder"`
+	UserID        *uuid.UUID            `db:"user_id"        json:"-"`
 	Rank          *string               `db:"-"              json:"rank"`
 	RaidTeam      *string               `db:"raid_team"      json:"raidTeam"`
 	Race          *string               `db:"race"           json:"race"`
@@ -108,7 +109,7 @@ func (r *Repo) professionsByCharacter(ctx context.Context, only *uuid.UUID) (map
 	return byCharacter, nil
 }
 
-const returningColumns = `id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, guild_rank, raid_team, race, level, gender, created_at`
+const returningColumns = `id, name, secondary_name, realm, class, spec, role, spec2, role2, is_main, guild_rank, user_id, raid_team, race, level, gender, created_at`
 
 const uniqueViolationCode = "23505"
 
@@ -169,7 +170,9 @@ func (r *Repo) Get(ctx context.Context, id uuid.UUID) (Character, error) {
 // spec2 and role2 outright so they can be cleared. professions, when non-nil,
 // replaces the character's whole profession set. isMain applies only to characters
 // with no guild rank: for the rest the rank decides, and the next sync would undo it.
-func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, second *secondSpec, professions *[]string) (Character, error) {
+// An empty role clears it. owner, when non-nil, limits the write to that user's
+// character, and the character then counts as not found when someone else owns it.
+func (r *Repo) Update(ctx context.Context, id uuid.UUID, owner *uuid.UUID, req UpdateRequest, second *secondSpec, professions *[]string) (Character, error) {
 	const query = `
 		UPDATE characters SET
 			name           = COALESCE($2, name),
@@ -177,14 +180,14 @@ func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, seco
 			realm          = COALESCE($4, realm),
 			class          = COALESCE($5, class),
 			spec           = COALESCE($6, spec),
-			role           = COALESCE($7, role),
+			role           = CASE WHEN $7::text = '' THEN NULL ELSE COALESCE($7, role) END,
 			is_main        = CASE WHEN guild_rank IS NULL THEN COALESCE($8, is_main) ELSE is_main END,
 			raid_team      = COALESCE($9, raid_team),
 			spec2          = CASE WHEN $10::boolean THEN $11::text ELSE spec2 END,
 			role2          = CASE WHEN $10::boolean THEN $12::text ELSE role2 END,
 			race           = COALESCE($13, race),
 			level          = COALESCE($14, level)
-		WHERE id = $1
+		WHERE id = $1 AND ($15::uuid IS NULL OR user_id = $15::uuid)
 		RETURNING ` + returningColumns
 
 	var spec2, role2 *string
@@ -199,7 +202,7 @@ func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest, seco
 	defer func() { _ = tx.Rollback() }() // no-op once committed
 
 	var updated Character
-	if err := tx.GetContext(ctx, &updated, query, id, req.Name, req.SecondaryName, req.Realm, req.Class, req.Spec, req.Role, req.IsMain, req.RaidTeam, second != nil, spec2, role2, req.Race, req.Level); err != nil {
+	if err := tx.GetContext(ctx, &updated, query, id, req.Name, req.SecondaryName, req.Realm, req.Class, req.Spec, req.Role, req.IsMain, req.RaidTeam, second != nil, spec2, role2, req.Race, req.Level, owner); err != nil {
 		return Character{}, mapWriteError(err)
 	}
 	if professions != nil {

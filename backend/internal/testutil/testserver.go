@@ -29,6 +29,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/raidhelper"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
 	"github.com/cageymage/fuzion/backend/internal/raids"
+	"github.com/cageymage/fuzion/backend/internal/rankrequests"
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
@@ -55,6 +56,8 @@ type Server struct {
 	Webhook   *FakeWebhook
 	// Announcements is the news announcements channel, separate from Webhook (recruiting).
 	Announcements *FakeWebhook
+	// RankRequests is the officers' rank requests channel.
+	RankRequests *FakeWebhook
 	YouTube       *FakeYouTube
 	Turnstile     *FakeTurnstile
 	// Shell is the static site's index.html that per-post news pages wrap tags around.
@@ -70,6 +73,7 @@ type serverOptions struct {
 	youTubePlaylistID    string
 	recruitingWebhook    bool
 	announcementsWebhook bool
+	rankRequestsWebhook  bool
 	turnstile            bool
 	raidHelperWebhookKey string
 	discordGuildID       string
@@ -122,6 +126,12 @@ func WithoutAnnouncementsWebhook() ServerOption {
 	return func(o *serverOptions) { o.announcementsWebhook = false }
 }
 
+// WithoutRankRequestsWebhook builds the server the way a deploy without
+// DISCORD_RANK_REQUESTS_WEBHOOK_URL runs: officers are not pinged about rank requests.
+func WithoutRankRequestsWebhook() ServerOption {
+	return func(o *serverOptions) { o.rankRequestsWebhook = false }
+}
+
 // WithoutRecruitingWebhook builds the server the way a deploy without
 // DISCORD_RECRUITING_WEBHOOK_URL runs: new applications are not announced.
 func WithoutRecruitingWebhook() ServerOption {
@@ -137,7 +147,7 @@ func WithoutYouTubePlaylist() ServerOption {
 func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	t.Helper()
 
-	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey, discordGuildID: DiscordGuildID, submissionStorage: SubmissionStorageLimit, submissionSlots: submissions.DefaultUploadSlots}
+	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, rankRequestsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey, discordGuildID: DiscordGuildID, submissionStorage: SubmissionStorageLimit, submissionSlots: submissions.DefaultUploadSlots}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -152,6 +162,12 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	var announcements news.Notifier
 	if options.announcementsWebhook {
 		announcements = discord.NewWebhook(announcementsWebhook.WebhookURL(), announcementsWebhook.Client())
+	}
+
+	rankRequestsWebhook := NewFakeWebhook(t)
+	var rankRequestsNotifier rankrequests.Notifier
+	if options.rankRequestsWebhook {
+		rankRequestsNotifier = discord.NewWebhook(rankRequestsWebhook.WebhookURL(), rankRequestsWebhook.Client())
 	}
 
 	fakeTurnstile := NewFakeTurnstile(t)
@@ -195,6 +211,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 		RaidHelper:     raidhelper.NewHandler(raidhelper.NewService(raidhelper.NewRepo(db)), options.raidHelperWebhookKey),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.Fixed(FixedNow))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
+		RankRequests:   rankrequests.NewHandler(rankrequests.NewService(rankrequests.NewRepo(db), clock.Fixed(FixedNow), rankRequestsNotifier, SiteBaseURL)),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), suggestedVideos),
 		Submissions:    submissions.NewHandler(submissions.NewService(submissions.NewRepo(db), clock.Fixed(FixedNow), !options.submissionsDisabled, options.submissionStorage), options.submissionSlots),
@@ -215,7 +232,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	client.Jar = jar
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
-	return &Server{Server: httpServer, Discord: discord, BattleNet: fakeBattleNet, Webhook: webhook, Announcements: announcementsWebhook, YouTube: youTube, Turnstile: fakeTurnstile, Shell: fakeShell, db: db, client: client}
+	return &Server{Server: httpServer, Discord: discord, BattleNet: fakeBattleNet, Webhook: webhook, Announcements: announcementsWebhook, RankRequests: rankRequestsWebhook, YouTube: youTube, Turnstile: fakeTurnstile, Shell: fakeShell, db: db, client: client}
 }
 
 type LoginOption func(*loginOptions)

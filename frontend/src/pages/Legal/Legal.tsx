@@ -40,6 +40,13 @@ export function Legal() {
             removes you as the owner of those characters.
           </li>
           <li>
+            Your characters and rank requests: the specs and roles you pick for characters you own,
+            and any rank change request you send, with its optional note, when you sent it and the
+            officer&apos;s reply. Officers can see your requests, and each new one is also posted,
+            with your Discord username and note, to the officers&apos; channel on the guild&apos;s
+            Discord server.
+          </li>
+          <li>
             Survey responses: your answers, the guild name you optionally enter, and your Discord
             username at the time you respond. Officers can see these per person, and the public
             results show totals only.

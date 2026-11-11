@@ -95,37 +95,89 @@
   font-size: var(--text-meta);
 }
 
-.professions {
-  margin-top: 8px;
-}
-
-.professionList {
-  margin: 0 0 6px;
-  padding: 0;
-  list-style: none;
-}
-
-.professionRow {
+.sectionHeader {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: 4px 0;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
 }
 
-.professionName {
-  min-width: 120px;
+.sectionHeader .sectionTitle {
+  margin: 0;
+}
+
+.specs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.specList {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0;
+}
+
+.specList dt {
   color: var(--muted);
 }
 
-.skillInput {
-  width: 5.5em;
+.specList dd {
+  margin: 0;
+}
+
+.specsForm,
+.requestForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  margin-top: 8px;
+}
+
+.specField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+}
+
+.formActions {
+  display: flex;
+  gap: 8px;
+}
+
+.rankRequest {
+  margin-top: 8px;
+}
+
+.rankRequest .hint {
+  margin: 0 0 6px;
+}
+
+.textarea {
+  min-width: min(320px, 100%);
   padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: var(--radius-chip);
-  background: transparent;
+  background: var(--surface);
   color: inherit;
   font: inherit;
+}
+
+.pendingBadge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-chip);
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-size: var(--text-meta);
 }
 
 .select {

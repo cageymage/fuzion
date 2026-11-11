@@ -11,6 +11,7 @@ func setRequiredConfig(t *testing.T) {
 	t.Setenv("DISCORD_GUILD_ID", "")
 	t.Setenv("DISCORD_ANNOUNCEMENTS_WEBHOOK_URL", "")
 	t.Setenv("DISCORD_RECRUITING_WEBHOOK_URL", "")
+	t.Setenv("DISCORD_RANK_REQUESTS_WEBHOOK_URL", "")
 	t.Setenv("SITE_BASE_URL", "")
 	t.Setenv("BATTLENET_REDIRECT_URL", "")
 	t.Setenv("BLIZZARD_CLIENT_ID", "")
@@ -82,6 +83,39 @@ func TestLoadConfig_Succeeds_WhenRecruitingWebhookAndSiteBaseURLAreSet(t *testin
 	}
 	if cfg.siteBaseURL != "https://fuzion.example" {
 		t.Errorf("expected siteBaseURL %q, got %q", "https://fuzion.example", cfg.siteBaseURL)
+	}
+}
+
+func TestLoadConfig_ReturnsError_WhenRankRequestsWebhookIsSetWithoutSiteBaseURL(t *testing.T) {
+	// given a rank requests webhook and no site base URL
+	setRequiredConfig(t)
+	t.Setenv("DISCORD_RANK_REQUESTS_WEBHOOK_URL", "https://discord.example/webhook")
+
+	// when I load the config
+	_, err := loadConfig()
+
+	// then I expect an error naming the missing variable
+	want := "SITE_BASE_URL is required when DISCORD_RANK_REQUESTS_WEBHOOK_URL is set"
+	if err == nil || err.Error() != want {
+		t.Errorf("expected error %q, got %v", want, err)
+	}
+}
+
+func TestLoadConfig_ReadsRankRequestsWebhook_WhenItAndSiteBaseURLAreSet(t *testing.T) {
+	// given a rank requests webhook and a site base URL
+	setRequiredConfig(t)
+	t.Setenv("DISCORD_RANK_REQUESTS_WEBHOOK_URL", "https://discord.example/webhook")
+	t.Setenv("SITE_BASE_URL", "https://fuzion.example")
+
+	// when I load the config
+	cfg, err := loadConfig()
+
+	// then I expect the webhook URL read
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.rankRequestsWebhookURL != "https://discord.example/webhook" {
+		t.Errorf("expected rankRequestsWebhookURL %q, got %q", "https://discord.example/webhook", cfg.rankRequestsWebhookURL)
 	}
 }
 

@@ -12,7 +12,8 @@ export interface CharacterFormValues {
   realm: string
   class: string
   spec: string
-  role: Role
+  // Empty only when editing a character whose owner has not picked a role yet.
+  role: Role | ''
   spec2: string
   role2: Role | ''
   isMain: boolean
@@ -71,7 +72,7 @@ export function formValuesFor(character: Character): CharacterFormValues {
     realm: character.realm,
     class: character.class,
     spec: character.spec ?? '',
-    role: character.role,
+    role: character.role ?? '',
     spec2: character.spec2 ?? '',
     role2: character.role2 ?? '',
     isMain: character.isMain,
@@ -113,7 +114,7 @@ export function buildUpdateRequest(
   if (current.realm !== initial.realm) request.realm = current.realm
   if (current.class !== initial.class) request.class = current.class
   if (current.spec !== initial.spec) request.spec = current.spec
-  if (current.role !== initial.role) request.role = current.role
+  if (current.role !== initial.role && current.role !== '') request.role = current.role
   if (current.spec2 !== initial.spec2 || current.role2 !== initial.role2) {
     request.spec2 = current.spec2
     request.role2 = current.role2

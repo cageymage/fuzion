@@ -38,7 +38,7 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
   }
 
   function changeSecondSpec(spec2: string) {
-    change({ spec2, role2: spec2 === '' ? '' : values.role2 || values.role })
+    change({ spec2, role2: spec2 === '' ? '' : values.role2 || values.role || roles[0] })
   }
 
   function toggleSecondaryProfession(profession: string, checked: boolean) {
@@ -141,6 +141,7 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
         <label className={styles.field}>
           <span>Role</span>
           <select value={values.role} onChange={(event) => change({ role: event.target.value as Role })}>
+            {values.role === '' && <option value="">Not set</option>}
             {roles.map((role) => (
               <option key={role} value={role}>
                 {roleLabels[role]}

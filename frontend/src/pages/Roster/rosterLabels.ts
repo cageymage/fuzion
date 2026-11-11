@@ -12,6 +12,7 @@ export function specLabel(character: Character): string {
 }
 
 export function roleLabel(character: Character): string {
+  if (character.role === null) return 'Not set'
   if (character.role2 && character.role2 !== character.role) {
     return `${roleLabels[character.role]}/${roleLabels[character.role2]}`
   }

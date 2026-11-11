@@ -381,6 +381,17 @@ describe('Roster race and level', () => {
     const row = (await screen.findByText('Ragnok')).closest('tr') as HTMLElement
     expect(within(row).getByRole('cell', { name: '—' })).toBeInTheDocument()
   })
+
+  it('should show the role as not set when the owner has not picked one', async () => {
+    server.use(
+      http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, spec: null, role: null, spec2: null, role2: null }])),
+    )
+
+    renderWithProviders(<Roster />)
+
+    const row = (await screen.findByText('Ragnok')).closest('tr') as HTMLElement
+    expect(within(row).getByRole('cell', { name: 'Not set' })).toBeInTheDocument()
+  })
 })
 
 describe('Roster sorting and search', () => {
