@@ -16,6 +16,7 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/raidhelper"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
 	"github.com/cageymage/fuzion/backend/internal/raids"
+	"github.com/cageymage/fuzion/backend/internal/rankrequests"
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/streams"
 	"github.com/cageymage/fuzion/backend/internal/submissions"
@@ -31,6 +32,7 @@ type Deps struct {
 	RaidHelper     *raidhelper.Handler
 	RaidProgress   *raidprogress.Handler
 	Raids          *raids.Handler
+	RankRequests   *rankrequests.Handler
 	Roster         *roster.Handler
 	Streams        *streams.Handler
 	Submissions    *submissions.Handler
@@ -67,6 +69,7 @@ func New(deps Deps) *chi.Mux {
 		deps.RaidHelper.Register(api)
 		deps.RaidProgress.Register(api)
 		deps.Raids.Register(api)
+		deps.RankRequests.Register(api)
 		deps.Roster.Register(api)
 		deps.Streams.Register(api)
 		deps.Submissions.Register(api)

@@ -122,6 +122,11 @@ services:
       # as a secret.
       - key: DISCORD_RECRUITING_WEBHOOK_URL
         sync: false
+      # Optional: without it, officers are not pinged in Discord about new rank change
+      # requests (they still see them on /officer/rank-requests). A channel webhook URL,
+      # so treat it as a secret. When it is set, SITE_BASE_URL is required.
+      - key: DISCORD_RANK_REQUESTS_WEBHOOK_URL
+        sync: false
       # Optional: without it, POST /applications skips the Turnstile bot check.
       # The widget's secret key; set it only once the frontend sends tokens, or
       # every real submission is rejected.

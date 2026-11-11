@@ -28,6 +28,7 @@ func (h *Handler) Register(r chi.Router) {
 	r.With(auth.RequireOfficer).Patch("/roster/{id}", h.update)
 	r.With(auth.RequireOfficer).Delete("/roster/{id}", h.delete)
 	r.With(auth.RequireUser).Get("/me/characters", h.listMine)
+	r.With(auth.RequireUser).Patch("/me/characters/{id}", h.updateMine)
 }
 
 func (h *Handler) listMine(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +40,25 @@ func (h *Handler) listMine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, characters)
+}
+
+func (h *Handler) updateMine(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	var req UpdateMyCharacterRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+
+	user, _ := auth.UserFrom(r.Context())
+	updated, err := h.service.UpdateMyCharacter(r.Context(), user.ID, id, req)
+	if err != nil {
+		writeError(w, r, "update my character", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +131,8 @@ func writeError(w http.ResponseWriter, r *http.Request, action string, err error
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": validationErr.Error()})
 	case errors.Is(err, ErrNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrNotFound.Error()})
+	case errors.Is(err, ErrNotOwner):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": ErrNotOwner.Error()})
 	case errors.Is(err, ErrConflict):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrConflict.Error()})
 	default:

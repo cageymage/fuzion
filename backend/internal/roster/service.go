@@ -26,6 +26,7 @@ const (
 var (
 	ErrNotFound = errors.New("character not found")
 	ErrConflict = errors.New("character with this name and secondary name already exists")
+	ErrNotOwner = errors.New("character is not yours")
 
 	// Mirrors the CHECK constraint on characters.class.
 	classes = []string{"Warrior", "Paladin", "Hunter", "Rogue", "Priest", "Shaman", "Mage", "Warlock", "Druid"}
@@ -98,6 +99,15 @@ type UpdateRequest struct {
 	Level         *int      `json:"level"`
 }
 
+// UpdateMyCharacterRequest holds what a member decides about their own character.
+// Everything else comes from the sync or from officers.
+type UpdateMyCharacterRequest struct {
+	Spec  *string `json:"spec"`
+	Role  *string `json:"role"`
+	Spec2 *string `json:"spec2"`
+	Role2 *string `json:"role2"`
+}
+
 type Service struct {
 	repo *Repo
 }
@@ -138,7 +148,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, err
 		Realm:         defaultRealm,
 		Class:         strings.TrimSpace(req.Class),
 		Spec:          trimOptional(req.Spec),
-		Role:          strings.TrimSpace(req.Role),
+		Role:          trimOptional(&req.Role),
 		Spec2:         blankToNil(req.Spec2),
 		Role2:         blankToNil(req.Role2),
 		IsMain:        req.IsMain,
@@ -161,7 +171,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, err
 	if err := validateClass(character.Class); err != nil {
 		return Character{}, err
 	}
-	if err := validateRole("role", character.Role); err != nil {
+	if err := validateRole("role", *character.Role); err != nil {
 		return Character{}, err
 	}
 	if err := validateSpecs(character.Class, character.Spec, character.Spec2, character.Role2, allSpecChecks); err != nil {
@@ -190,6 +200,10 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Character, err
 }
 
 func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateRequest) (Character, error) {
+	return s.update(ctx, id, nil, req)
+}
+
+func (s *Service) update(ctx context.Context, id uuid.UUID, owner *uuid.UUID, req UpdateRequest) (Character, error) {
 	req.Name = trimOptional(req.Name)
 	req.SecondaryName = trimOptional(req.SecondaryName)
 	req.Realm = trimOptional(req.Realm)
@@ -221,7 +235,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateRequest) (
 			return Character{}, err
 		}
 	}
-	if req.Role != nil {
+	if req.Role != nil && *req.Role != "" {
 		if err := validateRole("role", *req.Role); err != nil {
 			return Character{}, err
 		}
@@ -248,13 +262,30 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateRequest) (
 		return Character{}, err
 	}
 
-	updated, err := s.repo.Update(ctx, id, req, second, professions)
+	updated, err := s.repo.Update(ctx, id, owner, req, second, professions)
 	if err != nil {
 		return Character{}, fmt.Errorf("update character %s: %w", id, err)
 	}
 	updated.Faction = factionOf(updated.Race)
 	updated.Rank = rankName(updated.GuildRank)
 	return updated, nil
+}
+
+func (s *Service) UpdateMyCharacter(ctx context.Context, userID, id uuid.UUID, req UpdateMyCharacterRequest) (Character, error) {
+	current, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return Character{}, fmt.Errorf("load character %s: %w", id, err)
+	}
+	if current.UserID == nil || *current.UserID != userID {
+		return Character{}, ErrNotOwner
+	}
+	updated, err := s.update(ctx, id, &userID, UpdateRequest{Spec: req.Spec, Role: req.Role, Spec2: req.Spec2, Role2: req.Role2})
+	// The owner check above can go stale if the character is reassigned before the
+	// write, which then finds no row of ours to update.
+	if errors.Is(err, ErrNotFound) {
+		return Character{}, ErrNotOwner
+	}
+	return updated, err
 }
 
 func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {

@@ -23,7 +23,7 @@ type characterJSON struct {
 	Realm         string  `json:"realm"`
 	Class         string  `json:"class"`
 	Spec          *string `json:"spec"`
-	Role          string  `json:"role"`
+	Role          *string `json:"role"`
 	Spec2         *string `json:"spec2"`
 	Role2         *string `json:"role2"`
 	IsMain        bool    `json:"isMain"`
@@ -64,7 +64,7 @@ func TestListRoster_ReturnsMainsBeforeAlts(t *testing.T) {
 			Realm:         "Emberreach",
 			Class:         "Warrior",
 			Spec:          &protection,
-			Role:          "tank",
+			Role:          strPtr("tank"),
 			IsMain:        true,
 			RaidTeam:      &team1,
 			CreatedAt:     "2026-09-01T12:00:00Z",
@@ -76,7 +76,7 @@ func TestListRoster_ReturnsMainsBeforeAlts(t *testing.T) {
 			Realm:         "Emberreach",
 			Class:         "Priest",
 			Spec:          &holy,
-			Role:          "healer",
+			Role:          strPtr("healer"),
 			IsMain:        false,
 			RaidTeam:      nil,
 			CreatedAt:     "2026-09-01T12:00:00Z",
@@ -211,7 +211,7 @@ func TestCreateCharacter_ReturnsCreatedCharacter_WhenOfficerSubmitsValidBody(t *
 		Realm:         "Emberreach",
 		Class:         "Priest",
 		Spec:          &holy,
-		Role:          "healer",
+		Role:          strPtr("healer"),
 		IsMain:        true,
 		RaidTeam:      &team1,
 		CreatedAt:     created.CreatedAt,
@@ -423,7 +423,7 @@ func TestUpdateCharacter_ChangesOnlyProvidedFields(t *testing.T) {
 		Realm:         "Emberreach",
 		Class:         "Priest",
 		Spec:          &holy,
-		Role:          "dps",
+		Role:          strPtr("dps"),
 		IsMain:        true,
 		RaidTeam:      &team1,
 		CreatedAt:     "2026-09-01T12:00:00Z",
@@ -592,7 +592,7 @@ func TestListRoster_ReturnsSecondSpecAndRole_WhenCharacterHasOne(t *testing.T) {
 			Realm:         "Emberreach",
 			Class:         "Rogue",
 			Spec:          &assassination,
-			Role:          "dps",
+			Role:          strPtr("dps"),
 			Spec2:         &combat,
 			Role2:         &tank,
 			IsMain:        true,
@@ -662,7 +662,7 @@ func TestCreateCharacter_ReturnsCreatedCharacter_WhenBothSpecsAndRolesAreSent(t 
 		Realm:         "Emberreach",
 		Class:         "Rogue",
 		Spec:          &assassination,
-		Role:          "dps",
+		Role:          strPtr("dps"),
 		Spec2:         &combat,
 		Role2:         &tank,
 		IsMain:        false,
@@ -808,7 +808,7 @@ func TestUpdateCharacter_SetsSecondSpecAndRole_WhenBothAreSent(t *testing.T) {
 		Realm:         "Emberreach",
 		Class:         "Priest",
 		Spec:          &holy,
-		Role:          "healer",
+		Role:          strPtr("healer"),
 		Spec2:         &shadow,
 		Role2:         &dps,
 		IsMain:        true,
@@ -847,7 +847,38 @@ func TestUpdateCharacter_ClearsSecondSpecAndRole_WhenBothAreEmptyStrings(t *test
 		Realm:         "Emberreach",
 		Class:         "Priest",
 		Spec:          &holy,
-		Role:          "healer",
+		Role:          strPtr("healer"),
+		IsMain:        true,
+		CreatedAt:     "2026-09-01T12:00:00Z",
+	}
+	if diff := cmp.Diff(want, updated); diff != "" {
+		t.Errorf("unexpected updated character (-want +got):\n%s", diff)
+	}
+}
+
+func TestUpdateCharacter_ClearsTheRole_WhenTheRoleIsAnEmptyString(t *testing.T) {
+	// given a healer
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	srv.LoginAs(t, "officer-1", "Officer", testutil.AsOfficer())
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, is_main, created_at)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'Holy', 'healer', true, '2026-09-01T12:00:00Z')`)
+
+	// when I send an empty role
+	resp := srv.Patch(t, "/api/roster/11111111-1111-1111-1111-111111111111", map[string]any{"role": ""})
+
+	// then I expect a 200 where the role is null and the spec is kept
+	resp.RequireStatus(t, http.StatusOK)
+	var updated characterJSON
+	resp.DecodeJSON(t, &updated)
+	want := characterJSON{
+		ID:            "11111111-1111-1111-1111-111111111111",
+		Name:          "Aeliana",
+		SecondaryName: "Dawnsong",
+		Realm:         "Emberreach",
+		Class:         "Priest",
+		Spec:          strPtr("Holy"),
 		IsMain:        true,
 		CreatedAt:     "2026-09-01T12:00:00Z",
 	}
@@ -1399,8 +1430,8 @@ func TestListRoster_ReturnsTheGuildRankName_WhenTheSyncHasSeenTheCharacter(t *te
 	var characters []characterJSON
 	resp.DecodeJSON(t, &characters)
 	want := []characterJSON{
-		{ID: "22222222-2222-2222-2222-222222222222", Name: "Brannock", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: "tank", IsMain: true, Rank: strPtr("Member"), CreatedAt: "2026-09-01T12:00:00Z"},
-		{ID: "11111111-1111-1111-1111-111111111111", Name: "Aeliana", SecondaryName: "Dawnsong", Realm: "Emberreach", Class: "Priest", Role: "healer", IsMain: false, Rank: strPtr("Officer Alt"), CreatedAt: "2026-09-01T12:00:00Z"},
+		{ID: "22222222-2222-2222-2222-222222222222", Name: "Brannock", SecondaryName: "Ironhide", Realm: "Emberreach", Class: "Warrior", Role: strPtr("tank"), IsMain: true, Rank: strPtr("Member"), CreatedAt: "2026-09-01T12:00:00Z"},
+		{ID: "11111111-1111-1111-1111-111111111111", Name: "Aeliana", SecondaryName: "Dawnsong", Realm: "Emberreach", Class: "Priest", Role: strPtr("healer"), IsMain: false, Rank: strPtr("Officer Alt"), CreatedAt: "2026-09-01T12:00:00Z"},
 	}
 	if diff := cmp.Diff(want, characters); diff != "" {
 		t.Errorf("unexpected roster (-want +got):\n%s", diff)
@@ -1423,7 +1454,7 @@ func TestListRoster_ReturnsANumberedRank_WhenTheGuildRankIsOneTheSiteHasNoNameFo
 	var characters []characterJSON
 	resp.DecodeJSON(t, &characters)
 	want := []characterJSON{
-		{ID: "33333333-3333-3333-3333-333333333333", Name: "Corwin", SecondaryName: "Ashfall", Realm: "Emberreach", Class: "Mage", Role: "dps", IsMain: true, Rank: strPtr("Rank 7"), CreatedAt: "2026-09-01T12:00:00Z"},
+		{ID: "33333333-3333-3333-3333-333333333333", Name: "Corwin", SecondaryName: "Ashfall", Realm: "Emberreach", Class: "Mage", Role: strPtr("dps"), IsMain: true, Rank: strPtr("Rank 7"), CreatedAt: "2026-09-01T12:00:00Z"},
 	}
 	if diff := cmp.Diff(want, characters); diff != "" {
 		t.Errorf("unexpected roster (-want +got):\n%s", diff)
@@ -1446,7 +1477,7 @@ func TestListRoster_ReturnsNoRank_WhenTheCharacterWasEnteredByHand(t *testing.T)
 	var characters []characterJSON
 	resp.DecodeJSON(t, &characters)
 	want := []characterJSON{
-		{ID: "44444444-4444-4444-4444-444444444444", Name: "Dunstan", SecondaryName: "Oakheart", Realm: "Emberreach", Class: "Druid", Role: "healer", IsMain: true, CreatedAt: "2026-09-01T12:00:00Z"},
+		{ID: "44444444-4444-4444-4444-444444444444", Name: "Dunstan", SecondaryName: "Oakheart", Realm: "Emberreach", Class: "Druid", Role: strPtr("healer"), IsMain: true, CreatedAt: "2026-09-01T12:00:00Z"},
 	}
 	if diff := cmp.Diff(want, characters); diff != "" {
 		t.Errorf("unexpected roster (-want +got):\n%s", diff)
@@ -1471,7 +1502,7 @@ func TestUpdateCharacter_KeepsMainOrAltFromTheRank_WhenTheCharacterHasAGuildRank
 	resp.DecodeJSON(t, &updated)
 	want := characterJSON{
 		ID: "11111111-1111-1111-1111-111111111111", Name: "Aeliana", SecondaryName: "Dawnsong", Realm: "Emberreach",
-		Class: "Priest", Role: "healer", IsMain: false, Rank: strPtr("Alt"), CreatedAt: "2026-09-01T12:00:00Z",
+		Class: "Priest", Role: strPtr("healer"), IsMain: false, Rank: strPtr("Alt"), CreatedAt: "2026-09-01T12:00:00Z",
 	}
 	if diff := cmp.Diff(want, updated); diff != "" {
 		t.Errorf("unexpected updated character (-want +got):\n%s", diff)

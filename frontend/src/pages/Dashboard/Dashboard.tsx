@@ -1,11 +1,32 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { battlenetLinkUrl, unlinkBattlenet } from '../../api/auth'
+import { fetchOpenRankRequestCount, rankRequestsQueryKey } from '../../api/rankRequests'
 import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
 import { useLoginUrl } from '../../hooks/useLoginUrl'
 import styles from './Dashboard.module.css'
 import { MyCharacters } from './MyCharacters'
 import { myCharactersQueryKey } from './myCharactersQueryKey'
+
+function OfficerLinks() {
+  const count = useQuery({ queryKey: [...rankRequestsQueryKey, 'count'], queryFn: fetchOpenRankRequestCount })
+
+  return (
+    <section aria-labelledby="officer-heading" className={styles.section}>
+      <h2 id="officer-heading" className={styles.sectionTitle}>
+        Officer
+      </h2>
+      <p>
+        <Link to="/officer/rank-requests">Rank requests</Link>
+        {count.isSuccess && (
+          <span className={styles.pendingBadge}>
+            {count.data.open === 0 ? 'none pending' : `${count.data.open} pending`}
+          </span>
+        )}
+      </p>
+    </section>
+  )
+}
 
 export function Dashboard() {
   const currentUser = useCurrentUser()
@@ -60,6 +81,11 @@ export function Dashboard() {
         <h2 id="battlenet-heading" className={styles.sectionTitle}>
           Battle.net
         </h2>
+        {searchParams.get('battlenet') === 'linked' && (
+          <p role="status" className={styles.hint}>
+            Battle.net is linked and your characters are refreshed.
+          </p>
+        )}
         {searchParams.get('battlenet') === 'already-linked' && (
           <p role="alert" className={styles.error}>
             That Battle.net account is already linked to another member. Ask an officer on Discord
@@ -103,6 +129,8 @@ export function Dashboard() {
       </section>
 
       {user.battlenetLinked && <MyCharacters />}
+
+      {user.isOfficer && <OfficerLinks />}
     </article>
   )
 }
