@@ -115,8 +115,7 @@ function RaceCell({ race, gender }: { race: string | null; gender: Character['ge
   return <img className={styles.raceIcon} src={iconUrl} alt={race} title={race} width={24} height={24} />
 }
 
-function ArmoryLink({ character, children }: { character: Character; children: string }) {
-  if (!children) return null
+function ArmoryLink({ character }: { character: Character }) {
   return (
     <a
       className={styles.characterLink}
@@ -125,7 +124,7 @@ function ArmoryLink({ character, children }: { character: Character; children: s
       rel="noreferrer"
       style={{ color: classColor(character.class) }}
     >
-      {children}
+      {[character.name, character.secondaryName].filter(Boolean).join(' ')}
     </a>
   )
 }
@@ -269,9 +268,7 @@ export function Roster() {
                         <RaceCell race={character.race} gender={character.gender} />
                       </td>
                       <td>
-                        <ArmoryLink character={character}>{character.name}</ArmoryLink>
-                        {character.secondaryName && ' '}
-                        <ArmoryLink character={character}>{character.secondaryName}</ArmoryLink>
+                        <ArmoryLink character={character} />
                       </td>
                       <td>{character.level}</td>
                       <td style={{ color: classColor(character.class) }}>{character.class}</td>

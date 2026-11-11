@@ -102,7 +102,7 @@ describe('Roster', () => {
 
     const table = within(await screen.findByRole('table'))
     expect(table.queryByRole('columnheader', { name: 'Secondary name' })).not.toBeInTheDocument()
-    const nameCell = table.getByText('Ragnok').closest('td') as HTMLElement
+    const nameCell = table.getByText('Ragnok Ironhide').closest('td') as HTMLElement
     expect(nameCell).toHaveTextContent('Ragnok Ironhide')
   })
 
@@ -118,29 +118,29 @@ describe('Roster', () => {
     )
   })
 
-  it('should link the secondary name to the same armory profile when the character has one', async () => {
-    server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, secondaryName: 'Ironhide' }])))
-
-    renderWithProviders(<Roster />)
-
-    const link = within(await screen.findByRole('table')).getByRole('link', { name: 'Ironhide' })
-    expect(link).toHaveAttribute(
-      'href',
-      'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/ragnok-ironhide',
-    )
-  })
-
-  it('should color both name links with the class color', async () => {
+  it('should render both names inside one armory link when the character has a secondary name', async () => {
     server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, secondaryName: 'Ironhide' }])))
 
     renderWithProviders(<Roster />)
 
     const table = within(await screen.findByRole('table'))
-    expect(table.getByRole('link', { name: 'Ragnok' })).toHaveStyle({ color: '#C79C6E' })
-    expect(table.getByRole('link', { name: 'Ironhide' })).toHaveStyle({ color: '#C79C6E' })
+    expect(table.getAllByRole('link').map((link) => link.textContent)).toEqual(['Ragnok Ironhide'])
+    expect(table.getByRole('link', { name: 'Ragnok Ironhide' })).toHaveAttribute(
+      'href',
+      'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/ragnok-ironhide',
+    )
   })
 
-  it('should not render a secondary name link when the character has no secondary name', async () => {
+  it('should color the name link with the class color', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, secondaryName: 'Ironhide' }])))
+
+    renderWithProviders(<Roster />)
+
+    const table = within(await screen.findByRole('table'))
+    expect(table.getByRole('link', { name: 'Ragnok Ironhide' })).toHaveStyle({ color: '#C79C6E' })
+  })
+
+  it('should render only the first name in the link when the character has no secondary name', async () => {
     server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
 
     renderWithProviders(<Roster />)
@@ -488,7 +488,7 @@ describe('Roster sorting and search', () => {
     server.use(http.get('/api/roster', () => HttpResponse.json([ragnok, twinked])))
     const user = userEvent.setup()
     renderWithProviders(<Roster />)
-    await screen.findByText('Aeliana')
+    await screen.findByText('Aeliana Dawnsong')
 
     await user.type(screen.getByRole('searchbox', { name: 'Name' }), 'dawn')
 
