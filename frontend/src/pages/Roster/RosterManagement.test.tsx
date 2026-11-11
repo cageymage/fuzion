@@ -22,6 +22,7 @@ const ragnok: Character = {
   role2: null,
   isMain: true,
   rank: null,
+  rankOrder: null,
   raidTeam: 'Team Alpha',
   race: null,
   level: null,
@@ -53,6 +54,7 @@ const zaldrix: Character = {
   role: 'dps',
   isMain: false,
   rank: null,
+  rankOrder: null,
   raidTeam: null,
 }
 
@@ -118,7 +120,7 @@ describe('Roster management', () => {
 
     renderWithProviders(<Roster />)
 
-    await screen.findByText('Ragnok')
+    await screen.findByText('Ragnok Ironhide')
     expect(screen.queryByRole('button', { name: 'Add character' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Ragnok' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete Ragnok' })).not.toBeInTheDocument()
@@ -130,7 +132,7 @@ describe('Roster management', () => {
 
     renderWithProviders(<Roster />)
 
-    await screen.findByText('Ragnok')
+    await screen.findByText('Ragnok Ironhide')
     expect(screen.queryByRole('button', { name: 'Add character' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Ragnok' })).not.toBeInTheDocument()
   })
@@ -140,7 +142,7 @@ describe('Roster management', () => {
     serveRoster([ragnok, zaldrix])
     const user = userEvent.setup()
     renderWithProviders(<Roster />)
-    await screen.findByText('Ragnok')
+    await screen.findByText('Ragnok Ironhide')
 
     await user.click(screen.getByRole('checkbox', { name: 'Show alts' }))
     await user.click(screen.getByRole('button', { name: 'Edit Zaldrix' }))
@@ -214,7 +216,7 @@ describe('Roster management', () => {
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Role' }), 'healer')
     await user.click(dialog.getByRole('button', { name: 'Save character' }))
 
-    expect(await screen.findByText('Aeliana')).toBeInTheDocument()
+    expect(await screen.findByText('Aeliana Stormwind')).toBeInTheDocument()
     expect(calls.created).toEqual([
       {
         name: 'Aeliana',
@@ -243,7 +245,7 @@ describe('Roster management', () => {
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Spec' }), 'Frost')
     await user.click(dialog.getByRole('button', { name: 'Save character' }))
 
-    await screen.findByText('Aeliana')
+    await screen.findByText('Aeliana Stormwind')
     expect(calls.created).toEqual([
       {
         name: 'Aeliana',
@@ -469,8 +471,8 @@ describe('Roster management', () => {
     )
 
     await waitForDialogToClose()
-    expect(screen.queryByText('Ragnok')).not.toBeInTheDocument()
-    expect(screen.getByText('Selene')).toBeInTheDocument()
+    expect(screen.queryByText('Ragnok Ironhide')).not.toBeInTheDocument()
+    expect(screen.getByText('Selene Dawnsong')).toBeInTheDocument()
     expect(calls.deleted).toEqual(['char-1'])
   })
 
@@ -486,7 +488,7 @@ describe('Roster management', () => {
     )
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByText('Ragnok')).toBeInTheDocument()
+    expect(screen.getByText('Ragnok Ironhide')).toBeInTheDocument()
     expect(calls.deleted).toEqual([])
   })
 })

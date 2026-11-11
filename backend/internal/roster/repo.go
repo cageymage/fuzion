@@ -23,7 +23,7 @@ type Character struct {
 	Spec2         *string               `db:"spec2"          json:"spec2"`
 	Role2         *string               `db:"role2"          json:"role2"`
 	IsMain        bool                  `db:"is_main"        json:"isMain"`
-	GuildRank     *int                  `db:"guild_rank"     json:"-"`
+	GuildRank     *int                  `db:"guild_rank"     json:"rankOrder"`
 	UserID        *uuid.UUID            `db:"user_id"        json:"-"`
 	Rank          *string               `db:"-"              json:"rank"`
 	RaidTeam      *string               `db:"raid_team"      json:"raidTeam"`

@@ -14,6 +14,7 @@ const main: Character = {
   role2: null,
   isMain: true,
   rank: null,
+  rankOrder: null,
   raidTeam: 'Team Alpha',
   race: null,
   level: null,
@@ -41,6 +42,7 @@ const alt: Character = {
   role: 'dps',
   isMain: false,
   rank: null,
+  rankOrder: null,
 }
 
 const roster = [main, healer, alt]
@@ -168,5 +170,32 @@ describe('sortRoster', () => {
     const result = sortRoster([orc, second, dwarf], { key: 'name', direction: 'asc' })
 
     expect(result.map((c) => c.id)).toEqual(['b', 'd', 'a'])
+  })
+
+  describe('by rank', () => {
+    const guildMaster: Character = { ...main, id: 'gm', rank: 'Guild Master', rankOrder: 0 }
+    const veteran: Character = { ...main, id: 'vet', rank: 'Veteran', rankOrder: 4 }
+    const member: Character = { ...main, id: 'mem', rank: 'Member', rankOrder: 6 }
+    const unranked: Character = { ...main, id: 'none', rank: null, rankOrder: null }
+
+    it('should order by rank number rather than rank name when ascending', () => {
+      const result = sortRoster([member, veteran, guildMaster], { key: 'rank', direction: 'asc' })
+
+      expect(result.map((c) => c.id)).toEqual(['gm', 'vet', 'mem'])
+    })
+
+    it('should put the highest rank number first when descending', () => {
+      const result = sortRoster([guildMaster, member, veteran], { key: 'rank', direction: 'desc' })
+
+      expect(result.map((c) => c.id)).toEqual(['mem', 'vet', 'gm'])
+    })
+
+    it('should keep characters without a rank last in both directions', () => {
+      const ascending = sortRoster([unranked, member, guildMaster], { key: 'rank', direction: 'asc' })
+      const descending = sortRoster([unranked, member, guildMaster], { key: 'rank', direction: 'desc' })
+
+      expect(ascending.map((c) => c.id)).toEqual(['gm', 'mem', 'none'])
+      expect(descending.map((c) => c.id)).toEqual(['mem', 'gm', 'none'])
+    })
   })
 })

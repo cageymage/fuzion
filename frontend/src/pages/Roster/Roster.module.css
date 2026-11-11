@@ -119,8 +119,7 @@
 }
 
 .characterLink:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  filter: brightness(1.25);
 }
 
 .professionIcons {

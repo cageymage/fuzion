@@ -19,6 +19,7 @@ const ragnok: Character = {
   role2: null,
   isMain: true,
   rank: null,
+  rankOrder: null,
   raidTeam: 'Team Alpha',
   race: null,
   level: null,
@@ -46,6 +47,7 @@ const zaldrix: Character = {
   role: 'dps',
   isMain: false,
   rank: null,
+  rankOrder: null,
   raidTeam: null,
 }
 
@@ -92,15 +94,16 @@ describe('Roster', () => {
     expect(screen.queryByText('Ragnok')).not.toBeInTheDocument()
   })
 
-  it('should show the secondary name next to the name when the character has one', async () => {
+  it('should show the secondary name in the same cell as the name when the character has one', async () => {
     const withSecondaryName: Character = { ...ragnok, secondaryName: 'Ironhide' }
     server.use(http.get('/api/roster', () => HttpResponse.json([withSecondaryName])))
 
     renderWithProviders(<Roster />)
 
     const table = within(await screen.findByRole('table'))
-    expect(table.getByRole('columnheader', { name: 'Secondary name' })).toBeInTheDocument()
-    expect(table.getByText('Ironhide')).toBeInTheDocument()
+    expect(table.queryByRole('columnheader', { name: 'Secondary name' })).not.toBeInTheDocument()
+    const nameCell = table.getByText('Ragnok Ironhide').closest('td') as HTMLElement
+    expect(nameCell).toHaveTextContent('Ragnok Ironhide')
   })
 
   it('should render the character name as a link to their armory profile', async () => {
@@ -115,29 +118,29 @@ describe('Roster', () => {
     )
   })
 
-  it('should link the secondary name to the same armory profile when the character has one', async () => {
-    server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, secondaryName: 'Ironhide' }])))
-
-    renderWithProviders(<Roster />)
-
-    const link = within(await screen.findByRole('table')).getByRole('link', { name: 'Ironhide' })
-    expect(link).toHaveAttribute(
-      'href',
-      'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/ragnok-ironhide',
-    )
-  })
-
-  it('should color both name links with the class color', async () => {
+  it('should render both names inside one armory link when the character has a secondary name', async () => {
     server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, secondaryName: 'Ironhide' }])))
 
     renderWithProviders(<Roster />)
 
     const table = within(await screen.findByRole('table'))
-    expect(table.getByRole('link', { name: 'Ragnok' })).toHaveStyle({ color: '#C79C6E' })
-    expect(table.getByRole('link', { name: 'Ironhide' })).toHaveStyle({ color: '#C79C6E' })
+    expect(table.getAllByRole('link').map((link) => link.textContent)).toEqual(['Ragnok Ironhide'])
+    expect(table.getByRole('link', { name: 'Ragnok Ironhide' })).toHaveAttribute(
+      'href',
+      'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/ragnok-ironhide',
+    )
   })
 
-  it('should not render a secondary name link when the character has no secondary name', async () => {
+  it('should color the name link with the class color', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, secondaryName: 'Ironhide' }])))
+
+    renderWithProviders(<Roster />)
+
+    const table = within(await screen.findByRole('table'))
+    expect(table.getByRole('link', { name: 'Ragnok Ironhide' })).toHaveStyle({ color: '#C79C6E' })
+  })
+
+  it('should render only the first name in the link when the character has no secondary name', async () => {
     server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
 
     renderWithProviders(<Roster />)
@@ -338,7 +341,7 @@ describe('Roster race and level', () => {
     const row = (await screen.findByText('Ragnok')).closest('tr') as HTMLElement
     const cells = within(row).getAllByRole('cell')
     expect(cells[0]).toBeEmptyDOMElement()
-    expect(cells[3]).toBeEmptyDOMElement()
+    expect(cells[2]).toBeEmptyDOMElement()
     expect(within(row).queryByRole('img')).not.toBeInTheDocument()
   })
 
@@ -351,7 +354,6 @@ describe('Roster race and level', () => {
     expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
       'Race',
       'Name',
-      'Secondary name',
       'Level',
       'Class',
       'Spec',
@@ -455,6 +457,21 @@ describe('Roster sorting and search', () => {
     expect(rowNames()).toEqual(['Dwarfish', 'Orcish'])
   })
 
+  it('should sort the table by rank number rather than rank name when the Rank header is clicked', async () => {
+    const veteran: Character = { ...ragnok, id: 'vet', name: 'Vetish', rank: 'Veteran', rankOrder: 4 }
+    const officer: Character = { ...ragnok, id: 'off', name: 'Officerish', rank: 'Officer', rankOrder: 1 }
+    const member: Character = { ...ragnok, id: 'mem', name: 'Memberish', rank: 'Member', rankOrder: 6 }
+    server.use(http.get('/api/roster', () => HttpResponse.json([member, veteran, officer])))
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    await screen.findByText('Vetish')
+
+    await user.click(screen.getByRole('button', { name: 'Rank' }))
+
+    expect(rowNames()).toEqual(['Officerish', 'Vetish', 'Memberish'])
+    expect(screen.getByRole('columnheader', { name: /Rank/ })).toHaveAttribute('aria-sort', 'ascending')
+  })
+
   it('should only list matching characters when a name is typed in the search box', async () => {
     server.use(http.get('/api/roster', () => HttpResponse.json([high, low, mid])))
     const user = userEvent.setup()
@@ -471,11 +488,11 @@ describe('Roster sorting and search', () => {
     server.use(http.get('/api/roster', () => HttpResponse.json([ragnok, twinked])))
     const user = userEvent.setup()
     renderWithProviders(<Roster />)
-    await screen.findByText('Aeliana')
+    await screen.findByText('Aeliana Dawnsong')
 
     await user.type(screen.getByRole('searchbox', { name: 'Name' }), 'dawn')
 
-    expect(rowNames()).toEqual(['Aeliana'])
+    expect(rowNames()).toEqual(['Aeliana Dawnsong'])
   })
 
   it('should narrow the search to the selected role when a role filter is also active', async () => {
