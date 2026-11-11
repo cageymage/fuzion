@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { battlenetLinkUrl } from '../../api/auth'
-import { fetchMyRankRequests } from '../../api/rankRequests'
+import { fetchMyRankRequests, myRankRequestsQueryKey } from '../../api/rankRequests'
 import { fetchMyCharacters } from '../../api/roster'
 import { classColor } from '../../lib/classColor'
 import { CharacterSpecs } from './CharacterSpecs'
 import styles from './Dashboard.module.css'
-import { myCharactersQueryKey, myRankRequestsQueryKey } from './myCharactersQueryKey'
+import { myCharactersQueryKey } from './myCharactersQueryKey'
 import { RankRequestControl } from './RankRequestControl'
 
 export function MyCharacters() {

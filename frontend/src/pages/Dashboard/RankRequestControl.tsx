@@ -1,10 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { cancelRankRequest, createRankRequest } from '../../api/rankRequests'
+import { cancelRankRequest, createRankRequest, myRankRequestsQueryKey, rankRequestsQueryKey } from '../../api/rankRequests'
 import type { RankRequest, RankRequestDirection } from '../../types/rankRequests'
 import type { Character } from '../../types/roster'
 import styles from './Dashboard.module.css'
-import { myRankRequestsQueryKey, rankRequestsQueryKey } from './myCharactersQueryKey'
 
 const maxNoteLength = 500
 

@@ -92,18 +92,11 @@ func (s *Service) ListMine(ctx context.Context, userID uuid.UUID) ([]Request, er
 	return requests, nil
 }
 
-// Cancel lets the character's owner withdraw an open request.
+// Cancel lets the character's current owner withdraw an open request. The current
+// owner decides, matching ListMine, so a request filed before the character changed
+// hands does not leave the new owner stuck with it.
 func (s *Service) Cancel(ctx context.Context, userID, id uuid.UUID) error {
-	req, err := s.repo.Get(ctx, id)
-	if err != nil {
-		return fmt.Errorf("load rank request %s: %w", id, err)
-	}
-	// The character's current owner decides, matching ListMine, so a request filed
-	// before the character changed hands does not leave the new owner stuck with it.
-	if req.CharacterOwnerID == nil || *req.CharacterOwnerID != userID {
-		return ErrRequestNotOwned
-	}
-	if err := s.repo.Close(ctx, id, "cancelled", "", nil, s.clock.Now()); err != nil {
+	if err := s.repo.Cancel(ctx, id, userID, s.clock.Now()); err != nil {
 		return fmt.Errorf("cancel rank request %s: %w", id, err)
 	}
 	return nil
@@ -166,6 +159,21 @@ func (s *Service) notifyOfficers(ctx context.Context, req Request) {
 	}
 }
 
+// escapeMarkdown keeps a member's note as plain text in the embed, so a note cannot
+// show officers a masked link whose label hides where it goes, or restyle the post.
+func escapeMarkdown(text string) string {
+	var b strings.Builder
+	for _, r := range text {
+		if strings.ContainsRune(markdownCharacters, r) {
+			b.WriteRune('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+const markdownCharacters = "\\*_~`|>[]()#-"
+
 func newRequestMessage(req Request, siteBaseURL string) discord.Message {
 	fullName := req.CharacterName + " " + req.CharacterSecondaryName
 	change := "Alt to main rank"
@@ -179,7 +187,7 @@ func newRequestMessage(req Request, siteBaseURL string) discord.Message {
 	}
 	// Discord rejects empty field values.
 	if req.Note != "" {
-		fields = append(fields, discord.EmbedField{Name: "Note", Value: req.Note})
+		fields = append(fields, discord.EmbedField{Name: "Note", Value: escapeMarkdown(req.Note)})
 	}
 	return discord.Message{Embeds: []discord.Embed{{
 		Title:       "Rank request: " + fullName,

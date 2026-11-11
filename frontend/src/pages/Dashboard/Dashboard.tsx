@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { battlenetLinkUrl, unlinkBattlenet } from '../../api/auth'
-import { fetchOpenRankRequestCount } from '../../api/rankRequests'
+import { fetchOpenRankRequestCount, rankRequestsQueryKey } from '../../api/rankRequests'
 import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
 import { useLoginUrl } from '../../hooks/useLoginUrl'
 import styles from './Dashboard.module.css'
@@ -9,7 +9,7 @@ import { MyCharacters } from './MyCharacters'
 import { myCharactersQueryKey } from './myCharactersQueryKey'
 
 function OfficerLinks() {
-  const count = useQuery({ queryKey: ['rank-requests', 'count'], queryFn: fetchOpenRankRequestCount })
+  const count = useQuery({ queryKey: [...rankRequestsQueryKey, 'count'], queryFn: fetchOpenRankRequestCount })
 
   return (
     <section aria-labelledby="officer-heading" className={styles.section}>

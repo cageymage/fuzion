@@ -175,6 +175,39 @@ func (r *Repo) Close(ctx context.Context, id uuid.UUID, status, resolutionNote s
 	return nil
 }
 
+// Cancel withdraws an open request only while userID still owns its character, so a
+// character that changes hands between the service's read and this write cannot have
+// the new owner's request cancelled by the old one.
+func (r *Repo) Cancel(ctx context.Context, id, userID uuid.UUID, cancelledAt time.Time) error {
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE rank_change_requests
+		SET status = 'cancelled', resolved_at = $3
+		WHERE id = $1 AND status = 'open'
+		  AND character_id IN (SELECT id FROM characters WHERE user_id = $2)`, id, userID, cancelledAt)
+	if err != nil {
+		return fmt.Errorf("cancel rank request: %w", err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count cancelled rank requests: %w", err)
+	}
+	if n == 0 {
+		return r.whyNotCancelled(ctx, id, userID)
+	}
+	return nil
+}
+
+func (r *Repo) whyNotCancelled(ctx context.Context, id, userID uuid.UUID) error {
+	req, err := r.Get(ctx, id)
+	if err != nil {
+		return fmt.Errorf("load rank request that was not cancelled: %w", err)
+	}
+	if req.CharacterOwnerID == nil || *req.CharacterOwnerID != userID {
+		return ErrRequestNotOwned
+	}
+	return ErrNotOpen
+}
+
 // pgx hands back timestamptz in the process-local zone; the API always emits UTC.
 func inUTC(req Request) Request {
 	req.CreatedAt = req.CreatedAt.UTC()

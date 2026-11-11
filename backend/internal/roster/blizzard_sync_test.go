@@ -803,13 +803,17 @@ func TestSyncRoster_ClosesOpenRankRequest_WhenTheCharacterMovedIntoTheRequestedR
 	// when the roster sync runs
 	err := fake.runSync(db)
 
-	// then I expect the request done, with no officer named
+	// then I expect the request done, with no officer named, and the closure counted in the sync log
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
 	want := []rankRequestRow{{Direction: "to_alt", Status: "done", Resolved: true}}
 	if diff := cmp.Diff(want, rankRequestRows(t, db)); diff != "" {
 		t.Errorf("unexpected rank requests (-want +got):\n%s", diff)
+	}
+	wantLog := []syncLogEntry{{Source: "blizzard-roster", Status: "ok", Message: "1 members: 0 added, 1 updated, 0 left, 0 skipped, 1 rank requests closed"}}
+	if diff := cmp.Diff(wantLog, syncLogEntries(t, db)); diff != "" {
+		t.Errorf("unexpected sync log (-want +got):\n%s", diff)
 	}
 }
 

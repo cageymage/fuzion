@@ -22,7 +22,7 @@ CREATE TABLE rank_change_requests (
     resolution_note text        NOT NULL DEFAULT '',
     created_at      timestamptz NOT NULL,
     resolved_at     timestamptz,
-    -- NULL on a resolved request means the roster sync closed it.
+    -- NULL on a done request means the roster sync closed it; cancelled requests also have none.
     resolved_by     uuid        REFERENCES users (id) ON DELETE SET NULL
 );
 

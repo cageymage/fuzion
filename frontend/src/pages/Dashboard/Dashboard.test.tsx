@@ -561,6 +561,23 @@ describe('Dashboard', () => {
     expect(screen.getByRole('button', { name: 'Request alt rank for Ragefist Ironjaw' })).toBeInTheDocument()
   })
 
+  it('should say the rank request is done when an officer marked it done', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true)]),
+      ),
+      http.get('/api/me/rank-requests', () =>
+        HttpResponse.json([
+          rankRequest({ status: 'done', resolvedAt: '2026-10-21T12:00:00Z', resolvedBy: 'officerbob' }),
+        ]),
+      ),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    expect(await screen.findByText('Your request for a move to an alt rank is done.')).toBeInTheDocument()
+  })
+
   it('should show officers a rank requests link with the pending count', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(officer)),

@@ -1,6 +1,11 @@
 import type { RankRequest, RankRequestDecision } from '../types/rankRequests'
 import { apiDelete, apiGet, apiSend } from './client'
 
+export const myRankRequestsQueryKey = ['me', 'rank-requests'] as const
+// The officer list and the Dashboard's pending count both sit under this key, so
+// invalidating it after a member or officer change refreshes both.
+export const rankRequestsQueryKey = ['rank-requests'] as const
+
 export function fetchMyRankRequests(): Promise<RankRequest[]> {
   return apiGet<RankRequest[]>('/me/rank-requests')
 }

@@ -250,6 +250,36 @@ func TestCreateRankChangeRequest_PostsDiscordEmbed_WhenWebhookConfigured(t *test
 	}
 }
 
+func TestCreateRankChangeRequest_EscapesMarkdownInTheEmbedNote_WhenTheNoteHasALink(t *testing.T) {
+	// given my main and a deploy with the rank requests webhook set
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	me := srv.LoginAs(t, "80351110224678912", "thundermane")
+	insertCharacter(t, db, tankardID, "Tankard", "Ironhide", "Warrior", true, &me.ID)
+
+	// when I ask for its rank to be changed with a masked link and bold text in the note
+	resp := srv.Post(t, "/api/me/characters/"+tankardID+"/rank-requests", map[string]any{"note": "[Officer form](https://example.com) **now**"})
+
+	// then I expect the note posted with its markdown escaped, and stored as I wrote it
+	resp.RequireStatus(t, http.StatusCreated)
+	want := []string{`{"embeds":[{"title":"Rank request: Tankard Ironhide","url":"https://fuzion.example/officer/rank-requests",` +
+		`"description":"An officer needs to change this character's rank in game.","fields":[` +
+		`{"name":"Character","value":"Tankard Ironhide (Warrior)"},` +
+		`{"name":"Request","value":"Main to alt rank"},` +
+		`{"name":"Member","value":"thundermane"},` +
+		`{"name":"Note","value":"\\[Officer form\\]\\(https://example.com\\) \\*\\*now\\*\\*"}]}]}`}
+	var got []string
+	for _, body := range srv.RankRequests.Bodies() {
+		got = append(got, string(body))
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected webhook posts (-want +got):\n%s", diff)
+	}
+	if created := decodeCreated(t, resp); created.Note != "[Officer form](https://example.com) **now**" {
+		t.Errorf("expected the stored note unescaped, got %q", created.Note)
+	}
+}
+
 func TestCreateRankChangeRequest_Succeeds_WhenWebhookFails(t *testing.T) {
 	// given my main and a rank requests webhook that is down
 	db := testutil.DB(t)
@@ -367,7 +397,7 @@ func TestCancelRankChangeRequest_MarksItCancelled_WhenTheRequesterCancelsAnOpenR
 	}
 }
 
-func TestCancelRankChangeRequest_ReturnsForbidden_WhenNotTheRequester(t *testing.T) {
+func TestCancelRankChangeRequest_ReturnsForbidden_WhenTheCharacterBelongsToSomeoneElse(t *testing.T) {
 	// given another member's open request
 	db := testutil.DB(t)
 	srv := testutil.NewServer(t, db)
