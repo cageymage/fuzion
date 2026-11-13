@@ -67,7 +67,7 @@ describe('Professions recipe search', () => {
 
     renderWithProviders(<Professions />)
 
-    await screen.findByRole('region', { name: 'Alchemy' })
+    await screen.findByRole('tab', { name: 'Alchemy (2)' })
     expect(requests).toBe(0)
     expect(screen.queryByRole('region', { name: 'Who can craft it' })).not.toBeInTheDocument()
   })
@@ -81,27 +81,27 @@ describe('Professions recipe search', () => {
     })
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
-    await screen.findByRole('region', { name: 'Alchemy' })
+    await screen.findByRole('tab', { name: 'Alchemy (2)' })
 
     await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'e')
 
     expect(requests).toBe(0)
   })
 
-  it('should narrow the directory to the characters who craft the matched recipe when the text matches no character', async () => {
+  it('should count and list only the characters who craft the matched recipe when the text matches no character', async () => {
     respondWithProfessions()
     respondWithRecipes(() => [elixir])
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
-    await screen.findByRole('region', { name: 'Alchemy' })
+    await screen.findByRole('tab', { name: 'Alchemy (2)' })
 
     await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'lion')
 
     await screen.findByRole('region', { name: 'Who can craft it' })
-    const alchemy = screen.getByRole('region', { name: 'Alchemy' })
+    const alchemy = screen.getByRole('tabpanel', { name: 'Alchemy (1)' })
     expect(within(alchemy).getAllByRole('listitem')).toHaveLength(1)
     expect(within(alchemy).getByText('Aeliana')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Blacksmithing' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Blacksmithing (0)' })).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('should show a no-match message when neither the directory nor the recipes match the search', async () => {
@@ -109,7 +109,7 @@ describe('Professions recipe search', () => {
     respondWithRecipes(() => [])
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
-    await screen.findByRole('region', { name: 'Alchemy' })
+    await screen.findByRole('tab', { name: 'Alchemy (2)' })
 
     await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'dragonscale')
 
@@ -139,7 +139,7 @@ describe('Professions character recipes', () => {
 
     renderWithProviders(<Professions />)
 
-    await screen.findByRole('region', { name: 'Alchemy' })
+    await screen.findByRole('tab', { name: 'Alchemy (2)' })
     expect(requests).toBe(0)
   })
 
@@ -152,7 +152,7 @@ describe('Professions character recipes', () => {
     })
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
-    const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    const alchemy = await screen.findByRole('tabpanel', { name: 'Alchemy (2)' })
 
     await user.click(within(alchemy).getByRole('button', { name: /Aeliana/ }))
 
@@ -166,7 +166,7 @@ describe('Professions character recipes', () => {
     respondWithRecipes(() => [elixir])
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
-    const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    const alchemy = await screen.findByRole('tabpanel', { name: 'Alchemy (2)' })
     const row = within(alchemy).getByRole('button', { name: /Aeliana/ })
     await user.click(row)
     await within(alchemy).findByText("Elixir of Lion's Strength")
@@ -182,7 +182,7 @@ describe('Professions character recipes', () => {
     respondWithRecipes(() => [brewOfWorms])
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
-    const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    const alchemy = await screen.findByRole('tabpanel', { name: 'Alchemy (2)' })
 
     await user.click(within(alchemy).getByRole('button', { name: /Aeliana/ }))
 
@@ -200,7 +200,7 @@ describe('Professions character recipes', () => {
     respondWithRecipes(() => many)
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
-    const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    const alchemy = await screen.findByRole('tabpanel', { name: 'Alchemy (2)' })
     await user.click(within(alchemy).getByRole('button', { name: /Aeliana/ }))
     await within(alchemy).findByText('Elixir 1')
     expect(within(alchemy).queryByText('Elixir 9')).not.toBeInTheDocument()
@@ -215,7 +215,7 @@ describe('Professions character recipes', () => {
     server.use(http.get('/api/recipes', () => new HttpResponse(null, { status: 500 })))
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
-    const alchemy = await screen.findByRole('region', { name: 'Alchemy' })
+    const alchemy = await screen.findByRole('tabpanel', { name: 'Alchemy (2)' })
 
     await user.click(within(alchemy).getByRole('button', { name: /Aeliana/ }))
 

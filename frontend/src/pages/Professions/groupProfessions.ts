@@ -11,7 +11,7 @@ export function crafterKey(profession: string, characterId: string): string {
 }
 
 function matches(entry: ProfessionEntry, query: string): boolean {
-  return [entry.profession, entry.character.name, entry.character.secondaryName].some((text) =>
+  return [entry.character.name, entry.character.secondaryName].some((text) =>
     text.toLowerCase().includes(query),
   )
 }
