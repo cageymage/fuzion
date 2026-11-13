@@ -4,11 +4,14 @@ import type { ProfessionEntry } from '../../types/professions'
 import { CharacterRecipes } from './CharacterRecipes'
 import { CrafterResults } from './CrafterResults'
 import { crafterKey, groupProfessions } from './groupProfessions'
+import { professionPanelId, ProfessionTabs, professionTabId } from './ProfessionTabs'
+import { resolveSelectedTab, tabRows } from './tabSelection'
 import styles from './Professions.module.css'
 import { useProfessionsData } from './useProfessionsData'
 import { useRecipes } from './useRecipes'
 
 const minRecipeSearchLength = 2
+const tabRowLabels = ['Primary professions', 'Secondary professions']
 
 export function Professions() {
   const professions = useProfessionsData()
@@ -27,6 +30,15 @@ export function Professions() {
   const groups = groupProfessions(professions.data ?? [], query, crafters)
   const waitingForRecipes = searchingRecipes && recipes.isPending
 
+  const counts = Object.fromEntries(groups.map((group) => [group.profession, group.entries.length]))
+  const [selectedTab, setSelectedTab] = useState<string | null>(null)
+  const activeTab =
+    waitingForRecipes && selectedTab !== null ? selectedTab : resolveSelectedTab(selectedTab, counts)
+  if (!waitingForRecipes && professions.isSuccess && activeTab !== selectedTab) {
+    setSelectedTab(activeTab)
+  }
+  const activeGroup = groups.find((group) => group.profession === activeTab)
+
   return (
     <section className={styles.page}>
       <h1 className={styles.title}>Professions</h1>
@@ -37,7 +49,7 @@ export function Professions() {
           id="professions-search"
           type="search"
           className={styles.search}
-          placeholder="Profession, character or recipe"
+          placeholder="Character or recipe"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -54,25 +66,28 @@ export function Professions() {
       )}
       {professions.isSuccess &&
         professions.data.length > 0 &&
-        groups.length === 0 &&
+        activeTab === null &&
         !waitingForRecipes &&
         matchedRecipes.length === 0 && <p className={styles.noticeText}>No matches for "{trimmedQuery}".</p>}
 
-      {groups.map((group) => {
-        const headingId = `profession-${group.profession.replace(/\s+/g, '-')}`
-        return (
-          <section key={group.profession} className={styles.group} aria-labelledby={headingId}>
-            <h2 id={headingId} className={styles.groupTitle}>
-              {group.profession}
-            </h2>
-            <ul className={styles.entries}>
-              {group.entries.map((entry) => (
-                <CharacterEntry key={entry.id} entry={entry} />
-              ))}
-            </ul>
-          </section>
-        )
-      })}
+      {professions.isSuccess && professions.data.length > 0 && (
+        <ProfessionTabs
+          rows={tabRows}
+          rowLabels={tabRowLabels}
+          counts={counts}
+          selected={activeTab}
+          onSelect={setSelectedTab}
+        />
+      )}
+      {activeTab !== null && activeGroup && (
+        <div role="tabpanel" id={professionPanelId} aria-labelledby={professionTabId(activeTab)}>
+          <ul className={styles.entries}>
+            {activeGroup.entries.map((entry) => (
+              <CharacterEntry key={entry.id} entry={entry} />
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }
@@ -93,7 +108,7 @@ function CharacterEntry({ entry }: { entry: ProfessionEntry }) {
           <span className={styles.chevron} aria-hidden="true">
             {expanded ? '▾' : '▸'}
           </span>
-          <span className={styles.name} style={{ color }}>
+          <span style={{ color }}>
             {entry.character.name}
           </span>{' '}
           <span style={{ color }}>{entry.character.secondaryName}</span>

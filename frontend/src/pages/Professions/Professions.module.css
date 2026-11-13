@@ -66,10 +66,6 @@
   background: var(--surface);
 }
 
-.name {
-  font-weight: 600;
-}
-
 .skill {
   font-variant-numeric: tabular-nums;
 }
@@ -144,4 +140,52 @@
   font-size: var(--text-meta);
   cursor: pointer;
   text-decoration: underline;
+}
+
+.tabRow {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  overflow-x: auto;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.tab {
+  flex: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px 12px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+
+.tab:hover {
+  background: var(--surface);
+}
+
+.tab[aria-selected='true'] {
+  border-bottom-color: var(--gold);
+  color: var(--gold);
+}
+
+.tab[aria-disabled='true'] {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.tab[aria-disabled='true']:hover {
+  background: none;
+}
+
+.tabCount {
+  color: var(--muted);
+  font-size: var(--text-meta);
 }
