@@ -71,7 +71,7 @@ func (r *Repo) List(ctx context.Context, profession string) ([]Profession, error
 	const query = `
 		SELECT ` + selectColumns + `
 		FROM professions p
-		JOIN characters c ON c.id = p.character_id
+		JOIN characters c ON c.id = p.character_id AND c.left_guild_at IS NULL
 		WHERE $1 = '' OR lower(p.profession) = lower($1)
 		ORDER BY p.profession ASC, p.skill_level DESC, c.name ASC, c.secondary_name ASC, p.id ASC`
 

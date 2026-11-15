@@ -105,7 +105,7 @@ never seen). Officers can set main/alt only on those unranked, hand-entered char
 Members ask for a rank change with a rank change request instead; each run marks an open
 request done, with no officer named, once the character's main/alt matches it.
 A character the sync saw before and no longer sees gets `left_guild_at` and
-drops off `GET /api/roster`; characters entered by hand that Blizzard never
+drops off `GET /api/roster` and `GET /api/professions`; characters entered by hand that Blizzard never
 listed are left alone. Members with a class the site lacks (Death Knight,
 Monk, Demon Hunter, Evoker exist on retail only) are skipped and counted in
 the `sync_log` message, and an empty or failed Blizzard response changes
@@ -147,7 +147,7 @@ is no separate migrate step.
 | ------ | ------------------- | --------------------------------------------------- |
 | GET    | `/api/health`       | `{"status":"ok"}`                                   |
 | GET    | `/api/recipes`      | recipes the `sync blizzard-professions` job stored, each with the characters still in the guild who can craft it, sorted by recipe name; optional `?q=` (name contains, case-insensitive) and `?characterId=` (only that character's recipes; 400 when not a UUID); at most 500 recipes, `[]` when nothing matches |
-| GET    | `/api/professions`  | crafting directory with each character embedded, sorted by profession, then skill; optional `?profession=` (case-insensitive, `[]` when nothing matches) |
+| GET    | `/api/professions`  | crafting directory with each character embedded, leaving out characters that left the guild, sorted by profession, then skill; optional `?profession=` (case-insensitive, `[]` when nothing matches) |
 | POST   | `/api/professions`  | officer only: `{characterId, profession, skillLevel}`; 201 with the same shape the list returns; 400 for an unknown `characterId`, a blank `profession` or a negative `skillLevel`; 409 when the character already has that profession |
 | PATCH  | `/api/professions/{id}` | officer only: any of `profession`, `skillLevel`; 200 with the updated row; 404 for an unknown or malformed id; 409 when it would duplicate another of the character's professions |
 | DELETE | `/api/professions/{id}` | officer only: 204; 404 for an unknown or malformed id |
