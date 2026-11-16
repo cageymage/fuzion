@@ -47,6 +47,14 @@ describe('Legal', () => {
     )
   })
 
+  it('should describe what the server log records about a Battle.net link when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      'our server log for each link records your BattleTag, how many characters the account has, and the names of any that did not match the guild roster or already belong to another member.',
+    )
+  })
+
   it('should describe the roster display choice kept in local storage when the page renders', () => {
     renderWithProviders(<Legal />)
 
@@ -77,7 +85,7 @@ describe('Legal', () => {
 
     const privacy = screen.getByRole('region', { name: 'Privacy policy' })
     expect(privacy).toHaveTextContent('Battle.net ID and BattleTag')
-    expect(privacy).toHaveTextContent('Unlinking deletes both')
+    expect(privacy).toHaveTextContent('Unlinking deletes your Battle.net ID and BattleTag')
   })
 
   it('should say linking Battle.net records which roster characters are yours when the page renders', () => {

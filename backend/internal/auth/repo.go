@@ -126,7 +126,8 @@ func (r *Repo) UpdateUserRoles(ctx context.Context, id uuid.UUID, isOfficer, isA
 // that are no longer on the account are released, so linking again refreshes the set.
 // When the character list is unknown, only the identity is stored: an empty list
 // from a failed lookup would otherwise release every character the user owns.
-func (r *Repo) LinkBattleNet(ctx context.Context, userID uuid.UUID, identity Identity) error {
+// The summary says how each account character matched, for troubleshooting a missing claim.
+func (r *Repo) LinkBattleNet(ctx context.Context, userID uuid.UUID, identity Identity) (LinkSummary, error) {
 	const link = `
 		UPDATE users
 		SET battlenet_id = $2, battlenet_tag = $3
@@ -142,6 +143,12 @@ func (r *Repo) LinkBattleNet(ctx context.Context, userID uuid.UUID, identity Ide
 		WHERE user_id IS NULL
 		  AND (lower(name), lower(secondary_name)) IN (SELECT * FROM unnest($2::text[], $3::text[]))`
 
+	const match = `
+		SELECT a.ord, c.id IS NOT NULL AS on_roster, c.user_id = $3 AS mine
+		FROM unnest($1::text[], $2::text[]) WITH ORDINALITY AS a(name, surname, ord)
+		LEFT JOIN characters c ON lower(c.name) = a.name AND lower(c.secondary_name) = a.surname
+		ORDER BY a.ord`
+
 	names := make([]string, 0, len(identity.Characters))
 	surnames := make([]string, 0, len(identity.Characters))
 	for _, c := range identity.Characters {
@@ -151,30 +158,85 @@ func (r *Repo) LinkBattleNet(ctx context.Context, userID uuid.UUID, identity Ide
 
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin link battle.net: %w", err)
+		return LinkSummary{}, fmt.Errorf("begin link battle.net: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }() // no-op once committed
 
 	_, err = tx.ExecContext(ctx, link, userID, identity.ProviderUserID, identity.Username)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
-		return ErrBattleNetAlreadyLinked
+		return LinkSummary{}, ErrBattleNetAlreadyLinked
 	}
 	if err != nil {
-		return fmt.Errorf("link battle.net: %w", err)
+		return LinkSummary{}, fmt.Errorf("link battle.net: %w", err)
 	}
+	var summary LinkSummary
 	if identity.CharactersKnown {
 		if _, err := tx.ExecContext(ctx, release, userID, names, surnames); err != nil {
-			return fmt.Errorf("release characters no longer on the account: %w", err)
+			return LinkSummary{}, fmt.Errorf("release characters no longer on the account: %w", err)
 		}
 		if _, err := tx.ExecContext(ctx, claim, userID, names, surnames); err != nil {
-			return fmt.Errorf("claim characters: %w", err)
+			return LinkSummary{}, fmt.Errorf("claim characters: %w", err)
 		}
+		var matches []characterMatch
+		if err := tx.SelectContext(ctx, &matches, match, names, surnames, userID); err != nil {
+			return LinkSummary{}, fmt.Errorf("match account characters: %w", err)
+		}
+		summary = summarizeLink(identity.Characters, matches)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit link battle.net: %w", err)
+		return LinkSummary{}, fmt.Errorf("commit link battle.net: %w", err)
 	}
-	return nil
+	return summary, nil
+}
+
+// LinkSummary sorts the account's characters by how the link matched them.
+type LinkSummary struct {
+	AccountCharacters int
+	Owned             int
+	Unmatched         []AccountCharacter
+	OwnedByOthers     []AccountCharacter
+}
+
+type characterMatch struct {
+	Ord      int   `db:"ord"`
+	OnRoster bool  `db:"on_roster"`
+	Mine     *bool `db:"mine"`
+}
+
+// summarizeLink folds the match rows, one or more per account character when the
+// roster holds duplicates, into one outcome each: owned beats owned by someone else,
+// which beats not on the roster.
+func summarizeLink(characters []AccountCharacter, matches []characterMatch) LinkSummary {
+	const (
+		unmatched = iota
+		ownedByOther
+		owned
+	)
+	outcomes := make([]int, len(characters))
+	for _, m := range matches {
+		outcome := unmatched
+		switch {
+		case m.Mine != nil && *m.Mine:
+			outcome = owned
+		case m.OnRoster:
+			outcome = ownedByOther
+		}
+		outcomes[m.Ord-1] = max(outcomes[m.Ord-1], outcome)
+	}
+
+	summary := LinkSummary{AccountCharacters: len(characters), Unmatched: []AccountCharacter{}, OwnedByOthers: []AccountCharacter{}}
+	for i, outcome := range outcomes {
+		switch outcome {
+		case owned:
+			summary.Owned++
+		case ownedByOther:
+			summary.OwnedByOthers = append(summary.OwnedByOthers, characters[i])
+		default:
+			summary.Unmatched = append(summary.Unmatched, characters[i])
+		}
+	}
+	return summary
 }
 
 // UnlinkBattleNet clears the identity and releases every character the user owns,

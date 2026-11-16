@@ -1,6 +1,9 @@
 package auth_test
 
 import (
+	"bytes"
+	"encoding/json"
+	"log/slog"
 	"net/url"
 	"testing"
 
@@ -321,6 +324,81 @@ func TestBattlenetLink_ClaimsRosterCharactersOnTheAccount(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, ownedCharacters(t, db)); diff != "" {
 		t.Errorf("unexpected owners (-want +got):\n%s", diff)
+	}
+}
+
+// captureLogs sends the default logger's JSON lines to a buffer for the rest of the test.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return &buf
+}
+
+type linkLogLine struct {
+	Msg               string   `json:"msg"`
+	UserID            string   `json:"user_id"`
+	BattleTag         string   `json:"battletag"`
+	AccountCharacters int      `json:"account_characters"`
+	Owned             int      `json:"owned"`
+	Unmatched         []string `json:"unmatched"`
+	OwnedByOthers     []string `json:"owned_by_others"`
+}
+
+func linkLogLines(t *testing.T, logs *bytes.Buffer) []linkLogLine {
+	t.Helper()
+	var lines []linkLogLine
+	for _, raw := range bytes.Split(bytes.TrimSpace(logs.Bytes()), []byte("\n")) {
+		var line linkLogLine
+		if err := json.Unmarshal(raw, &line); err != nil {
+			t.Fatalf("decode log line %q: %v", raw, err)
+		}
+		if line.Msg == "battle.net link" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
+func TestBattlenetLink_LogsHowEachAccountCharacterMatchedTheRoster(t *testing.T) {
+	// given roster characters Tankard Ironhide (unowned), Stranger Unset (another member's) and Billiejoe
+	// Strongarm, and my Battle.net account listing Tankard, Stranger, Billiejoe with no surname, and a
+	// character the roster does not have
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	other := srv.LoginAs(t, "11111111111111111", "someoneelse")
+	me := srv.LoginAs(t, "80351110224678912", "thundermane")
+	insertRosterCharacter(t, db, "Tankard", "Ironhide", "Emberreach")
+	insertRosterCharacter(t, db, "Stranger", "Unset", "Emberreach")
+	insertRosterCharacter(t, db, "Billiejoe", "Strongarm", "Emberreach")
+	db.MustExec(`UPDATE characters SET user_id = $1 WHERE name = 'Stranger'`, other.ID)
+	state := startBattleNetLink(t, srv)
+	srv.BattleNet.GrantCode("bnet-code", testutil.BattleNetUser{ID: 123456789, BattleTag: "Thunder#1234", Characters: []testutil.BattleNetCharacter{
+		{Name: "Tankard", Surname: "Ironhide"},
+		{Name: "Stranger", Surname: "Unset"},
+		{Name: "Billiejoe", Surname: ""},
+		{Name: "Newbie", Surname: "Rookie"},
+	}})
+	logs := captureLogs(t)
+
+	// when Battle.net sends the browser back with the code
+	resp := srv.Get(t, "/api/auth/battlenet/callback?code=bnet-code&state="+state)
+
+	// then I expect one log line counting my owned character and naming the ones that did not match or belong to someone else
+	resp.RequireStatus(t, 302)
+	want := []linkLogLine{{
+		Msg:               "battle.net link",
+		UserID:            me.ID.String(),
+		BattleTag:         "Thunder#1234",
+		AccountCharacters: 4,
+		Owned:             1,
+		Unmatched:         []string{"Billiejoe (no surname)", "Newbie Rookie"},
+		OwnedByOthers:     []string{"Stranger Unset"},
+	}}
+	if diff := cmp.Diff(want, linkLogLines(t, logs)); diff != "" {
+		t.Errorf("unexpected link log (-want +got):\n%s", diff)
 	}
 }
 
