@@ -137,14 +137,13 @@ describe('Roster management', () => {
     expect(screen.queryByRole('button', { name: 'Edit Ragnok' })).not.toBeInTheDocument()
   })
 
-  it('should let an officer edit an alt after showing alts', async () => {
+  it('should let an officer edit an alt', async () => {
     signInAs(officer)
     serveRoster([ragnok, zaldrix])
     const user = userEvent.setup()
     renderWithProviders(<Roster />)
     await screen.findByText('Ragnok Ironhide')
 
-    await user.click(screen.getByRole('checkbox', { name: 'Show alts' }))
     await user.click(screen.getByRole('button', { name: 'Edit Zaldrix' }))
 
     expect(screen.getByRole('dialog', { name: 'Edit Zaldrix' })).toBeInTheDocument()

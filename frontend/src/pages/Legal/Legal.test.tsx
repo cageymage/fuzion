@@ -47,6 +47,14 @@ describe('Legal', () => {
     )
   })
 
+  it('should describe the roster display choice kept in local storage when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      "whether the Roster page shows alts is saved in your browser's local storage so the page remembers it. It stays on your device and is never sent to us.",
+    )
+  })
+
   it('should name the third parties that handle data when the page renders', () => {
     renderWithProviders(<Legal />)
 

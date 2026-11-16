@@ -61,17 +61,18 @@ describe('Roster', () => {
     expect(placeholder?.querySelectorAll('[data-skeleton]')).toHaveLength(10)
   })
 
-  it('should list only main characters by default', async () => {
+  it('should list mains and alts by default', async () => {
     server.use(http.get('/api/roster', () => HttpResponse.json(roster)))
 
     renderWithProviders(<Roster />)
 
     expect(await screen.findByText('Ragnok')).toBeInTheDocument()
     expect(screen.getByText('Selene')).toBeInTheDocument()
-    expect(screen.queryByText('Zaldrix')).not.toBeInTheDocument()
+    expect(screen.getByText('Zaldrix')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Show alts' })).toBeChecked()
   })
 
-  it('should include alts when the show-alts checkbox is checked', async () => {
+  it('should hide alts when the show-alts checkbox is unchecked', async () => {
     server.use(http.get('/api/roster', () => HttpResponse.json(roster)))
     const user = userEvent.setup()
     renderWithProviders(<Roster />)
@@ -79,7 +80,38 @@ describe('Roster', () => {
 
     await user.click(screen.getByRole('checkbox', { name: 'Show alts' }))
 
-    expect(screen.getByText('Zaldrix')).toBeInTheDocument()
+    expect(screen.getByText('Selene')).toBeInTheDocument()
+    expect(screen.queryByText('Zaldrix')).not.toBeInTheDocument()
+  })
+
+  it('should keep alts hidden on the next visit when the show-alts checkbox was unchecked', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json(roster)))
+    const user = userEvent.setup()
+    const firstVisit = renderWithProviders(<Roster />)
+    await screen.findByText('Ragnok')
+    await user.click(screen.getByRole('checkbox', { name: 'Show alts' }))
+    firstVisit.unmount()
+
+    renderWithProviders(<Roster />)
+
+    expect(await screen.findByText('Ragnok')).toBeInTheDocument()
+    expect(screen.queryByText('Zaldrix')).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Show alts' })).not.toBeChecked()
+  })
+
+  it('should show alts on the next visit when the show-alts checkbox was checked again', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json(roster)))
+    const user = userEvent.setup()
+    const firstVisit = renderWithProviders(<Roster />)
+    await screen.findByText('Ragnok')
+    await user.click(screen.getByRole('checkbox', { name: 'Show alts' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Show alts' }))
+    firstVisit.unmount()
+
+    renderWithProviders(<Roster />)
+
+    expect(await screen.findByText('Zaldrix')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Show alts' })).toBeChecked()
   })
 
   it('should only show healers when the Healer role filter is selected', async () => {
@@ -521,15 +553,15 @@ describe('Roster composition summary', () => {
     await screen.findByText('Ragnok')
 
     const summary = screen.getByRole('region', { name: 'Roster summary' })
+    expect(within(summary).getByText('4 characters')).toBeInTheDocument()
+    expect(within(summary).getByText(/Main 3 \| 1 Alt/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('checkbox', { name: 'Show alts' }))
+
     expect(within(summary).getByText('3 characters')).toBeInTheDocument()
     expect(within(summary).getByText(/1 Tank \| 1 Healer \| 1 DPS/)).toBeInTheDocument()
     expect(within(summary).getByText(/Main 3 \| 0 Alts/)).toBeInTheDocument()
     expect(within(summary).getByText(/Avg level 59/)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('checkbox', { name: 'Show alts' }))
-
-    expect(within(summary).getByText('4 characters')).toBeInTheDocument()
-    expect(within(summary).getByText(/Main 3 \| 1 Alt/)).toBeInTheDocument()
   })
 
   it('should follow the role filter when a role is selected', async () => {
