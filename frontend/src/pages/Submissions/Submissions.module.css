@@ -1,0 +1,166 @@
+.page {
+  padding: 28px var(--gutter) 40px;
+  max-width: 820px;
+  font-size: var(--text-ui);
+}
+
+.title {
+  margin: 0 0 12px;
+  font-size: 38px;
+}
+
+.intro,
+.notice,
+.hint {
+  color: var(--muted);
+}
+
+.hint {
+  font-size: var(--text-meta);
+}
+
+.manageLink {
+  display: inline-block;
+  margin-bottom: 12px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 16px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-chip);
+  text-align: center;
+}
+
+.dragging {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+}
+
+.dropzone p {
+  margin: 0;
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.button,
+.submit {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: var(--text-meta);
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled),
+.submit:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold-hover);
+}
+
+.submit {
+  align-self: flex-start;
+  border-color: var(--gold);
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.button:disabled,
+.submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.selected,
+.problems,
+.results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview {
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+}
+
+.itemBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.filename {
+  overflow-wrap: anywhere;
+}
+
+.description {
+  min-height: 3em;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.license {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+}
+
+.licenseTitle {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+.attestation {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.error,
+.problems {
+  color: var(--danger);
+}
+
+.success {
+  color: var(--gold);
+}

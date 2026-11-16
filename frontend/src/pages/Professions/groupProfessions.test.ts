@@ -30,10 +30,8 @@ describe('groupProfessions', () => {
     ])
   })
 
-  it('should keep every row of a profession when the query matches the profession name', () => {
-    expect(groupProfessions(rows, 'alch')).toEqual([
-      { profession: 'Alchemy', entries: [alchemyAeliana, alchemyZephyrion] },
-    ])
+  it('should return no groups when the query matches only a profession name', () => {
+    expect(groupProfessions(rows, 'alch')).toEqual([])
   })
 
   it('should keep only the matching rows across professions when the query matches a character name', () => {
@@ -50,8 +48,8 @@ describe('groupProfessions', () => {
   })
 
   it('should ignore surrounding whitespace when the query has leading or trailing spaces', () => {
-    expect(groupProfessions(rows, '  smith  ')).toEqual([
-      { profession: 'Blacksmithing', entries: [smithingZephyrion] },
+    expect(groupProfessions(rows, '  dawn  ')).toEqual([
+      { profession: 'Alchemy', entries: [alchemyAeliana] },
     ])
   })
 
@@ -61,5 +59,23 @@ describe('groupProfessions', () => {
 
   it('should return no groups when there are no rows', () => {
     expect(groupProfessions([], '')).toEqual([])
+  })
+})
+
+describe('groupProfessions with recipe crafters', () => {
+  it('should keep an entry that does not match the text when its character crafts a matched recipe in that profession', () => {
+    const crafters = new Set(['Alchemy\u0000char-Zephyrion'])
+
+    const groups = groupProfessions(rows, 'elixir', crafters)
+
+    expect(groups).toEqual([{ profession: 'Alchemy', entries: [alchemyZephyrion] }])
+  })
+
+  it('should drop an entry whose character crafts the recipe only in another profession', () => {
+    const crafters = new Set(['Alchemy\u0000char-Zephyrion'])
+
+    const groups = groupProfessions(rows, 'elixir', crafters)
+
+    expect(groups.map((group) => group.profession)).not.toContain('Blacksmithing')
   })
 })

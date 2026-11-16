@@ -75,6 +75,14 @@
   font-weight: normal;
 }
 
+.table tbody tr:nth-child(even) {
+  background: var(--surface);
+}
+
+.table tbody tr:hover {
+  background: var(--gold-soft);
+}
+
 .voidedRow {
   opacity: 0.55;
 }

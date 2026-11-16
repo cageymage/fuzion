@@ -1,0 +1,67 @@
+{
+  "_links": { "self": { "href": "https://us.api.blizzard.com/profile/wow/character/terrorskull-gloomstep/professions?namespace=profile-forever-us" } },
+  "character": {
+    "key": { "href": "https://us.api.blizzard.com/profile/wow/character/terrorskull-gloomstep?namespace=profile-forever-us" },
+    "name": "Terrorskull",
+    "id": 163709,
+    "surname": "Gloomstep",
+    "slug": "terrorskull-gloomstep"
+  },
+  "primaries": [
+    {
+      "profession": { "key": { "href": "https://us.api.blizzard.com/data/wow/profession/165" }, "name": "Leatherworking", "id": 165 },
+      "tiers": [
+        {
+          "skill_points": 55,
+          "max_skill_points": 75,
+          "tier": { "name": "Leatherworking", "id": 2945 },
+          "known_recipes": [
+            { "key": { "href": "https://us.api.blizzard.com/data/wow/recipe/1353" }, "name": "Handstitched Leather Boots", "id": 1353 },
+            { "key": { "href": "https://us.api.blizzard.com/data/wow/recipe/1356" }, "name": "Light Armor Kit", "id": 1356 }
+          ]
+        }
+      ]
+    },
+    {
+      "profession": { "key": { "href": "https://us.api.blizzard.com/data/wow/profession/393" }, "name": "Skinning", "id": 393 },
+      "tiers": [
+        {
+          "skill_points": 98,
+          "max_skill_points": 150,
+          "tier": { "name": "Skinning", "id": 2947 },
+          "known_recipes": [
+            { "key": { "href": "https://us.api.blizzard.com/data/wow/recipe/4767" }, "name": "Skinning", "id": 4767 }
+          ]
+        }
+      ]
+    }
+  ],
+  "secondaries": [
+    {
+      "profession": { "key": { "href": "https://us.api.blizzard.com/data/wow/profession/185" }, "name": "Cooking", "id": 185 },
+      "tiers": [
+        {
+          "skill_points": 24,
+          "max_skill_points": 75,
+          "tier": { "name": "Cooking", "id": 2939 },
+          "known_recipes": [
+            { "key": { "href": "https://us.api.blizzard.com/data/wow/recipe/8616" }, "name": "Crispy Bat Wing", "id": 8616 }
+          ]
+        }
+      ]
+    },
+    {
+      "profession": { "key": { "href": "https://us.api.blizzard.com/data/wow/profession/129" }, "name": "First Aid", "id": 129 },
+      "tiers": [
+        {
+          "skill_points": 71,
+          "max_skill_points": 150,
+          "tier": { "name": "First Aid", "id": 2942 },
+          "known_recipes": [
+            { "key": { "href": "https://us.api.blizzard.com/data/wow/recipe/1838" }, "name": "Linen Bandage", "id": 1838 }
+          ]
+        }
+      ]
+    }
+  ]
+}

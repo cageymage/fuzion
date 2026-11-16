@@ -16,6 +16,16 @@ export function formatCountdown(msRemaining: number): string {
   return `${minutes}m`
 }
 
+export function splitCountdown(msRemaining: number) {
+  const totalSeconds = Math.max(0, Math.floor(msRemaining / 1_000))
+  return {
+    days: Math.floor(totalSeconds / 86_400),
+    hours: Math.floor((totalSeconds % 86_400) / 3_600),
+    minutes: Math.floor((totalSeconds % 3_600) / 60),
+    seconds: totalSeconds % 60,
+  }
+}
+
 export function formatViewerCount(viewers: number): string {
   if (viewers < 1_000) {
     return String(viewers)

@@ -38,7 +38,7 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
   }
 
   function changeSecondSpec(spec2: string) {
-    change({ spec2, role2: spec2 === '' ? '' : values.role2 || values.role })
+    change({ spec2, role2: spec2 === '' ? '' : values.role2 || values.role || roles[0] })
   }
 
   function toggleSecondaryProfession(profession: string, checked: boolean) {
@@ -141,6 +141,7 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
         <label className={styles.field}>
           <span>Role</span>
           <select value={values.role} onChange={(event) => change({ role: event.target.value as Role })}>
+            {values.role === '' && <option value="">Not set</option>}
             {roles.map((role) => (
               <option key={role} value={role}>
                 {roleLabels[role]}
@@ -229,14 +230,18 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
             </label>
           ))}
         </fieldset>
-        <label className={styles.toggle}>
-          <input
-            type="checkbox"
-            checked={values.isMain}
-            onChange={(event) => change({ isMain: event.target.checked })}
-          />
-          <span>Main character</span>
-        </label>
+        {character?.rank ? (
+          <p>Main or alt follows the guild rank in game ({character.rank}).</p>
+        ) : (
+          <label className={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={values.isMain}
+              onChange={(event) => change({ isMain: event.target.checked })}
+            />
+            <span>Main character</span>
+          </label>
+        )}
 
         {mutation.isError && (
           <p role="alert" className={styles.error}>

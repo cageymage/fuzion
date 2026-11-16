@@ -152,6 +152,32 @@ func TestListProfessions_OmitsProfessions_WhenTheirCharacterIsDeleted(t *testing
 	}
 }
 
+func TestListProfessions_OmitsProfessions_WhenTheirCharacterHasLeftTheGuild(t *testing.T) {
+	// given professions for two characters, after the roster sync marked one of them as having left,
+	// as it does when Blizzard renames a character and the new name syncs as a new character
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(seedCharacters)
+	db.MustExec(seedProfessions)
+	db.MustExec(`UPDATE characters SET left_guild_at = '2026-11-01T12:00:00Z' WHERE id = '22222222-2222-2222-2222-222222222222'`)
+
+	// when I ask for the professions
+	resp := srv.Get(t, "/api/professions")
+
+	// then I expect only the professions of the character still in the guild
+	resp.RequireStatus(t, 200)
+	var professions []professionJSON
+	resp.DecodeJSON(t, &professions)
+
+	want := []professionJSON{
+		{ID: "a3333333-3333-3333-3333-333333333333", Profession: "Alchemy", SkillLevel: 300, Character: aeliana},
+		{ID: "a2222222-2222-2222-2222-222222222222", Profession: "Blacksmithing", SkillLevel: 225, Character: aeliana},
+	}
+	if diff := cmp.Diff(want, professions); diff != "" {
+		t.Errorf("unexpected professions (-want +got):\n%s", diff)
+	}
+}
+
 func TestCreateProfession_ReturnsCreated_WhenOfficerSubmitsValidProfession(t *testing.T) {
 	// given I am an officer and a character exists
 	db := testutil.DB(t)
@@ -220,7 +246,7 @@ func TestCreateProfession_ReturnsBadRequest_WhenSkillLevelIsNegative(t *testing.
 	resp.RequireStatus(t, http.StatusBadRequest)
 	var body map[string]string
 	resp.DecodeJSON(t, &body)
-	if diff := cmp.Diff(map[string]string{"error": "skillLevel: must be 0 or more"}, body); diff != "" {
+	if diff := cmp.Diff(map[string]string{"error": "skillLevel: must be between 0 and 300"}, body); diff != "" {
 		t.Errorf("unexpected error body (-want +got):\n%s", diff)
 	}
 }

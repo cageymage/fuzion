@@ -16,6 +16,7 @@ import (
 
 	"github.com/cageymage/fuzion/backend/internal/applications"
 	"github.com/cageymage/fuzion/backend/internal/auth"
+	"github.com/cageymage/fuzion/backend/internal/blizzard"
 	"github.com/cageymage/fuzion/backend/internal/clock"
 	idiscord "github.com/cageymage/fuzion/backend/internal/discord"
 	"github.com/cageymage/fuzion/backend/internal/images"
@@ -24,9 +25,11 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/raidhelper"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
 	"github.com/cageymage/fuzion/backend/internal/raids"
+	"github.com/cageymage/fuzion/backend/internal/rankrequests"
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/submissions"
 	"github.com/cageymage/fuzion/backend/internal/surveys"
 	"github.com/cageymage/fuzion/backend/internal/turnstile"
 	"github.com/cageymage/fuzion/backend/internal/youtube"
@@ -76,13 +79,19 @@ func run() error {
 	// Assign only when configured: a typed-nil *BattleNet in the option would read as enabled.
 	if cfg.battleNet.enabled() {
 		authOptions = append(authOptions, auth.WithBattleNet(auth.NewBattleNet(auth.BattleNetConfig{
-			ClientID:     cfg.battleNet.clientID,
-			ClientSecret: cfg.battleNet.clientSecret,
-			RedirectURL:  cfg.battleNet.redirectURL,
-			BaseURL:      auth.BattleNetAPIBaseURL,
+			ClientID:       cfg.battleNet.clientID,
+			ClientSecret:   cfg.battleNet.clientSecret,
+			RedirectURL:    cfg.battleNet.redirectURL,
+			BaseURL:        auth.BattleNetAPIBaseURL,
+			ProfileBaseURL: blizzard.APIBaseURL(cfg.battleNet.region),
+			Namespace:      cfg.battleNet.namespace,
 		}, &http.Client{Timeout: 10 * time.Second})))
 	} else {
 		slog.Info("battle.net linking disabled: BATTLENET_REDIRECT_URL is not set")
+	}
+
+	if !cfg.submissions.enabled {
+		slog.Warn("art submissions closed: SUBMISSIONS_ENABLED is false")
 	}
 
 	playlistID := cfg.youtube.playlistID
@@ -121,6 +130,13 @@ func run() error {
 		slog.Info("news announcements disabled: DISCORD_ANNOUNCEMENTS_WEBHOOK_URL is not set")
 	}
 
+	var rankRequests rankrequests.Notifier
+	if cfg.rankRequestsWebhookURL != "" {
+		rankRequests = idiscord.NewWebhook(cfg.rankRequestsWebhookURL, &http.Client{Timeout: 5 * time.Second})
+	} else {
+		slog.Info("rank request notifications disabled: DISCORD_RANK_REQUESTS_WEBHOOK_URL is not set")
+	}
+
 	if cfg.raidHelperWebhookKey == "" {
 		slog.Info("raid-helper webhook disabled: RAID_HELPER_WEBHOOK_SECRET is not set")
 	}
@@ -134,8 +150,10 @@ func run() error {
 		RaidHelper:     raidhelper.NewHandler(raidhelper.NewService(raidhelper.NewRepo(db)), cfg.raidHelperWebhookKey),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.System{})),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
+		RankRequests:   rankrequests.NewHandler(rankrequests.NewService(rankrequests.NewRepo(db), clock.System{}, rankRequests, cfg.siteBaseURL)),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), streams.NewSuggestedVideos(youTube, playlistID, clock.System{})),
+		Submissions:    submissions.NewHandler(submissions.NewService(submissions.NewRepo(db), clock.System{}, cfg.submissions.enabled, cfg.submissions.storageLimitBytes), submissions.DefaultUploadSlots),
 		Surveys:        surveys.NewHandler(surveys.NewService(surveys.NewRepo(db), clock.System{})),
 		AllowedOrigins: cfg.allowedOrigins,
 	})

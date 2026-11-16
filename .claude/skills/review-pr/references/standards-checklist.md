@@ -37,7 +37,7 @@ Turn each rule into a concrete check against the diff. CLAUDE.md is the source o
 - Test names follow `<feature> should <expected behavior> when <criteria>` with one action per test, no long "and" chains.
 
 ## Legal page
-`frontend/src/pages/Legal/Legal.tsx` must change in the same PR, with a Legal test, when the diff: collects or stores new personal data (form fields, linked accounts, cookies), adds a third party that receives data or is embedded, adds a user-uploaded content type, or adds an asset needing attribution. Missing update is a `must`. The PR body should say what changed on the page.
+`frontend/src/pages/Legal/Legal.tsx` (guild site) or `hub/src/pages/Legal/Legal.tsx` (hub) must change in the same PR, with a Legal test, when a change to that site: collects or stores new personal data (form fields, linked accounts, cookies), adds a third party that receives data or is embedded, adds a user-uploaded content type, or adds an asset needing attribution. Missing update is a `must`. The PR body should say what changed on the page.
 
 ## Git and scope
 - Changes unrelated to the linked issue are a `should` (suggest a separate PR).

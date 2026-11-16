@@ -28,6 +28,7 @@ Environment:
 | `DISCORD_CLIENT_SECRET` | required | same place; never commit it        |
 | `DISCORD_REDIRECT_URL`  | required | must be registered on the Discord app; `http://localhost:5173/api/auth/callback` in dev |
 | `DISCORD_GUILD_ID`      | optional | the guild Discord server's ID (Developer Mode, right-click the server, Copy Server ID). When set, login also asks for the `guilds` scope and records whether the user is in that server. Only users in the server count as guild members (`isGuildMember` on `/api/auth/me`), and only guild members can answer surveys; responses also carry the flag for officers. It is read at login and kept on the account, so it is as old as the person's last login (up to 30 days for someone who stays logged in; logging out and in refreshes it). Without it every logged-in user counts as a guild member, the stored flag is false for everyone, and the officer "only people in our Discord server" filter hides every response |
+| `DISCORD_RANK_REQUESTS_WEBHOOK_URL` | optional | a Discord channel webhook URL (Edit Channel > Integrations > Webhooks) that gets an embed for each new rank change request, linking to `/officer/rank-requests`; treat it as a secret. Without it officers are not pinged and the API logs that at startup. When set, `SITE_BASE_URL` is required |
 | `RAID_HELPER_WEBHOOK_SECRET` | optional | Raid-Helper's webhook key from `/webhooks show`; without it `POST /api/webhooks/raid-helper` is not registered (404) |
 | `TWITCH_CLIENT_ID`      | optional | `cmd/sync` only; from a dev.twitch.tv app. The Twitch job skips itself unless both are set |
 | `TWITCH_CLIENT_SECRET`  | optional | same place; never commit it        |
@@ -36,10 +37,11 @@ Environment:
 | `BLIZZARD_CLIENT_ID`    | when enabled | from a develop.battle.net client |
 | `BLIZZARD_CLIENT_SECRET` | when enabled | same place; never commit it |
 | `BLIZZARD_REGION`       | `us` | API host region |
-| `BLIZZARD_NAMESPACE`    | `profile-<region>` | the game version's profile namespace, e.g. `profile-classic1x-us`; Forever's value is not known yet |
-| `GUILD_REALM_SLUG`      | when enabled | the guild's realm in Blizzard's slug form, e.g. `area-52` |
+| `BLIZZARD_NAMESPACE`    | `profile-forever-<region>` | the game version's profile namespace; set it only to point at another game version, e.g. `profile-us` for retail |
 | `GUILD_NAME_SLUG`       | when enabled | the guild name as a slug (lowercase, spaces to hyphens), e.g. `my-guild` |
-| `BATTLENET_REDIRECT_URL` | optional | enables Battle.net account linking on `/dashboard`; must be registered on the Blizzard client, `http://localhost:5173/api/auth/battlenet/callback` in dev. Needs `BLIZZARD_CLIENT_ID` and `BLIZZARD_CLIENT_SECRET` on the API too |
+| `SUBMISSIONS_ENABLED`   | `true` | emergency switch for art and screenshot submissions: `false` makes uploads return 503 and the submission page show a closed message, while officers keep reviewing, downloading and deleting. Unset means on. Needs a restart or redeploy to change |
+| `SUBMISSIONS_STORAGE_LIMIT_MB` | `512` | total MiB all submission originals may hold; past it, new submissions are refused (503) and the page shows the closed message |
+| `BATTLENET_REDIRECT_URL` | optional | enables Battle.net account linking on `/dashboard`; must be registered on the Blizzard client, `http://localhost:5173/api/auth/battlenet/callback` in dev. Needs `BLIZZARD_CLIENT_ID` and `BLIZZARD_CLIENT_SECRET` on the API too, and the API reads `BLIZZARD_REGION` and `BLIZZARD_NAMESPACE` to list the member's characters |
 
 Background jobs run from `cmd/sync`, one job per invocation, once and exit
 (Render runs `/sync twitch` every minute and `/sync youtube` every 5 minutes). Locally, with the API already run
@@ -79,18 +81,46 @@ then run `npx dotenv -e .env -e .env.example -- go run -C backend ./cmd/sync you
 `sync blizzard-roster` pulls the guild roster from Blizzard once an hour and
 is off until `SYNC_BLIZZARD_ROSTER_ENABLED=true`. For each member it adds the
 character if the roster lacks it, or refreshes class, level, race and guild rank if
-it exists (matched on name and realm, ignoring case). Race is set from the
-roster when its id is known (Classic races only; Skyborne ids are not mapped yet, so
-those members keep whatever race an officer set and show up as `unmapped race N` in
-the `sync_log` message). New characters get the
-secondary name `Unset` and role `dps` because Blizzard supplies neither; the
-sync never touches role, spec, main/alt, raid team or owner after that. A
-character the sync saw before and no longer sees gets `left_guild_at` and
-drops off `GET /api/roster`; characters entered by hand that Blizzard never
+it exists (matched on name and surname, ignoring case; Forever has no realms). A row left
+with the secondary name `Unset` by an earlier sync takes the surname on first match.
+Race is set from the
+roster when its id is known (Classic races and Skyborne (Windshaper), id 96; Skyborne
+(High Order)'s id is not mapped yet, so those members keep whatever race an officer set and show up as `unmapped race N` in
+the `sync_log` message). New characters take Blizzard's surname as the
+secondary name and start with no role or spec, which their owner picks on the
+Dashboard; the sync never writes role, spec, raid team or owner. Gender is not in the
+roster response, so after the upsert the job asks each in-guild character that has none
+for its profile (`/profile/wow/character/{name}-{surname}`, with the app token) and
+stores `male` or `female`, which `GET /api/roster` returns as `gender` and the roster
+page uses to pick the race icon. It asks once per character; a profile Blizzard answers
+404 for is counted in the `sync_log` message as `N without a Blizzard profile` and tried
+again next run, and any other Blizzard error fails the run. Main/alt
+always follows the guild rank: Officer Alt (3) and Alt (5) are alts and every other
+rank is a main, on every run, so a rank change in game moves the character. The rank
+numbers and their names live in `internal/roster/ranks.go`; Blizzard's roster gives only
+the number, so add, remove or rename a rank there when the guild changes it in game. A
+rank missing from that list syncs as a main and shows as `Rank N`. `GET /api/roster` and
+`GET /api/me/characters` return the name as `rank` (`null` for characters the sync has
+never seen). Officers can set main/alt only on those unranked, hand-entered characters.
+Members ask for a rank change with a rank change request instead; each run marks an open
+request done, with no officer named, once the character's main/alt matches it.
+A character the sync saw before and no longer sees gets `left_guild_at` and
+drops off `GET /api/roster` and `GET /api/professions`; characters entered by hand that Blizzard never
 listed are left alone. Members with a class the site lacks (Death Knight,
 Monk, Demon Hunter, Evoker exist on retail only) are skipped and counted in
 the `sync_log` message, and an empty or failed Blizzard response changes
 nothing.
+
+`sync blizzard-professions` reads each roster character's professions from Blizzard
+(`/profile/wow/character/{name}-{surname}/professions`, with the app token, so no
+Battle.net link is needed) and is off until `SYNC_BLIZZARD_PROFESSIONS_ENABLED=true`.
+It uses the same `BLIZZARD_*` settings as the roster sync and skips characters who left
+the guild or still have the `Unset` secondary name. Blizzard wins per profession: each
+profession it reports is written with its skill level, replacing an officer's number,
+while professions it does not report keep the officer's row. Members cannot edit
+professions. A character Blizzard answers 404 for is skipped and counted
+in the `sync_log` message; any other Blizzard error fails the run. The sync never
+removes a profession, so a profession a character drops stays until an officer removes it.
 
 Raid-Helper events reach the `raids` table through its webhook (Premium only).
 Point `/webhooks set` for `event.create`, `event.update` and `event.delete` at
@@ -104,6 +134,10 @@ stops a late create or update from bringing it back. Hand-entered raids (no
 `raid_helper_event_id`) are never touched. Payload details and the captures the
 tests use are in [plans/integrations/raid-helper.md](../plans/integrations/raid-helper.md).
 
+Every `/api/submissions` response carries `X-Content-Type-Options: nosniff` and
+`Cache-Control: private`. Submissions are never publicly readable, unlike
+`/api/images`. Originals are kept byte for byte, EXIF data included.
+
 Migrations under `migrations/` are embedded and applied on startup, so there
 is no separate migrate step.
 
@@ -112,7 +146,8 @@ is no separate migrate step.
 | Method | Path                | Response                                            |
 | ------ | ------------------- | --------------------------------------------------- |
 | GET    | `/api/health`       | `{"status":"ok"}`                                   |
-| GET    | `/api/professions`  | crafting directory with each character embedded, sorted by profession, then skill; optional `?profession=` (case-insensitive, `[]` when nothing matches) |
+| GET    | `/api/recipes`      | recipes the `sync blizzard-professions` job stored, each with the characters still in the guild who can craft it, sorted by recipe name; optional `?q=` (name contains, case-insensitive) and `?characterId=` (only that character's recipes; 400 when not a UUID); at most 500 recipes, `[]` when nothing matches |
+| GET    | `/api/professions`  | crafting directory with each character embedded, leaving out characters that left the guild, sorted by profession, then skill; optional `?profession=` (case-insensitive, `[]` when nothing matches) |
 | POST   | `/api/professions`  | officer only: `{characterId, profession, skillLevel}`; 201 with the same shape the list returns; 400 for an unknown `characterId`, a blank `profession` or a negative `skillLevel`; 409 when the character already has that profession |
 | PATCH  | `/api/professions/{id}` | officer only: any of `profession`, `skillLevel`; 200 with the updated row; 404 for an unknown or malformed id; 409 when it would duplicate another of the character's professions |
 | DELETE | `/api/professions/{id}` | officer only: 204; 404 for an unknown or malformed id |
@@ -128,6 +163,24 @@ is no separate migrate step.
 | GET    | `/api/auth/callback` | Discord lands here; verifies state, upserts the user, sets `fuzion_session`, 302 to `/` |
 | POST   | `/api/auth/logout`   | deletes the session server-side, clears the cookie, 204 |
 | GET    | `/api/auth/me`       | `{id, username, avatarUrl}` for the cookie's user, or 401 |
+| GET    | `/api/auth/battlenet/callback` | Battle.net lands here after `/api/auth/battlenet/link`: stores the Battle.net ID and BattleTag, then reads the account's characters from `/profile/user/wow` and makes the member the owner of the roster characters with the same name and surname (ignoring case; Forever has no realms and the response carries none). Characters another member owns stay theirs, and ones the account no longer has are released. The token is not stored, so linking again refreshes the set. 302 to `/dashboard?battlenet=linked`, or `?battlenet=already-linked` / `?battlenet=characters-unavailable` when it could not claim, and plain `/dashboard` when the member cancelled |
+| DELETE | `/api/auth/battlenet` | unlinks Battle.net and releases every character the member owns, 204 |
+| GET    | `/api/me/characters` | login required: the caller's characters still in the guild, in the roster's shape, mains first (`[]` when none). `role` is `null` until the owner picks one |
+| PATCH  | `/api/me/characters/{id}` | login required, owner only: any of `spec`, `role`, `spec2`, `role2`, validated as for officers (specs from the class's list, `spec2` and `role2` set or cleared together, `spec2` different from `spec`); an empty `role` clears it; other fields are ignored. 200 in the roster's shape; 403 when someone else or nobody owns the character, 404 when unknown |
+| POST   | `/api/me/characters/{id}/rank-requests` | login required, owner only: `{note?}` (at most 500 characters) asks an officer to move the character to an alt rank in game if it is a main, or to a main rank if it is an alt; `direction` is `to_alt` or `to_main`. 201 with the request; 409 when the character already has an open one; 403 and 404 as above. Posts to `DISCORD_RANK_REQUESTS_WEBHOOK_URL` when set; a failed post is logged and the request still succeeds |
+| GET    | `/api/me/rank-requests` | login required: the newest request that was not cancelled for each of the caller's characters, newest first: `{id, characterId, characterName, characterSecondaryName, characterClass, direction, status: "open"\|"done"\|"declined", note, resolutionNote, requestedBy, createdAt, resolvedAt, resolvedBy}`; `resolvedBy` is `null` when the roster sync closed it |
+| DELETE | `/api/me/rank-requests/{id}` | login required: the character's current owner cancels its open request (also one an earlier owner filed), 204; 403 when the character is not the caller's, 404 when unknown, 409 once it is no longer open |
+| GET    | `/api/rank-requests` | officer only: every open request oldest first, then the 20 most recently done or declined, newest first; cancelled ones are left out |
+| GET    | `/api/rank-requests/count` | officer only: `{open}`, the number of open requests |
+| PATCH  | `/api/rank-requests/{id}` | officer only: `{status: "done"\|"declined", note?}` (at most 500 characters); stamps the officer and time. Done does not change the character; the next roster sync reads the new rank. 400 for another status, 404 when unknown, 409 once it is no longer open |
+| GET    | `/api/submissions/status` | public: `{open, attestationVersion}`; `open` is false when `SUBMISSIONS_ENABLED=false` or storage is full |
+| POST   | `/api/submissions`   | guild members only: multipart, a `metadata` JSON part (`{attestationAccepted, attestationVersion, descriptions}`) first, then up to 10 `files` parts (PNG, JPEG, WebP or GIF, sniffed from the bytes, at most 20 MiB each, 50 MiB in total, 25 megapixels). `descriptions[i]` belongs to the i-th file, at most 500 characters. 201 with `{results: [{filename, submission?, error?}]}` when any file was stored; 400 or 409 (all duplicates) when none were. 400 without the attestation or with an out-of-date `attestationVersion`; 413 over 50 MiB; 429 over 20 files or 100 MiB per member per rolling 24 hours; 503 when closed or storage is full, or when two uploads are already in progress (with `Retry-After: 10`). The quota and storage checks and the inserts run under one advisory lock, so parallel uploads cannot overshoot them |
+| GET    | `/api/submissions`   | officer only: `{total, limit, offset, items}`, newest first, metadata and URLs only (never image bytes); `?limit=` 1 to 100 (default 48), `?offset=` |
+| GET    | `/api/submissions/{id}/thumb` | officer only: an 800px WebP preview |
+| GET    | `/api/submissions/{id}/full` | officer only: the exact original, as the type sniffed at upload |
+| GET    | `/api/submissions/{id}/download` | officer only: the original as `Content-Disposition: attachment` with its sanitized original filename |
+| DELETE | `/api/submissions/{id}` | officer only: hard-deletes the original and thumbnail, 204; 404 when unknown. Works while submissions are closed |
+| POST   | `/api/submissions/bulk-delete` | officer only: `{ids}` (1 to 100), 200 with `{deleted}`, the ids that existed; 400 for a malformed id. Every delete is logged with the officer's id |
 | GET    | `/api/surveys`       | every survey, latest deadline first: `[{id, title, closesAt, status}]`, `status` being `open` or `closed` |
 | GET    | `/api/surveys/{id}`  | the survey with its questions in order (`{id, prompt, type: "single"\|"multi", required, options}`) and `myResponse: {guildName, answers: [{questionId, values}]}` for a logged-in caller who has answered, else `null`; 404 for an unknown or malformed id |
 | PUT    | `/api/surveys/{id}/response` | login required: `{guildName?, answers: [{questionId, values}]}` creates or replaces the caller's response, 200 with what was saved; 400 for an unanswered required question, a value that is not an option, two values on a single-choice question, a question from another survey or a guild name over 64 characters; 409 after the deadline; 404 for an unknown survey. Saving over a voided response clears the void |

@@ -29,9 +29,11 @@ import (
 	"github.com/cageymage/fuzion/backend/internal/raidhelper"
 	"github.com/cageymage/fuzion/backend/internal/raidprogress"
 	"github.com/cageymage/fuzion/backend/internal/raids"
+	"github.com/cageymage/fuzion/backend/internal/rankrequests"
 	"github.com/cageymage/fuzion/backend/internal/roster"
 	"github.com/cageymage/fuzion/backend/internal/server"
 	"github.com/cageymage/fuzion/backend/internal/streams"
+	"github.com/cageymage/fuzion/backend/internal/submissions"
 	"github.com/cageymage/fuzion/backend/internal/surveys"
 	"github.com/cageymage/fuzion/backend/internal/turnstile"
 	"github.com/cageymage/fuzion/backend/internal/youtube"
@@ -54,12 +56,14 @@ type Server struct {
 	Webhook   *FakeWebhook
 	// Announcements is the news announcements channel, separate from Webhook (recruiting).
 	Announcements *FakeWebhook
+	// RankRequests is the officers' rank requests channel.
+	RankRequests *FakeWebhook
 	YouTube       *FakeYouTube
 	Turnstile     *FakeTurnstile
 	// Shell is the static site's index.html that per-post news pages wrap tags around.
 	Shell *FakeShell
 
-	db    *sqlx.DB
+	db     *sqlx.DB
 	client *http.Client
 }
 
@@ -69,9 +73,33 @@ type serverOptions struct {
 	youTubePlaylistID    string
 	recruitingWebhook    bool
 	announcementsWebhook bool
+	rankRequestsWebhook  bool
 	turnstile            bool
 	raidHelperWebhookKey string
 	discordGuildID       string
+	submissionsDisabled  bool
+	submissionStorage    int64
+	submissionSlots      int
+}
+
+// SubmissionStorageLimit is the storage ceiling NewServer gives submissions unless a
+// test sets its own with WithSubmissionStorageLimit.
+const SubmissionStorageLimit = 512 << 20
+
+// WithSubmissionsDisabled builds the server the way a deploy runs with
+// SUBMISSIONS_ENABLED=false: uploads are refused, officer review still works.
+func WithSubmissionsDisabled() ServerOption {
+	return func(o *serverOptions) { o.submissionsDisabled = true }
+}
+
+// WithSubmissionStorageLimit sets the total bytes all submissions may hold.
+func WithSubmissionStorageLimit(bytes int64) ServerOption {
+	return func(o *serverOptions) { o.submissionStorage = bytes }
+}
+
+// WithSubmissionUploadSlots sets how many uploads may run at once.
+func WithSubmissionUploadSlots(slots int) ServerOption {
+	return func(o *serverOptions) { o.submissionSlots = slots }
 }
 
 // WithoutDiscordGuild builds the server the way a deploy without
@@ -98,6 +126,12 @@ func WithoutAnnouncementsWebhook() ServerOption {
 	return func(o *serverOptions) { o.announcementsWebhook = false }
 }
 
+// WithoutRankRequestsWebhook builds the server the way a deploy without
+// DISCORD_RANK_REQUESTS_WEBHOOK_URL runs: officers are not pinged about rank requests.
+func WithoutRankRequestsWebhook() ServerOption {
+	return func(o *serverOptions) { o.rankRequestsWebhook = false }
+}
+
 // WithoutRecruitingWebhook builds the server the way a deploy without
 // DISCORD_RECRUITING_WEBHOOK_URL runs: new applications are not announced.
 func WithoutRecruitingWebhook() ServerOption {
@@ -113,7 +147,7 @@ func WithoutYouTubePlaylist() ServerOption {
 func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	t.Helper()
 
-	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey, discordGuildID: DiscordGuildID}
+	options := serverOptions{youTubePlaylistID: YouTubePlaylistID, recruitingWebhook: true, announcementsWebhook: true, rankRequestsWebhook: true, turnstile: true, raidHelperWebhookKey: RaidHelperWebhookKey, discordGuildID: DiscordGuildID, submissionStorage: SubmissionStorageLimit, submissionSlots: submissions.DefaultUploadSlots}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -128,6 +162,12 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	var announcements news.Notifier
 	if options.announcementsWebhook {
 		announcements = discord.NewWebhook(announcementsWebhook.WebhookURL(), announcementsWebhook.Client())
+	}
+
+	rankRequestsWebhook := NewFakeWebhook(t)
+	var rankRequestsNotifier rankrequests.Notifier
+	if options.rankRequestsWebhook {
+		rankRequestsNotifier = discord.NewWebhook(rankRequestsWebhook.WebhookURL(), rankRequestsWebhook.Client())
 	}
 
 	fakeTurnstile := NewFakeTurnstile(t)
@@ -151,10 +191,12 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 
 	fakeBattleNet := NewFakeBattleNet(t)
 	battleNet := auth.NewBattleNet(auth.BattleNetConfig{
-		ClientID:     BattleNetClientID,
-		ClientSecret: BattleNetClientSecret,
-		RedirectURL:  BattleNetRedirectURL,
-		BaseURL:      fakeBattleNet.URL,
+		ClientID:       BattleNetClientID,
+		ClientSecret:   BattleNetClientSecret,
+		RedirectURL:    BattleNetRedirectURL,
+		BaseURL:        fakeBattleNet.URL,
+		ProfileBaseURL: fakeBattleNet.URL,
+		Namespace:      BattleNetNamespace,
 	}, fakeBattleNet.Client())
 
 	fakeShell := NewFakeShell(t)
@@ -163,14 +205,16 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	router := server.New(server.Deps{
 		Applications:   applications.NewHandler(applications.NewService(applications.NewRepo(db), clock.Fixed(FixedNow), recruiting, verifier, SiteBaseURL)),
 		Auth:           auth.NewHandler(auth.NewService(provider, auth.NewRepo(db), auth.WithDiscordServerMembership(options.discordGuildID), auth.WithBattleNet(battleNet))),
-		Images:        images.NewHandler(images.NewService(images.NewRepo(db))),
+		Images:         images.NewHandler(images.NewService(images.NewRepo(db))),
 		News:           news.NewHandler(news.NewService(news.NewRepo(db), clock.Fixed(FixedNow), announcements, SiteBaseURL), shell),
 		Professions:    professions.NewHandler(professions.NewService(professions.NewRepo(db))),
 		RaidHelper:     raidhelper.NewHandler(raidhelper.NewService(raidhelper.NewRepo(db)), options.raidHelperWebhookKey),
 		RaidProgress:   raidprogress.NewHandler(raidprogress.NewService(raidprogress.NewRepo(db), clock.Fixed(FixedNow))),
 		Raids:          raids.NewHandler(raids.NewService(raids.NewRepo(db))),
+		RankRequests:   rankrequests.NewHandler(rankrequests.NewService(rankrequests.NewRepo(db), clock.Fixed(FixedNow), rankRequestsNotifier, SiteBaseURL)),
 		Roster:         roster.NewHandler(roster.NewService(roster.NewRepo(db))),
 		Streams:        streams.NewHandler(streams.NewService(streams.NewRepo(db)), suggestedVideos),
+		Submissions:    submissions.NewHandler(submissions.NewService(submissions.NewRepo(db), clock.Fixed(FixedNow), !options.submissionsDisabled, options.submissionStorage), options.submissionSlots),
 		Surveys:        surveys.NewHandler(surveys.NewService(surveys.NewRepo(db), clock.Fixed(FixedNow))),
 		AllowedOrigins: []string{"http://localhost:5173"},
 	})
@@ -188,7 +232,7 @@ func NewServer(t *testing.T, db *sqlx.DB, opts ...ServerOption) *Server {
 	client.Jar = jar
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
-	return &Server{Server: httpServer, Discord: discord, BattleNet: fakeBattleNet, Webhook: webhook, Announcements: announcementsWebhook, YouTube: youTube, Turnstile: fakeTurnstile, Shell: fakeShell, db: db, client: client}
+	return &Server{Server: httpServer, Discord: discord, BattleNet: fakeBattleNet, Webhook: webhook, Announcements: announcementsWebhook, RankRequests: rankRequestsWebhook, YouTube: youTube, Turnstile: fakeTurnstile, Shell: fakeShell, db: db, client: client}
 }
 
 type LoginOption func(*loginOptions)
@@ -351,6 +395,51 @@ func (s *Server) PostFile(t *testing.T, path, field, filename, contentType strin
 	}
 	if _, err := part.Write(data); err != nil {
 		t.Fatalf("write multipart part for POST %s: %v", path, err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart body for POST %s: %v", path, err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, s.URL+path, &body)
+	if err != nil {
+		t.Fatalf("build POST %s: %v", path, err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return s.do(t, req)
+}
+
+// MultipartPart is one part of a PostMultipart body: a file when Filename is set,
+// otherwise a plain field.
+type MultipartPart struct {
+	Field       string
+	Filename    string
+	ContentType string
+	Data        []byte
+}
+
+// PostMultipart sends the parts in order, as a browser's FormData does.
+func (s *Server) PostMultipart(t *testing.T, path string, parts ...MultipartPart) Response {
+	t.Helper()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for _, p := range parts {
+		header := textproto.MIMEHeader{}
+		if p.Filename != "" {
+			header.Set("Content-Disposition", fmt.Sprintf(`form-data; name=%q; filename=%q`, p.Field, p.Filename))
+		} else {
+			header.Set("Content-Disposition", fmt.Sprintf(`form-data; name=%q`, p.Field))
+		}
+		if p.ContentType != "" {
+			header.Set("Content-Type", p.ContentType)
+		}
+		part, err := writer.CreatePart(header)
+		if err != nil {
+			t.Fatalf("create multipart part for POST %s: %v", path, err)
+		}
+		if _, err := part.Write(p.Data); err != nil {
+			t.Fatalf("write multipart part for POST %s: %v", path, err)
+		}
 	}
 	if err := writer.Close(); err != nil {
 		t.Fatalf("close multipart body for POST %s: %v", path, err)

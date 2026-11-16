@@ -19,10 +19,13 @@ const aeliana: Character = {
   spec2: null,
   role2: null,
   isMain: true,
+  rank: null,
+  rankOrder: null,
   raidTeam: 'Team 1',
   race: null,
   level: null,
   faction: null,
+  gender: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   professions: [],
 }

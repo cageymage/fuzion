@@ -34,20 +34,47 @@ export function Legal() {
           </li>
           <li>
             Battle.net link: if you choose to link Battle.net on your dashboard, your Battle.net ID
-            and BattleTag. Unlinking deletes both.
+            and BattleTag. While linking, we also read the list of World of Warcraft characters on
+            that account once, to record which guild roster characters are yours. We keep only that
+            ownership, not the list or Battle.net&apos;s access token. Unlinking deletes both and
+            removes you as the owner of those characters.
+          </li>
+          <li>
+            Your characters and rank requests: the specs and roles you pick for characters you own,
+            and any rank change request you send, with its optional note, when you sent it and the
+            officer&apos;s reply. Officers can see your requests, and each new one is also posted,
+            with your Discord username and note, to the officers&apos; channel on the guild&apos;s
+            Discord server.
           </li>
           <li>
             Survey responses: your answers, the guild name you optionally enter, and your Discord
             username at the time you respond. Officers can see these per person, and the public
             results show totals only.
           </li>
+          <li>
+            Roster display choice: whether the Roster page shows alts is saved in your
+            browser&apos;s local storage so the page remembers it. It stays on your device and is
+            never sent to us.
+          </li>
           <li>Images uploaded by officers, such as news post images.</li>
+          <li>
+            Art and screenshot submissions: when a guild member submits images, we keep each exact
+            original file, a small preview, its file name, the optional description, who submitted
+            it, and when they accepted the license and which version of its wording. Originals keep
+            any data the file carries, such as EXIF details and, for some phone photos, the GPS
+            location where it was taken. Only officers can see submissions; they are never public.
+            Officers can delete a submission at any time, which removes the original and the
+            preview.
+          </li>
         </ul>
         <p>Other services are involved in running the site:</p>
         <ul>
           <li>Cloudflare Turnstile checks that application submissions come from a person.</li>
           <li>Twitch and YouTube provide live status, thumbnails and embedded streams and videos.</li>
-          <li>Blizzard Battle.net signs you in when you link your account.</li>
+          <li>
+            Blizzard Battle.net signs you in when you link your account and tells us which
+            characters are on it.
+          </li>
           <li>Render hosts the site and its database.</li>
         </ul>
         <p>
@@ -69,6 +96,11 @@ export function Legal() {
           confirm they have the right to share them. Guild news, names and branding belong to
           Fuzion. If you believe something on this site infringes your rights, ask an officer on
           Discord and it will be reviewed and removed where appropriate.
+        </p>
+        <p>
+          When you submit art or screenshots, you confirm that you created each image or bought the
+          rights to it (game screenshots are fine), and you grant the guild an unrestricted license
+          to use it on this site and in related social media posts. You keep your copyright.
         </p>
       </section>
 

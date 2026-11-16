@@ -3,6 +3,7 @@ package blizzard_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -47,7 +48,7 @@ func newFakeBlizzard(t *testing.T) *fakeBlizzard {
 		f.tokenGrant = r.PostForm.Get("grant_type")
 		json.NewEncoder(w).Encode(map[string]any{"access_token": "app-token", "token_type": "bearer", "expires_in": 86399})
 	})
-	mux.HandleFunc("GET /data/wow/guild/{realm}/{guild}/roster", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /data/wow/guild/{guild}/roster", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.rosterPath = r.URL.EscapedPath()
@@ -70,28 +71,28 @@ func (f *fakeBlizzard) config() blizzard.Config {
 		ClientSecret: "test-secret",
 		BaseURL:      f.URL,
 		AuthURL:      f.URL,
-		Namespace:    "profile-classic1x-us",
+		Namespace:    "profile-forever-us",
 	}
 }
 
 func TestGuildRoster_ParsesMembers_WhenBlizzardResponds(t *testing.T) {
-	// given a Blizzard that returns a Classic-shaped guild roster
+	// given a Blizzard that returns Forever's guild roster
 	fake := newFakeBlizzard(t)
 	client := blizzard.NewClient(fake.config(), nil)
 
 	// when I ask for the guild roster
-	members, err := client.GuildRoster(context.Background(), "defias-pillager", "test-guild")
+	members, err := client.GuildRoster(context.Background(), "fuzion")
 
-	// then I expect each member's name, realm, level, rank and class
+	// then I expect each member's name, surname, level, rank, class and race
 	if err != nil {
 		t.Fatalf("GuildRoster: %v", err)
 	}
 	want := []blizzard.RosterMember{
-		{Name: "Testwarr", RealmSlug: "defias-pillager", Level: 60, Rank: 0, ClassID: 1, Class: "Warrior", RaceID: 1, Race: "Human"},
-		{Name: "Testmage", RealmSlug: "defias-pillager", Level: 45, Rank: 5, ClassID: 8, Class: "Mage", RaceID: 7, Race: "Gnome"},
-		{Name: "Testdruid", RealmSlug: "defias-pillager", Level: 60, Rank: 6, ClassID: 11, Class: "Druid", RaceID: 4, Race: "Night Elf"},
-		{Name: "Thráin", RealmSlug: "area-52", Level: 58, Rank: 3, ClassID: 2, Class: "Paladin", RaceID: 3, Race: "Dwarf"},
-		{Name: "Testdk", RealmSlug: "area-52", Level: 90, Rank: 5, ClassID: 6, Class: "", RaceID: 1, Race: "Human"},
+		{Name: "Mosshorn", Surname: "Rebelfist", Level: 7, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 6, Race: "Tauren"},
+		{Name: "Terrorskull", Surname: "Gloomstep", Level: 14, Rank: 1, ClassID: 4, Class: "Rogue", RaceID: 5, Race: "Undead"},
+		{Name: "Kirk", Surname: "Bear", Level: 1, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 96, Race: "Skyborne (Windshaper)"},
+		{Name: "Kirk", Surname: "Fel", Level: 11, Rank: 3, ClassID: 9, Class: "Warlock", RaceID: 2, Race: "Orc"},
+		{Name: "Testdk", Surname: "Grave", Level: 90, Rank: 5, ClassID: 6, Class: "", RaceID: 1, Race: "Human"},
 	}
 	if diff := cmp.Diff(want, members); diff != "" {
 		t.Errorf("unexpected members (-want +got):\n%s", diff)
@@ -104,7 +105,7 @@ func TestGuildRoster_SendsBasicAuthTokenRequestAndBearerRosterRequest(t *testing
 	client := blizzard.NewClient(fake.config(), nil)
 
 	// when I ask for the guild roster
-	if _, err := client.GuildRoster(context.Background(), "defias-pillager", "test-guild"); err != nil {
+	if _, err := client.GuildRoster(context.Background(), "fuzion"); err != nil {
 		t.Fatalf("GuildRoster: %v", err)
 	}
 
@@ -120,10 +121,10 @@ func TestGuildRoster_SendsBasicAuthTokenRequestAndBearerRosterRequest(t *testing
 	if fake.rosterAuth != "Bearer app-token" {
 		t.Errorf("roster Authorization = %q, want Bearer app-token", fake.rosterAuth)
 	}
-	if fake.rosterPath != "/data/wow/guild/defias-pillager/test-guild/roster" {
+	if fake.rosterPath != "/data/wow/guild/fuzion/roster" {
 		t.Errorf("roster path = %q", fake.rosterPath)
 	}
-	if fake.rosterQuery != "locale=en_US&namespace=profile-classic1x-us" {
+	if fake.rosterQuery != "locale=en_US&namespace=profile-forever-us" {
 		t.Errorf("roster query = %q", fake.rosterQuery)
 	}
 }
@@ -134,14 +135,14 @@ func TestGuildRoster_EscapesSlugs_WhenTheyContainReservedCharacters(t *testing.T
 	client := blizzard.NewClient(fake.config(), nil)
 
 	// when I ask for that guild's roster
-	if _, err := client.GuildRoster(context.Background(), "area-52", "my guild/x"); err != nil {
+	if _, err := client.GuildRoster(context.Background(), "my guild/x"); err != nil {
 		t.Fatalf("GuildRoster: %v", err)
 	}
 
 	// then I expect the request path to keep the slug in one escaped segment
 	fake.mu.Lock()
 	defer fake.mu.Unlock()
-	if fake.rosterPath != "/data/wow/guild/area-52/my%20guild%2Fx/roster" {
+	if fake.rosterPath != "/data/wow/guild/my%20guild%2Fx/roster" {
 		t.Errorf("roster path = %q", fake.rosterPath)
 	}
 }
@@ -150,12 +151,12 @@ func TestGuildRoster_FetchesOneToken_WhenCalledTwice(t *testing.T) {
 	// given a client that already fetched a roster
 	fake := newFakeBlizzard(t)
 	client := blizzard.NewClient(fake.config(), nil)
-	if _, err := client.GuildRoster(context.Background(), "defias-pillager", "test-guild"); err != nil {
+	if _, err := client.GuildRoster(context.Background(), "fuzion"); err != nil {
 		t.Fatalf("first GuildRoster: %v", err)
 	}
 
 	// when I ask again
-	if _, err := client.GuildRoster(context.Background(), "defias-pillager", "test-guild"); err != nil {
+	if _, err := client.GuildRoster(context.Background(), "fuzion"); err != nil {
 		t.Fatalf("second GuildRoster: %v", err)
 	}
 
@@ -174,7 +175,7 @@ func TestGuildRoster_ReturnsError_WhenBlizzardRespondsWithNotFound(t *testing.T)
 	client := blizzard.NewClient(fake.config(), nil)
 
 	// when I ask for the guild roster
-	_, err := client.GuildRoster(context.Background(), "defias-pillager", "test-guild")
+	_, err := client.GuildRoster(context.Background(), "fuzion")
 
 	// then I expect an error naming the status
 	if err == nil || !strings.Contains(err.Error(), "404") {
@@ -193,10 +194,72 @@ func TestGuildRoster_ReturnsError_WhenTokenRequestFails(t *testing.T) {
 	client := blizzard.NewClient(blizzard.Config{ClientID: "x", ClientSecret: "y", BaseURL: srv.URL, AuthURL: srv.URL}, nil)
 
 	// when I ask for the guild roster
-	_, err := client.GuildRoster(context.Background(), "defias-pillager", "test-guild")
+	_, err := client.GuildRoster(context.Background(), "fuzion")
 
 	// then I expect the token failure to be reported
 	if err == nil || !strings.Contains(err.Error(), "app token") {
 		t.Errorf("err = %v, want an app token error", err)
+	}
+}
+
+func TestCharacterGender_ReturnsLowercaseGender_WhenProfileReportsFemale(t *testing.T) {
+	// given a Blizzard whose profile summary says the character is female
+	mux := http.NewServeMux()
+	var gotPath, gotQuery, gotAuth string
+	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"access_token": "app-token"})
+	})
+	mux.HandleFunc("GET /profile/wow/character/{slug}", func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotQuery, gotAuth = r.URL.EscapedPath(), r.URL.RawQuery, r.Header.Get("Authorization")
+		json.NewEncoder(w).Encode(map[string]any{"gender": map[string]any{"type": "FEMALE", "name": "Female"}})
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	client := blizzard.NewClient(blizzard.Config{
+		ClientID: "id", ClientSecret: "secret", BaseURL: server.URL, AuthURL: server.URL, Namespace: "profile-forever-us",
+	}, nil)
+
+	// when I ask for the gender of a character
+	gender, err := client.CharacterGender(context.Background(), "kirk-bear")
+
+	// then I expect "female" from the profile summary, fetched with the app token
+	if err != nil {
+		t.Fatalf("CharacterGender: %v", err)
+	}
+	if gender != "female" {
+		t.Errorf("gender = %q, want %q", gender, "female")
+	}
+	if gotPath != "/profile/wow/character/kirk-bear" {
+		t.Errorf("path = %q, want /profile/wow/character/kirk-bear", gotPath)
+	}
+	if gotQuery != "locale=en_US&namespace=profile-forever-us" {
+		t.Errorf("query = %q", gotQuery)
+	}
+	if gotAuth != "Bearer app-token" {
+		t.Errorf("authorization = %q, want Bearer app-token", gotAuth)
+	}
+}
+
+func TestCharacterGender_ReturnsNotFound_WhenBlizzardHasNoProfile(t *testing.T) {
+	// given a Blizzard that answers 404 for the character
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"access_token": "app-token"})
+	})
+	mux.HandleFunc("GET /profile/wow/character/{slug}", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "nope", http.StatusNotFound)
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	client := blizzard.NewClient(blizzard.Config{
+		ClientID: "id", ClientSecret: "secret", BaseURL: server.URL, AuthURL: server.URL, Namespace: "profile-forever-us",
+	}, nil)
+
+	// when I ask for the gender of that character
+	_, err := client.CharacterGender(context.Background(), "ghost-walker")
+
+	// then I expect an error wrapping ErrNotFound
+	if !errors.Is(err, blizzard.ErrNotFound) {
+		t.Errorf("err = %v, want one wrapping ErrNotFound", err)
 	}
 }

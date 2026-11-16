@@ -11,10 +11,15 @@ func setRequiredConfig(t *testing.T) {
 	t.Setenv("DISCORD_GUILD_ID", "")
 	t.Setenv("DISCORD_ANNOUNCEMENTS_WEBHOOK_URL", "")
 	t.Setenv("DISCORD_RECRUITING_WEBHOOK_URL", "")
+	t.Setenv("DISCORD_RANK_REQUESTS_WEBHOOK_URL", "")
 	t.Setenv("SITE_BASE_URL", "")
 	t.Setenv("BATTLENET_REDIRECT_URL", "")
 	t.Setenv("BLIZZARD_CLIENT_ID", "")
 	t.Setenv("BLIZZARD_CLIENT_SECRET", "")
+	t.Setenv("BLIZZARD_REGION", "")
+	t.Setenv("BLIZZARD_NAMESPACE", "")
+	t.Setenv("SUBMISSIONS_ENABLED", "")
+	t.Setenv("SUBMISSIONS_STORAGE_LIMIT_MB", "")
 }
 
 func TestLoadConfig_ReturnsError_WhenBattleNetRedirectIsSetWithoutBlizzardCredentials(t *testing.T) {
@@ -81,6 +86,39 @@ func TestLoadConfig_Succeeds_WhenRecruitingWebhookAndSiteBaseURLAreSet(t *testin
 	}
 }
 
+func TestLoadConfig_ReturnsError_WhenRankRequestsWebhookIsSetWithoutSiteBaseURL(t *testing.T) {
+	// given a rank requests webhook and no site base URL
+	setRequiredConfig(t)
+	t.Setenv("DISCORD_RANK_REQUESTS_WEBHOOK_URL", "https://discord.example/webhook")
+
+	// when I load the config
+	_, err := loadConfig()
+
+	// then I expect an error naming the missing variable
+	want := "SITE_BASE_URL is required when DISCORD_RANK_REQUESTS_WEBHOOK_URL is set"
+	if err == nil || err.Error() != want {
+		t.Errorf("expected error %q, got %v", want, err)
+	}
+}
+
+func TestLoadConfig_ReadsRankRequestsWebhook_WhenItAndSiteBaseURLAreSet(t *testing.T) {
+	// given a rank requests webhook and a site base URL
+	setRequiredConfig(t)
+	t.Setenv("DISCORD_RANK_REQUESTS_WEBHOOK_URL", "https://discord.example/webhook")
+	t.Setenv("SITE_BASE_URL", "https://fuzion.example")
+
+	// when I load the config
+	cfg, err := loadConfig()
+
+	// then I expect the webhook URL read
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.rankRequestsWebhookURL != "https://discord.example/webhook" {
+		t.Errorf("expected rankRequestsWebhookURL %q, got %q", "https://discord.example/webhook", cfg.rankRequestsWebhookURL)
+	}
+}
+
 func TestLoadConfig_ReadsDiscordGuildID_WhenItIsSet(t *testing.T) {
 	// given the guild's Discord server ID in the environment
 	setRequiredConfig(t)
@@ -95,5 +133,74 @@ func TestLoadConfig_ReadsDiscordGuildID_WhenItIsSet(t *testing.T) {
 	}
 	if cfg.discord.guildID != "987654321098765432" {
 		t.Errorf("expected guild ID 987654321098765432, got %q", cfg.discord.guildID)
+	}
+}
+
+func TestLoadConfig_DefaultsBattleNetNamespaceToTheRegionsForeverProfile_WhenNamespaceIsNotSet(t *testing.T) {
+	// given Battle.net linking in the eu region with no namespace
+	setRequiredConfig(t)
+	t.Setenv("BATTLENET_REDIRECT_URL", "http://localhost/battlenet/callback")
+	t.Setenv("BLIZZARD_CLIENT_ID", "id")
+	t.Setenv("BLIZZARD_CLIENT_SECRET", "secret")
+	t.Setenv("BLIZZARD_REGION", "eu")
+
+	// when I load the config
+	cfg, err := loadConfig()
+
+	// then I expect the eu region with Forever's eu profile namespace, as the roster sync defaults it
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.battleNet.region != "eu" || cfg.battleNet.namespace != "profile-forever-eu" {
+		t.Errorf("region, namespace = %q, %q, want %q, %q", cfg.battleNet.region, cfg.battleNet.namespace, "eu", "profile-forever-eu")
+	}
+}
+
+func TestLoadConfig_OpensSubmissionsWith512MiB_WhenTheirVariablesAreUnset(t *testing.T) {
+	// given neither submissions variable
+	setRequiredConfig(t)
+
+	// when I load the config
+	cfg, err := loadConfig()
+
+	// then I expect submissions on, so a missing variable never closes them, with the default ceiling
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.submissions != (submissionsConfig{enabled: true, storageLimitBytes: 512 << 20}) {
+		t.Errorf("submissions = %+v", cfg.submissions)
+	}
+}
+
+func TestLoadConfig_ClosesSubmissions_WhenSubmissionsEnabledIsFalse(t *testing.T) {
+	// given the emergency switch turned off and a 64 MiB ceiling
+	setRequiredConfig(t)
+	t.Setenv("SUBMISSIONS_ENABLED", "false")
+	t.Setenv("SUBMISSIONS_STORAGE_LIMIT_MB", "64")
+
+	// when I load the config
+	cfg, err := loadConfig()
+
+	// then I expect submissions off, with the ceiling I set
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if cfg.submissions != (submissionsConfig{enabled: false, storageLimitBytes: 64 << 20}) {
+		t.Errorf("submissions = %+v", cfg.submissions)
+	}
+}
+
+func TestLoadConfig_ReturnsError_WhenSubmissionsEnabledIsNotABoolean(t *testing.T) {
+	// given a mistyped switch
+	setRequiredConfig(t)
+	t.Setenv("SUBMISSIONS_ENABLED", "nope")
+
+	// when I load the config
+	_, err := loadConfig()
+
+	// then I expect startup to fail naming the variable, rather than guess
+	want := `SUBMISSIONS_ENABLED must be true or false, got "nope"`
+	if err == nil || err.Error() != want {
+		t.Errorf("expected error %q, got %v", want, err)
 	}
 }

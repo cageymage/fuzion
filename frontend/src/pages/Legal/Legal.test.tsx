@@ -47,6 +47,14 @@ describe('Legal', () => {
     )
   })
 
+  it('should describe the roster display choice kept in local storage when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      "whether the Roster page shows alts is saved in your browser's local storage so the page remembers it. It stays on your device and is never sent to us.",
+    )
+  })
+
   it('should name the third parties that handle data when the page renders', () => {
     renderWithProviders(<Legal />)
 
@@ -70,6 +78,36 @@ describe('Legal', () => {
     const privacy = screen.getByRole('region', { name: 'Privacy policy' })
     expect(privacy).toHaveTextContent('Battle.net ID and BattleTag')
     expect(privacy).toHaveTextContent('Unlinking deletes both')
+  })
+
+  it('should say linking Battle.net records which roster characters are yours when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    const privacy = screen.getByRole('region', { name: 'Privacy policy' })
+    expect(privacy).toHaveTextContent('to record which guild roster characters are yours')
+    expect(privacy).toHaveTextContent("not the list or Battle.net's access token")
+    expect(privacy).toHaveTextContent('removes you as the owner of those characters')
+  })
+
+  it('should say submitted originals are kept with their file data and are visible only to officers when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    const privacy = screen.getByRole('region', { name: 'Privacy policy' })
+    expect(privacy).toHaveTextContent('we keep each exact original file')
+    expect(privacy).toHaveTextContent('the GPS location where it was taken')
+    expect(privacy).toHaveTextContent('Only officers can see submissions; they are never public.')
+  })
+
+  it('should state the license submitters grant and what they attest when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    const copyright = screen.getByRole('region', { name: 'Copyright and content' })
+    expect(copyright).toHaveTextContent(
+      'you confirm that you created each image or bought the rights to it (game screenshots are fine)',
+    )
+    expect(copyright).toHaveTextContent(
+      'grant the guild an unrestricted license to use it on this site and in related social media posts',
+    )
   })
 
   it('should say removal is requested through an officer on Discord when the page renders', () => {
@@ -125,6 +163,14 @@ describe('Legal', () => {
 
     expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
       'Survey responses: your answers, the guild name you optionally enter, and your Discord username at the time you respond. Officers can see these per person, and the public results show totals only.',
+    )
+  })
+
+  it('should describe the rank request and spec data stored and who sees it when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
+      "Your characters and rank requests: the specs and roles you pick for characters you own, and any rank change request you send, with its optional note, when you sent it and the officer's reply. Officers can see your requests, and each new one is also posted, with your Discord username and note, to the officers' channel on the guild's Discord server.",
     )
   })
 

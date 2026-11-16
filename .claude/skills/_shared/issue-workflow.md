@@ -1,6 +1,6 @@
 # Issue workflow (shared by next-backend-issue and next-frontend-issue)
 
-Follow these steps in order. The calling skill supplies the **pick filter** (step 2) and the **verify** step (step 6).
+Follow these steps in order. The calling skill supplies the **pick filter** (step 2) and the **verify** step (step 7).
 
 ## Hard rules from CLAUDE.md
 
@@ -70,15 +70,25 @@ Reread your own diff against CLAUDE.md before verifying, and fix what you find:
 
 Then run the calling skill's verify step. Report results faithfully, including failures. If anything fails, fix it or stop and report; do not proceed to commit on a failing or skipped check without saying so.
 
-## 8. Ask before committing
+## 8. Review and fix
 
-Show `git status`, a diff summary, and the verification output. Ask: "Commit this?" Only on yes:
+Run the `review-pr` skill on the working tree. It is read-only, so you make the edits. Before it runs, `git add -N` any new files so they appear in the diff (this stages intent only, no commit).
+
+1. Fix every `must` and `should` finding by editing the code. Leave `nit`s unfixed.
+2. If you changed anything, rerun the calling skill's verify step (step 7).
+3. Run `review-pr` once more. If a `must` is still open, stop and report it. Fix any `should` it reports, rerun the verify step if you changed anything, and report what is left. Do not start a third review pass.
+
+No PR exists yet, so skip the PR title, commit and branch-name checks, and save the issue to the review folder (`gh issue view N --json number,title,body,labels,comments > <folder>/issue-N.json`) so the Requirements check has it. Keep the final verdict and the list of unfixed `nit`s for step 9.
+
+## 9. Ask before committing
+
+Show `git status`, a diff summary, the verification output, the final `review-pr` verdict, and any unfixed `nit`s. Ask: "Commit this?" Only on yes:
 
 - Subject: `<type>(scope): <summary>`, for example `feat(roster): Add officer create/update/delete endpoints`.
 - End the message with the attribution line from the session's system reminder (`Co-Authored-By: ...`).
 - Do not skip hooks. Do not amend.
 
-## 9. Ask before pushing and opening the PR
+## 10. Ask before pushing and opening the PR
 
 Ask: "Push and open the PR?" Only on yes:
 

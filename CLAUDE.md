@@ -18,6 +18,7 @@ Full architecture and rationale live in [plans/project-structure.md](plans/proje
 ## Code generation
 
 - No comments explaining *what* code does — names should carry that. A comment is only for a non-obvious *why* (a workaround, a constraint from an external API, a subtle invariant).
+- Comments describe how the code or config works now, never its history: no "used to", "was changed to", "now that X", "previously", or why something changed. That belongs in the commit message or PR description. Applies to config files like `render.yaml` too.
 - No speculative abstractions, interfaces, or config options for hypothetical future requirements. Three similar lines beat a premature helper.
 - Match existing package/file structure in [plans/project-structure.md](plans/project-structure.md) rather than inventing new top-level folders per feature.
 - Go: idiomatic stdlib-first code. chi is a thin router on top of `net/http` — don't reach for framework-style patterns (global middleware registries, magic context injection) that fight that.

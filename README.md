@@ -249,9 +249,12 @@ First-time setup:
    writes a row to `sync_log`.
 6. `fuzion-sync-blizzard-roster` ships switched off (`SYNC_BLIZZARD_ROSTER_ENABLED`
    is `false`). To turn it on, set the Blizzard credentials, `BLIZZARD_NAMESPACE`,
-   `GUILD_REALM_SLUG` and `GUILD_NAME_SLUG`, then flip the flag to `true`. Check
+   and `GUILD_NAME_SLUG`, then flip the flag to `true`. Check
    the first run's `sync_log` row before trusting it; see
-   [backend/README.md](backend/README.md) for what the job writes.
+   [backend/README.md](backend/README.md) for what the job writes. Once that run
+   has filled `characters.guild_rank`, check its rank numbers against
+   `backend/internal/roster/ranks.go`, which names each rank and marks the alt
+   ranks.
 7. Custom domain: the guild site is `forever.fuziongaming.gg`. Add it under
    `forever-fuzion-web` → Custom Domains, then create the record Render shows (a
    CNAME `forever` → the service's `onrender.com` hostname) at the domain's DNS host.

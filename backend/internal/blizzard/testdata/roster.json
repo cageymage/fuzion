@@ -1,69 +1,80 @@
 {
-  "_links": { "self": { "href": "https://us.api.blizzard.com/data/wow/guild/defias-pillager/test-guild/roster?namespace=profile-classic1x-us" } },
+  "_links": { "self": { "href": "https://us.api.blizzard.com/data/wow/guild/fuzion/roster?namespace=profile-forever-us" } },
   "guild": {
-    "name": "Test Guild",
-    "id": 1,
-    "realm": { "name": "Defias Pillager", "id": 5126, "slug": "defias-pillager" },
-    "faction": { "type": "ALLIANCE", "name": "Alliance" }
+    "key": { "href": "https://us.api.blizzard.com/data/wow/guild/fuzion?namespace=profile-forever-us" },
+    "name": "Fuzion",
+    "id": 173003,
+    "faction": { "type": "HORDE", "name": "Horde" },
+    "slug": "fuzion"
   },
   "members": [
     {
       "character": {
-        "name": "Testwarr",
-        "id": 1001,
-        "realm": { "id": 5126, "slug": "defias-pillager" },
-        "level": 60,
-        "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/1" }, "id": 1 },
-        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/1" }, "id": 1 },
-        "faction": { "type": "ALLIANCE" }
-      },
-      "rank": 0
-    },
-    {
-      "character": {
-        "name": "Testmage",
-        "id": 1002,
-        "realm": { "id": 5126, "slug": "defias-pillager" },
-        "level": 45,
-        "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/8" }, "id": 8 },
-        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/7" }, "id": 7 },
-        "faction": { "type": "ALLIANCE" }
-      },
-      "rank": 5
-    },
-    {
-      "character": {
-        "name": "Testdruid",
-        "id": 1003,
-        "realm": { "id": 5126, "slug": "defias-pillager" },
-        "level": 60,
+        "key": { "href": "https://us.api.blizzard.com/profile/wow/character/mosshorn-rebelfist?namespace=profile-forever-us" },
+        "name": "Mosshorn",
+        "id": 135038,
+        "level": 7,
         "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/11" }, "id": 11 },
-        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/4" }, "id": 4 },
-        "faction": { "type": "ALLIANCE" }
-      },
-      "rank": 6
-    },
-    {
-      "character": {
-        "name": "Thráin",
-        "id": 1004,
-        "realm": { "id": 1566, "slug": "area-52" },
-        "level": 58,
-        "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/2" }, "id": 2 },
-        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/3" }, "id": 3 },
-        "faction": { "type": "ALLIANCE" }
+        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/6" }, "id": 6 },
+        "faction": { "type": "HORDE" },
+        "surname": "Rebelfist",
+        "slug": "mosshorn-rebelfist"
       },
       "rank": 3
     },
     {
       "character": {
+        "key": { "href": "https://us.api.blizzard.com/profile/wow/character/terrorskull-gloomstep?namespace=profile-forever-us" },
+        "name": "Terrorskull",
+        "id": 163709,
+        "level": 14,
+        "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/4" }, "id": 4 },
+        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/5" }, "id": 5 },
+        "faction": { "type": "HORDE" },
+        "surname": "Gloomstep",
+        "slug": "terrorskull-gloomstep"
+      },
+      "rank": 1
+    },
+    {
+      "character": {
+        "key": { "href": "https://us.api.blizzard.com/profile/wow/character/kirk-bear?namespace=profile-forever-us" },
+        "name": "Kirk",
+        "id": 3675173,
+        "level": 1,
+        "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/11" }, "id": 11 },
+        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/96" }, "id": 96 },
+        "faction": { "type": "HORDE" },
+        "surname": "Bear",
+        "slug": "kirk-bear"
+      },
+      "rank": 3
+    },
+    {
+      "character": {
+        "key": { "href": "https://us.api.blizzard.com/profile/wow/character/kirk-fel?namespace=profile-forever-us" },
+        "name": "Kirk",
+        "id": 6741966,
+        "level": 11,
+        "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/9" }, "id": 9 },
+        "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/2" }, "id": 2 },
+        "faction": { "type": "HORDE" },
+        "surname": "Fel",
+        "slug": "kirk-fel"
+      },
+      "rank": 3
+    },
+    {
+      "character": {
+        "key": { "href": "https://us.api.blizzard.com/profile/wow/character/testdk-grave?namespace=profile-forever-us" },
         "name": "Testdk",
-        "id": 1005,
-        "realm": { "id": 1566, "slug": "area-52" },
+        "id": 9999,
         "level": 90,
         "playable_class": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-class/6" }, "id": 6 },
         "playable_race": { "key": { "href": "https://us.api.blizzard.com/data/wow/playable-race/1" }, "id": 1 },
-        "faction": { "type": "ALLIANCE" }
+        "faction": { "type": "HORDE" },
+        "surname": "Grave",
+        "slug": "testdk-grave"
       },
       "rank": 5
     }

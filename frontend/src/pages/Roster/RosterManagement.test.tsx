@@ -21,10 +21,13 @@ const ragnok: Character = {
   spec2: null,
   role2: null,
   isMain: true,
+  rank: null,
+  rankOrder: null,
   raidTeam: 'Team Alpha',
   race: null,
   level: null,
   faction: null,
+  gender: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   professions: [],
 }
@@ -50,6 +53,8 @@ const zaldrix: Character = {
   spec: 'Affliction',
   role: 'dps',
   isMain: false,
+  rank: null,
+  rankOrder: null,
   raidTeam: null,
 }
 
@@ -115,7 +120,7 @@ describe('Roster management', () => {
 
     renderWithProviders(<Roster />)
 
-    await screen.findByText('Ragnok')
+    await screen.findByText('Ragnok Ironhide')
     expect(screen.queryByRole('button', { name: 'Add character' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Ragnok' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete Ragnok' })).not.toBeInTheDocument()
@@ -127,19 +132,18 @@ describe('Roster management', () => {
 
     renderWithProviders(<Roster />)
 
-    await screen.findByText('Ragnok')
+    await screen.findByText('Ragnok Ironhide')
     expect(screen.queryByRole('button', { name: 'Add character' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Ragnok' })).not.toBeInTheDocument()
   })
 
-  it('should let an officer edit an alt after showing alts', async () => {
+  it('should let an officer edit an alt', async () => {
     signInAs(officer)
     serveRoster([ragnok, zaldrix])
     const user = userEvent.setup()
     renderWithProviders(<Roster />)
-    await screen.findByText('Ragnok')
+    await screen.findByText('Ragnok Ironhide')
 
-    await user.click(screen.getByRole('checkbox', { name: 'Show alts' }))
     await user.click(screen.getByRole('button', { name: 'Edit Zaldrix' }))
 
     expect(screen.getByRole('dialog', { name: 'Edit Zaldrix' })).toBeInTheDocument()
@@ -211,7 +215,7 @@ describe('Roster management', () => {
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Role' }), 'healer')
     await user.click(dialog.getByRole('button', { name: 'Save character' }))
 
-    expect(await screen.findByText('Aeliana')).toBeInTheDocument()
+    expect(await screen.findByText('Aeliana Stormwind')).toBeInTheDocument()
     expect(calls.created).toEqual([
       {
         name: 'Aeliana',
@@ -240,7 +244,7 @@ describe('Roster management', () => {
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Spec' }), 'Frost')
     await user.click(dialog.getByRole('button', { name: 'Save character' }))
 
-    await screen.findByText('Aeliana')
+    await screen.findByText('Aeliana Stormwind')
     expect(calls.created).toEqual([
       {
         name: 'Aeliana',
@@ -466,8 +470,8 @@ describe('Roster management', () => {
     )
 
     await waitForDialogToClose()
-    expect(screen.queryByText('Ragnok')).not.toBeInTheDocument()
-    expect(screen.getByText('Selene')).toBeInTheDocument()
+    expect(screen.queryByText('Ragnok Ironhide')).not.toBeInTheDocument()
+    expect(screen.getByText('Selene Dawnsong')).toBeInTheDocument()
     expect(calls.deleted).toEqual(['char-1'])
   })
 
@@ -483,7 +487,7 @@ describe('Roster management', () => {
     )
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByText('Ragnok')).toBeInTheDocument()
+    expect(screen.getByText('Ragnok Ironhide')).toBeInTheDocument()
     expect(calls.deleted).toEqual([])
   })
 })
@@ -491,3 +495,48 @@ describe('Roster management', () => {
 async function waitForDialogToClose() {
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 }
+
+describe('Roster management main and alt', () => {
+  it('should replace the main character checkbox with a rank note when the character has a guild rank', async () => {
+    signInAs(officer)
+    serveRoster([{ ...ragnok, rank: 'Veteran' }])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    expect(dialog.queryByRole('checkbox', { name: 'Main character' })).not.toBeInTheDocument()
+    expect(dialog.getByText('Main or alt follows the guild rank in game (Veteran).')).toBeInTheDocument()
+  })
+
+  it('should offer the main character checkbox when the character has no guild rank', async () => {
+    signInAs(officer)
+    serveRoster([{ ...ragnok, rank: null }])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    expect(dialog.getByRole('checkbox', { name: 'Main character' })).toBeChecked()
+  })
+})
+
+describe('Roster management unset role', () => {
+  it('should show the role as not set when editing a character whose owner has not picked one', async () => {
+    signInAs(officer)
+    serveRoster([{ ...ragnok, spec: null, role: null }])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    const role = dialog.getByRole('combobox', { name: 'Role' })
+    expect(role).toHaveValue('')
+    expect(within(role).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Not set',
+      'Tank',
+      'Healer',
+      'DPS',
+    ])
+  })
+})

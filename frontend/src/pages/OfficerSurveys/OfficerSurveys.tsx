@@ -31,7 +31,7 @@ function SurveyList() {
         <ul className={styles.list}>
           {surveys.data.map((survey) => (
             <li key={survey.id} className={`card ${styles.item}`}>
-              <Link to={`/officer/surveys/${survey.id}`} className={styles.link}>
+              <Link to={`/officer/surveys/${survey.id}`} className={styles.titleLink}>
                 {survey.title}
               </Link>
               <Chip tone={survey.status === 'open' ? 'gold' : 'epic'}>

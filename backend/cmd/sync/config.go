@@ -32,13 +32,13 @@ func (c youTubeConfig) configured() bool {
 }
 
 type blizzardConfig struct {
-	enabled      bool
-	clientID     string
-	clientSecret string
-	region       string
-	namespace    string
-	realmSlug    string
-	guildSlug    string
+	enabled            bool
+	professionsEnabled bool
+	clientID           string
+	clientSecret       string
+	region             string
+	namespace          string
+	guildSlug          string
 }
 
 // The job is flagged off until Blizzard's API is known to serve Forever. Once it is
@@ -47,7 +47,6 @@ func (c blizzardConfig) validate() error {
 	required := []struct{ name, value string }{
 		{"BLIZZARD_CLIENT_ID", c.clientID},
 		{"BLIZZARD_CLIENT_SECRET", c.clientSecret},
-		{"GUILD_REALM_SLUG", c.realmSlug},
 		{"GUILD_NAME_SLUG", c.guildSlug},
 	}
 	var missing []string
@@ -79,13 +78,13 @@ func loadConfig() (config, error) {
 			apiKey: os.Getenv("YOUTUBE_API_KEY"),
 		},
 		blizzard: blizzardConfig{
-			enabled:      os.Getenv("SYNC_BLIZZARD_ROSTER_ENABLED") == "true",
-			clientID:     os.Getenv("BLIZZARD_CLIENT_ID"),
-			clientSecret: os.Getenv("BLIZZARD_CLIENT_SECRET"),
-			region:       region,
-			namespace:    envOr("BLIZZARD_NAMESPACE", "profile-"+region),
-			realmSlug:    os.Getenv("GUILD_REALM_SLUG"),
-			guildSlug:    os.Getenv("GUILD_NAME_SLUG"),
+			enabled:            os.Getenv("SYNC_BLIZZARD_ROSTER_ENABLED") == "true",
+			professionsEnabled: os.Getenv("SYNC_BLIZZARD_PROFESSIONS_ENABLED") == "true",
+			clientID:           os.Getenv("BLIZZARD_CLIENT_ID"),
+			clientSecret:       os.Getenv("BLIZZARD_CLIENT_SECRET"),
+			region:             region,
+			namespace:          envOr("BLIZZARD_NAMESPACE", "profile-forever-"+region),
+			guildSlug:          os.Getenv("GUILD_NAME_SLUG"),
 		},
 	}, nil
 }

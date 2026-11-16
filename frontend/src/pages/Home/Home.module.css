@@ -53,6 +53,12 @@
   position: relative;
 }
 
+.heroCards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .title {
   margin: 10px 0 6px;
   font-size: 52px;

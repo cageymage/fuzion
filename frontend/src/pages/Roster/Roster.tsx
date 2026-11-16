@@ -108,24 +108,23 @@ function GenericRaceBadge({ race }: { race: string }) {
   )
 }
 
-function RaceCell({ race }: { race: string | null }) {
+function RaceCell({ race, gender }: { race: string | null; gender: Character['gender'] }) {
   if (race === null) return null
-  const iconUrl = raceIcon(race)
+  const iconUrl = raceIcon(race, gender)
   if (iconUrl === null) return <GenericRaceBadge race={race} />
   return <img className={styles.raceIcon} src={iconUrl} alt={race} title={race} width={24} height={24} />
 }
 
-function ArmoryLink({ character, children }: { character: Character; children: string }) {
-  if (!children) return null
+function ArmoryLink({ character }: { character: Character }) {
   return (
     <a
       className={styles.characterLink}
-      href={armoryUrl(character.realm, character.name, character.secondaryName)}
+      href={armoryUrl(character.name, character.secondaryName)}
       target="_blank"
       rel="noreferrer"
       style={{ color: classColor(character.class) }}
     >
-      {children}
+      {[character.name, character.secondaryName].filter(Boolean).join(' ')}
     </a>
   )
 }
@@ -135,7 +134,7 @@ function WarcraftLogsLink({ character }: { character: Character }) {
   return (
     <a
       className={styles.logsLink}
-      href={warcraftLogsUrl(character.realm, character.name, character.secondaryName)}
+      href={warcraftLogsUrl(character.name, character.secondaryName)}
       target="_blank"
       rel="noreferrer"
       aria-label={`Warcraft Logs profile for ${fullName}`}
@@ -146,12 +145,32 @@ function WarcraftLogsLink({ character }: { character: Character }) {
   )
 }
 
+const showAltsStorageKey = 'fuzion.roster.showAlts'
+
+// Storage can throw when the browser blocks it (private windows, site data turned off);
+// the page then falls back to showing alts and forgets the choice.
+function readShowAlts(): boolean {
+  try {
+    return localStorage.getItem(showAltsStorageKey) !== 'false'
+  } catch {
+    return true
+  }
+}
+
+function saveShowAlts(showAlts: boolean) {
+  try {
+    localStorage.setItem(showAltsStorageKey, String(showAlts))
+  } catch {
+    // The choice still applies for this visit.
+  }
+}
+
 export function Roster() {
   const roster = useRosterData()
   const currentUser = useCurrentUser()
   const [role, setRole] = useState<RoleFilter>('all')
   const [className, setClassName] = useState('all')
-  const [showAlts, setShowAlts] = useState(false)
+  const [showAlts, setShowAlts] = useState(readShowAlts)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<RosterSort | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
@@ -238,7 +257,10 @@ export function Roster() {
             type="checkbox"
             className={styles.altsCheckbox}
             checked={showAlts}
-            onChange={(event) => setShowAlts(event.target.checked)}
+            onChange={(event) => {
+              setShowAlts(event.target.checked)
+              saveShowAlts(event.target.checked)
+            }}
           />
           Show alts
         </label>
@@ -264,13 +286,12 @@ export function Roster() {
                   <tr>
                     <SortHeader label="Race" sortKey="race" sort={sort} onSort={toggleSort} />
                     <SortHeader label="Name" sortKey="name" sort={sort} onSort={toggleSort} />
-                    <th scope="col">Secondary name</th>
                     <SortHeader label="Level" sortKey="level" sort={sort} onSort={toggleSort} />
                     <SortHeader label="Class" sortKey="class" sort={sort} onSort={toggleSort} />
                     <th scope="col">Spec</th>
                     <SortHeader label="Role" sortKey="role" sort={sort} onSort={toggleSort} />
                     <SortHeader label="Raid Team" sortKey="raidTeam" sort={sort} onSort={toggleSort} />
-                    <th scope="col">Main/Alt</th>
+                    <SortHeader label="Rank" sortKey="rank" sort={sort} onSort={toggleSort} />
                     <th scope="col">Professions</th>
                     {canManage && (
                       <th scope="col">
@@ -283,23 +304,20 @@ export function Roster() {
                   {visibleCharacters.map((character) => (
                     <tr key={character.id}>
                       <td>
-                        <RaceCell race={character.race} />
+                        <RaceCell race={character.race} gender={character.gender} />
                       </td>
                       <td>
                         <span className={styles.nameCell}>
-                          <ArmoryLink character={character}>{character.name}</ArmoryLink>
+                          <ArmoryLink character={character} />
                           <WarcraftLogsLink character={character} />
                         </span>
-                      </td>
-                      <td>
-                        <ArmoryLink character={character}>{character.secondaryName}</ArmoryLink>
                       </td>
                       <td>{character.level}</td>
                       <td style={{ color: classColor(character.class) }}>{character.class}</td>
                       <td>{specLabel(character)}</td>
                       <td>{roleLabel(character)}</td>
                       <td>{character.raidTeam ?? '—'}</td>
-                      <td>{character.isMain ? 'Main' : 'Alt'}</td>
+                      <td>{character.rank ?? '—'}</td>
                       <td>
                         <span className={styles.professionIcons}>
                           {primaryProfessionIcons(character.professions).map(({ profession, iconUrl }) => (

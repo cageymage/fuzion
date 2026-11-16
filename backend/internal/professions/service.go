@@ -5,8 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
+)
+
+const (
+	maxProfessionNameLength = 50
+	maxSkillLevel           = 300
 )
 
 var (
@@ -110,12 +116,15 @@ func validateProfession(profession string) error {
 	if profession == "" {
 		return &ValidationError{Field: "profession", Problem: "must not be empty"}
 	}
+	if utf8.RuneCountInString(profession) > maxProfessionNameLength {
+		return &ValidationError{Field: "profession", Problem: fmt.Sprintf("must be %d characters or fewer", maxProfessionNameLength)}
+	}
 	return nil
 }
 
 func validateSkillLevel(skillLevel int) error {
-	if skillLevel < 0 {
-		return &ValidationError{Field: "skillLevel", Problem: "must be 0 or more"}
+	if skillLevel < 0 || skillLevel > maxSkillLevel {
+		return &ValidationError{Field: "skillLevel", Problem: fmt.Sprintf("must be between 0 and %d", maxSkillLevel)}
 	}
 	return nil
 }

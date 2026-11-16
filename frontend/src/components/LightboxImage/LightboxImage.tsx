@@ -6,9 +6,10 @@ import styles from './LightboxImage.module.css'
 interface LightboxImageProps {
   src?: string
   alt?: string
+  thumbSrc?: string
 }
 
-export function LightboxImage({ src, alt = '' }: LightboxImageProps) {
+export function LightboxImage({ src, alt = '', thumbSrc }: LightboxImageProps) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -28,7 +29,7 @@ export function LightboxImage({ src, alt = '' }: LightboxImageProps) {
         aria-label={alt ? `Open image: ${alt}` : 'Open image'}
         onClick={() => setOpen(true)}
       >
-        <img className={styles.thumbnail} src={thumbnailSrc(src)} alt={alt} />
+        <img className={styles.thumbnail} src={thumbSrc ?? thumbnailSrc(src)} alt={alt} />
       </button>
       {open &&
         // A portal, because Markdown puts images inside <p>, which cannot contain a <div>.

@@ -63,7 +63,7 @@ func (s *Service) Upload(ctx context.Context, data []byte, declaredType string) 
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("encode full image: %w", err)
 	}
-	thumb, err := encodeWebP(fitLongEdge(src, thumbLongEdge))
+	thumb, err := Thumbnail(src)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("encode thumbnail: %w", err)
 	}
@@ -113,6 +113,12 @@ func decode(data []byte, declaredType string) (image.Image, error) {
 		return nil, errNotAnImage
 	}
 	return src, nil
+}
+
+// Thumbnail is the WebP preview every gallery uses, at most thumbLongEdge on its
+// long side. Submissions use it too, so both galleries' previews match.
+func Thumbnail(src image.Image) ([]byte, error) {
+	return encodeWebP(fitLongEdge(src, thumbLongEdge))
 }
 
 // An image already within the limit is returned as is; this never upscales.

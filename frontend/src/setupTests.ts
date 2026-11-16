@@ -13,11 +13,16 @@ HTMLDialogElement.prototype.close = function close() {
   this.dispatchEvent(new Event('close'))
 }
 
+// jsdom has no object URLs; previews only need a string to put in src.
+URL.createObjectURL = (blob: Blob) => `blob:preview/${blob instanceof File ? blob.name : 'blob'}`
+URL.revokeObjectURL = () => {}
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 
 afterEach(() => {
   cleanup()
   server.resetHandlers()
+  localStorage.clear()
 })
 
 afterAll(() => server.close())

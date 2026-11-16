@@ -24,6 +24,7 @@ func NewHandler(service *Service) *Handler {
 
 func (h *Handler) Register(r chi.Router) {
 	r.Get("/professions", h.list)
+	r.Get("/recipes", h.listRecipes)
 	r.With(auth.RequireOfficer).Post("/professions", h.create)
 	r.With(auth.RequireOfficer).Patch("/professions/{id}", h.update)
 	r.With(auth.RequireOfficer).Delete("/professions/{id}", h.delete)
@@ -111,6 +112,8 @@ func writeError(w http.ResponseWriter, r *http.Request, action string, err error
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrNotFound.Error()})
 	case errors.Is(err, ErrConflict):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrConflict.Error()})
+	case errors.Is(err, ErrUnknownCharacter):
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrUnknownCharacter.Error()})
 	default:
 		slog.ErrorContext(r.Context(), action, "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": action + " failed"})

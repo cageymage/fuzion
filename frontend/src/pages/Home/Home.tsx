@@ -7,6 +7,7 @@ import heroMobileAvif from '../../assets/hero-mobile.avif'
 import heroMobileJpg from '../../assets/hero-mobile.jpg'
 import heroMobileWebp from '../../assets/hero-mobile.webp'
 import { FeaturedNewsCard } from '../../components/FeaturedNewsCard/FeaturedNewsCard'
+import { LAUNCH_AT, LaunchCountdownCard } from '../../components/LaunchCountdownCard/LaunchCountdownCard'
 import { LiveStreamEmbed } from '../../components/LiveStreamEmbed/LiveStreamEmbed'
 import { NewsCard } from '../../components/NewsCard/NewsCard'
 import { NextRaidCard } from '../../components/NextRaidCard/NextRaidCard'
@@ -47,20 +48,23 @@ export function Home() {
           <h1 className={styles.title}>Fuzion</h1>
           <div className={styles.tagline}>Raiding · Dungeons · Community</div>
         </div>
-        {nextRaid.data ? (
-          <NextRaidCard raid={nextRaid.data} />
-        ) : (
-          <div className={`card ${styles.notice}`}>
-            <div className="eyebrow eyebrow-muted">Next Raid</div>
-            {nextRaid.isPending ? (
-              <LoadingPlaceholder label="Checking the raid schedule…">
-                <Skeleton height={128} className={styles.noticeSkeleton} />
-              </LoadingPlaceholder>
-            ) : (
-              <p className={styles.noticeText}>No raid scheduled yet.</p>
-            )}
-          </div>
-        )}
+        <div className={styles.heroCards}>
+          <LaunchCountdownCard launchAt={LAUNCH_AT} />
+          {nextRaid.data ? (
+            <NextRaidCard raid={nextRaid.data} />
+          ) : (
+            <div className={`card ${styles.notice}`}>
+              <div className="eyebrow eyebrow-muted">Next Raid</div>
+              {nextRaid.isPending ? (
+                <LoadingPlaceholder label="Checking the raid schedule…">
+                  <Skeleton height={128} className={styles.noticeSkeleton} />
+                </LoadingPlaceholder>
+              ) : (
+                <p className={styles.noticeText}>No raid scheduled yet.</p>
+              )}
+            </div>
+          )}
+        </div>
       </section>
 
       <div className={styles.divider} />

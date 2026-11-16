@@ -1,9 +1,32 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useSearchParams } from 'react-router-dom'
 import { battlenetLinkUrl, unlinkBattlenet } from '../../api/auth'
+import { fetchOpenRankRequestCount, rankRequestsQueryKey } from '../../api/rankRequests'
 import { currentUserQueryKey, useCurrentUser } from '../../hooks/useCurrentUser'
 import { useLoginUrl } from '../../hooks/useLoginUrl'
 import styles from './Dashboard.module.css'
+import { MyCharacters } from './MyCharacters'
+import { myCharactersQueryKey } from './myCharactersQueryKey'
+
+function OfficerLinks() {
+  const count = useQuery({ queryKey: [...rankRequestsQueryKey, 'count'], queryFn: fetchOpenRankRequestCount })
+
+  return (
+    <section aria-labelledby="officer-heading" className={styles.section}>
+      <h2 id="officer-heading" className={styles.sectionTitle}>
+        Officer
+      </h2>
+      <p>
+        <Link to="/officer/rank-requests">Rank requests</Link>
+        {count.isSuccess && (
+          <span className={styles.pendingBadge}>
+            {count.data.open === 0 ? 'none pending' : `${count.data.open} pending`}
+          </span>
+        )}
+      </p>
+    </section>
+  )
+}
 
 export function Dashboard() {
   const currentUser = useCurrentUser()
@@ -12,7 +35,11 @@ export function Dashboard() {
   const [searchParams] = useSearchParams()
   const unlink = useMutation({
     mutationFn: unlinkBattlenet,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: currentUserQueryKey }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: currentUserQueryKey }),
+        queryClient.invalidateQueries({ queryKey: myCharactersQueryKey }),
+      ]),
   })
 
   if (currentUser.isPending) {
@@ -42,16 +69,33 @@ export function Dashboard() {
         <p>
           Logged in as <strong>{user.username}</strong>.
         </p>
+        {user.isGuildMember && (
+          <p>
+            <Link to="/submissions">Submit art or screenshots</Link> for news posts and the guild&apos;s
+            social media.
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="battlenet-heading" className={styles.section}>
         <h2 id="battlenet-heading" className={styles.sectionTitle}>
           Battle.net
         </h2>
+        {searchParams.get('battlenet') === 'linked' && (
+          <p role="status" className={styles.hint}>
+            Battle.net is linked and your characters are refreshed.
+          </p>
+        )}
         {searchParams.get('battlenet') === 'already-linked' && (
           <p role="alert" className={styles.error}>
             That Battle.net account is already linked to another member. Ask an officer on Discord
             if it should be moved.
+          </p>
+        )}
+        {searchParams.get('battlenet') === 'characters-unavailable' && (
+          <p role="status" className={styles.hint}>
+            Battle.net is linked, but its World of Warcraft characters could not be read, so none
+            were claimed and the characters you already had are unchanged. Try linking again later.
           </p>
         )}
         {user.battlenetLinked ? (
@@ -83,6 +127,10 @@ export function Dashboard() {
           </>
         )}
       </section>
+
+      {user.battlenetLinked && <MyCharacters />}
+
+      {user.isOfficer && <OfficerLinks />}
     </article>
   )
 }

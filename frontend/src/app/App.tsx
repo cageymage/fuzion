@@ -14,13 +14,16 @@ import { Legal } from '../pages/Legal/Legal'
 import { News } from '../pages/News/News'
 import { OfficerApplications } from '../pages/OfficerApplications/OfficerApplications'
 import { OfficerRaidProgress } from '../pages/OfficerRaidProgress/OfficerRaidProgress'
+import { OfficerRankRequests } from '../pages/OfficerRankRequests/OfficerRankRequests'
 import { OfficerSurveyManage } from '../pages/OfficerSurveyManage/OfficerSurveyManage'
 import { OfficerSurveyNew } from '../pages/OfficerSurveyNew/OfficerSurveyNew'
+import { OfficerSubmissions } from '../pages/OfficerSubmissions/OfficerSubmissions'
 import { OfficerSurveys } from '../pages/OfficerSurveys/OfficerSurveys'
 import { Professions } from '../pages/Professions/Professions'
 import { RaidProgress } from '../pages/RaidProgress/RaidProgress'
 import { Roster } from '../pages/Roster/Roster'
 import { Streams } from '../pages/Streams/Streams'
+import { Submissions } from '../pages/Submissions/Submissions'
 import { Survey } from '../pages/Survey/Survey'
 import { Surveys } from '../pages/Surveys/Surveys'
 import styles from './App.module.css'
@@ -58,6 +61,8 @@ export function App() {
             <Route path="/raid-progress" element={<RaidProgress />} />
             <Route path="/officer/raid-progress" element={<OfficerRaidProgress />} />
             <Route path="/officer/applications" element={<OfficerApplications />} />
+            <Route path="/officer/rank-requests" element={<OfficerRankRequests />} />
+            <Route path="/officer/submissions" element={<OfficerSubmissions />} />
             <Route path="/officer/surveys" element={<OfficerSurveys />} />
             <Route path="/officer/surveys/new" element={<OfficerSurveyNew />} />
             <Route path="/officer/surveys/:id" element={<OfficerSurveyManage />} />
@@ -72,6 +77,7 @@ export function App() {
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/streams" element={<Streams />} />
             <Route path="/applications" element={<Applications />} />
+            <Route path="/submissions" element={<Submissions />} />
             <Route path="/surveys" element={<Surveys />} />
             <Route path="/surveys/:id" element={<Survey />} />
             <Route path="/professions" element={<Professions />} />

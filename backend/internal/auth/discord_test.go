@@ -111,8 +111,8 @@ func TestDiscordExchange_ReturnsError_WhenTokenEndpointRejectsTheCode(t *testing
 	if !strings.Contains(err.Error(), "exchange discord code") || !strings.Contains(err.Error(), "400") {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if got != (auth.Identity{}) {
-		t.Errorf("expected empty identity, got %+v", got)
+	if diff := cmp.Diff(auth.Identity{}, got); diff != "" {
+		t.Errorf("expected empty identity (-want +got):\n%s", diff)
 	}
 }
 
@@ -133,8 +133,8 @@ func TestDiscordExchange_ReturnsError_WhenUserEndpointFails(t *testing.T) {
 	if !strings.Contains(err.Error(), "fetch discord user") || !strings.Contains(err.Error(), "500") {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if got != (auth.Identity{}) {
-		t.Errorf("expected empty identity, got %+v", got)
+	if diff := cmp.Diff(auth.Identity{}, got); diff != "" {
+		t.Errorf("expected empty identity (-want +got):\n%s", diff)
 	}
 }
 
@@ -220,7 +220,7 @@ func TestDiscordExchange_ReturnsError_WhenGuildsEndpointFails(t *testing.T) {
 	if !strings.Contains(err.Error(), "fetch discord guilds") || !strings.Contains(err.Error(), "500") {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if got != (auth.Identity{}) {
-		t.Errorf("expected empty identity, got %+v", got)
+	if diff := cmp.Diff(auth.Identity{}, got); diff != "" {
+		t.Errorf("expected empty identity (-want +got):\n%s", diff)
 	}
 }

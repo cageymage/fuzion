@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -22,6 +23,9 @@ type config struct {
 	// Optional: empty disables the Discord cross-post when a news post is published.
 	announcementsWebhookURL string
 
+	// Optional: empty disables the Discord ping to officers for new rank change requests.
+	rankRequestsWebhookURL string
+
 	// Optional: empty disables the Turnstile bot check on new applications.
 	turnstileSecretKey string
 
@@ -31,6 +35,38 @@ type config struct {
 	// Optional: empty disables the Raid-Helper webhook endpoint, so no event can be
 	// mirrored without the key that proves a request came from Raid-Helper.
 	raidHelperWebhookKey string
+
+	submissions submissionsConfig
+}
+
+// SUBMISSIONS_ENABLED is the emergency switch for art submissions: false refuses
+// uploads (officers can still review and delete), and unset means on, so a missing
+// variable never silently closes the form. storageLimitBytes caps what all
+// submissions may hold, so many accounts cannot fill the database.
+type submissionsConfig struct {
+	enabled           bool
+	storageLimitBytes int64
+}
+
+const defaultSubmissionStorageMB = 512
+
+func loadSubmissionsConfig() (submissionsConfig, error) {
+	cfg := submissionsConfig{enabled: true, storageLimitBytes: defaultSubmissionStorageMB << 20}
+	if raw := os.Getenv("SUBMISSIONS_ENABLED"); raw != "" {
+		enabled, err := strconv.ParseBool(raw)
+		if err != nil {
+			return submissionsConfig{}, fmt.Errorf("SUBMISSIONS_ENABLED must be true or false, got %q", raw)
+		}
+		cfg.enabled = enabled
+	}
+	if raw := os.Getenv("SUBMISSIONS_STORAGE_LIMIT_MB"); raw != "" {
+		mb, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || mb < 1 {
+			return submissionsConfig{}, fmt.Errorf("SUBMISSIONS_STORAGE_LIMIT_MB must be a whole number of MiB above 0, got %q", raw)
+		}
+		cfg.storageLimitBytes = mb << 20
+	}
+	return cfg, nil
 }
 
 // Both values are optional: without them the Home page simply has no suggested
@@ -45,11 +81,15 @@ func (c youTubeConfig) enabled() bool {
 }
 
 // Optional: without BATTLENET_REDIRECT_URL, members cannot link a Battle.net
-// account. The client credentials are the same Blizzard app the roster sync uses.
+// account. The client credentials, region and namespace are the same ones the
+// roster sync uses; region and namespace pick the game API that lists a member's
+// characters.
 type battleNetConfig struct {
 	clientID     string
 	clientSecret string
 	redirectURL  string
+	region       string
+	namespace    string
 }
 
 func (c battleNetConfig) enabled() bool {
@@ -88,10 +128,20 @@ func loadConfig() (config, error) {
 		return config{}, err
 	}
 
+	region := os.Getenv("BLIZZARD_REGION")
+	if region == "" {
+		region = "us"
+	}
+	namespace := os.Getenv("BLIZZARD_NAMESPACE")
+	if namespace == "" {
+		namespace = "profile-forever-" + region
+	}
 	battleNet := battleNetConfig{
 		clientID:     os.Getenv("BLIZZARD_CLIENT_ID"),
 		clientSecret: os.Getenv("BLIZZARD_CLIENT_SECRET"),
 		redirectURL:  os.Getenv("BATTLENET_REDIRECT_URL"),
+		region:       region,
+		namespace:    namespace,
 	}
 	if battleNet.enabled() {
 		for _, v := range []struct{ name, value string }{
@@ -104,7 +154,12 @@ func loadConfig() (config, error) {
 		}
 	}
 
-	for _, webhook := range []string{"DISCORD_ANNOUNCEMENTS_WEBHOOK_URL", "DISCORD_RECRUITING_WEBHOOK_URL"} {
+	submissions, err := loadSubmissionsConfig()
+	if err != nil {
+		return config{}, err
+	}
+
+	for _, webhook := range []string{"DISCORD_ANNOUNCEMENTS_WEBHOOK_URL", "DISCORD_RECRUITING_WEBHOOK_URL", "DISCORD_RANK_REQUESTS_WEBHOOK_URL"} {
 		if os.Getenv(webhook) != "" && os.Getenv("SITE_BASE_URL") == "" {
 			return config{}, fmt.Errorf("SITE_BASE_URL is required when %s is set", webhook)
 		}
@@ -116,15 +171,17 @@ func loadConfig() (config, error) {
 		allowedOrigins: allowedOrigins,
 		discord:        discord,
 		battleNet:      battleNet,
-		youtube:youTubeConfig{
+		youtube: youTubeConfig{
 			apiKey:     os.Getenv("YOUTUBE_API_KEY"),
 			playlistID: os.Getenv("YOUTUBE_PLAYLIST_ID"),
 		},
 		recruitingWebhookURL:    os.Getenv("DISCORD_RECRUITING_WEBHOOK_URL"),
 		announcementsWebhookURL: os.Getenv("DISCORD_ANNOUNCEMENTS_WEBHOOK_URL"),
+		rankRequestsWebhookURL:  os.Getenv("DISCORD_RANK_REQUESTS_WEBHOOK_URL"),
 		turnstileSecretKey:      os.Getenv("TURNSTILE_SECRET_KEY"),
 		siteBaseURL:             os.Getenv("SITE_BASE_URL"),
 		raidHelperWebhookKey:    os.Getenv("RAID_HELPER_WEBHOOK_SECRET"),
+		submissions:             submissions,
 	}, nil
 }
 

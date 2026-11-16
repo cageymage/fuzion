@@ -15,6 +15,7 @@
 }
 
 .link,
+.titleLink,
 .primaryLink {
   color: var(--gold);
   font-size: var(--text-ui);
@@ -46,11 +47,28 @@
 }
 
 .item {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
+}
+
+.item:hover,
+.item:focus-within {
+  border-color: var(--gold);
+}
+
+.titleLink:hover {
+  color: var(--gold-hover);
+}
+
+/* Stretched link: the title stays the only link, but its click area covers the whole card. */
+.titleLink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
 }
 
 .deadline {

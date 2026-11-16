@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { formatCountdown, formatRelativeDate, formatViewerCount } from './format'
+import { formatCountdown, formatRelativeDate, formatViewerCount, splitCountdown } from './format'
+
+describe('splitCountdown', () => {
+  it('should split the remaining time into days, hours, minutes and seconds', () => {
+    const remaining = 37 * 86_400_000 + 4 * 3_600_000 + 12 * 60_000 + 9_000
+
+    expect(splitCountdown(remaining)).toEqual({ days: 37, hours: 4, minutes: 12, seconds: 9 })
+  })
+
+  it('should round partial seconds down', () => {
+    expect(splitCountdown(59_999)).toEqual({ days: 0, hours: 0, minutes: 0, seconds: 59 })
+  })
+
+  it('should return all zeros when the time has already passed', () => {
+    expect(splitCountdown(-5_000)).toEqual({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+  })
+})
 
 describe('formatCountdown', () => {
   it('should show hours and minutes when the raid is less than a day away', () => {

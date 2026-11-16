@@ -5,7 +5,7 @@ description: Use when the user asks to find, pick up, or work on the next backen
 
 # Next backend issue
 
-Follow [../_shared/issue-workflow.md](../_shared/issue-workflow.md) end to end. This file supplies the backend-specific parts.
+Follow [../_shared/issue-workflow.md](../_shared/issue-workflow.md) end to end. This file supplies the backend-specific parts. `next-issue` links to the "Implementation notes" and "Verify" sections below, so keep those headings.
 
 ## Pick filter (step 2)
 
