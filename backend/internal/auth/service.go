@@ -67,10 +67,35 @@ func (s *Service) LinkBattleNet(ctx context.Context, userID uuid.UUID, code stri
 	if err != nil {
 		return false, fmt.Errorf("link battle.net: %w", err)
 	}
-	if err := s.repo.LinkBattleNet(ctx, userID, identity); err != nil {
+	summary, err := s.repo.LinkBattleNet(ctx, userID, identity)
+	if err != nil {
 		return false, fmt.Errorf("link battle.net: %w", err)
 	}
+	if identity.CharactersKnown {
+		slog.InfoContext(ctx, "battle.net link",
+			"user_id", userID,
+			"battletag", identity.Username,
+			"account_characters", summary.AccountCharacters,
+			"owned", summary.Owned,
+			"unmatched", describeCharacters(summary.Unmatched),
+			"owned_by_others", describeCharacters(summary.OwnedByOthers),
+		)
+	}
 	return identity.CharactersKnown, nil
+}
+
+// describeCharacters writes each name exactly as Battle.net sent it, so a log reader can
+// see a missing surname or a spelling that kept a character from matching the roster.
+func describeCharacters(characters []AccountCharacter) []string {
+	described := make([]string, 0, len(characters))
+	for _, c := range characters {
+		if c.Surname == "" {
+			described = append(described, c.Name+" (no surname)")
+			continue
+		}
+		described = append(described, c.Name+" "+c.Surname)
+	}
+	return described
 }
 
 func (s *Service) UnlinkBattleNet(ctx context.Context, userID uuid.UUID) error {

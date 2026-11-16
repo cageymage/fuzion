@@ -36,8 +36,11 @@ export function Legal() {
             Battle.net link: if you choose to link Battle.net on your dashboard, your Battle.net ID
             and BattleTag. While linking, we also read the list of World of Warcraft characters on
             that account once, to record which guild roster characters are yours. We keep only that
-            ownership, not the list or Battle.net&apos;s access token. Unlinking deletes both and
-            removes you as the owner of those characters.
+            ownership, not the list or Battle.net&apos;s access token. To help fix characters that
+            do not show up, our server log for each link records your BattleTag, how many characters
+            the account has, and the names of any that did not match the guild roster or already
+            belong to another member. Unlinking deletes your Battle.net ID and BattleTag and removes
+            you as the owner of those characters.
           </li>
           <li>
             Your characters and rank requests: the specs and roles you pick for characters you own,
