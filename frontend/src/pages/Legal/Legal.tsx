@@ -51,6 +51,11 @@ export function Legal() {
             username at the time you respond. Officers can see these per person, and the public
             results show totals only.
           </li>
+          <li>
+            Roster display choice: whether the Roster page shows alts is saved in your
+            browser&apos;s local storage so the page remembers it. It stays on your device and is
+            never sent to us.
+          </li>
           <li>Images uploaded by officers, such as news post images.</li>
           <li>
             Art and screenshot submissions: when a guild member submits images, we keep each exact

@@ -129,12 +129,32 @@ function ArmoryLink({ character }: { character: Character }) {
   )
 }
 
+const showAltsStorageKey = 'fuzion.roster.showAlts'
+
+// Storage can throw when the browser blocks it (private windows, site data turned off);
+// the page then falls back to showing alts and forgets the choice.
+function readShowAlts(): boolean {
+  try {
+    return localStorage.getItem(showAltsStorageKey) !== 'false'
+  } catch {
+    return true
+  }
+}
+
+function saveShowAlts(showAlts: boolean) {
+  try {
+    localStorage.setItem(showAltsStorageKey, String(showAlts))
+  } catch {
+    // The choice still applies for this visit.
+  }
+}
+
 export function Roster() {
   const roster = useRosterData()
   const currentUser = useCurrentUser()
   const [role, setRole] = useState<RoleFilter>('all')
   const [className, setClassName] = useState('all')
-  const [showAlts, setShowAlts] = useState(false)
+  const [showAlts, setShowAlts] = useState(readShowAlts)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<RosterSort | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
@@ -221,7 +241,10 @@ export function Roster() {
             type="checkbox"
             className={styles.altsCheckbox}
             checked={showAlts}
-            onChange={(event) => setShowAlts(event.target.checked)}
+            onChange={(event) => {
+              setShowAlts(event.target.checked)
+              saveShowAlts(event.target.checked)
+            }}
           />
           Show alts
         </label>
