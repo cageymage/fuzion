@@ -158,6 +158,14 @@ describe('Legal', () => {
     )
   })
 
+  it('should credit the Warcraft Logs logo to Warcraft Logs when the page renders', () => {
+    renderWithProviders(<Legal />)
+
+    expect(screen.getByRole('region', { name: 'Attributions' })).toHaveTextContent(
+      "Warcraft Logs and the Warcraft Logs logo: Warcraft Logs, shown only to link to each character's Warcraft Logs profile from the roster.",
+    )
+  })
+
   it('should describe the survey data stored and who can see it when the page renders', () => {
     renderWithProviders(<Legal />)
 

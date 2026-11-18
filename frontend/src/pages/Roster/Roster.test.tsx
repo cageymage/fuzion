@@ -156,7 +156,8 @@ describe('Roster', () => {
     renderWithProviders(<Roster />)
 
     const table = within(await screen.findByRole('table'))
-    expect(table.getAllByRole('link').map((link) => link.textContent)).toEqual(['Ragnok Ironhide', 'Logs'])
+    expect(table.getByRole('link', { name: 'Ragnok Ironhide' })).toHaveTextContent(/^Ragnok Ironhide$/)
+    expect(table.queryByRole('link', { name: 'Ironhide' })).not.toBeInTheDocument()
     expect(table.getByRole('link', { name: 'Ragnok Ironhide' })).toHaveAttribute(
       'href',
       'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/ragnok-ironhide',
@@ -178,7 +179,7 @@ describe('Roster', () => {
     renderWithProviders(<Roster />)
 
     const table = within(await screen.findByRole('table'))
-    expect(table.getAllByRole('link').map((link) => link.textContent)).toEqual(['Ragnok', 'Logs'])
+    expect(table.getByRole('link', { name: 'Ragnok' })).toHaveTextContent(/^Ragnok$/)
   })
 
   it('should open the armory link in a new tab', async () => {
@@ -200,6 +201,16 @@ describe('Roster', () => {
     const logs = table.getByRole('link', { name: 'Warcraft Logs profile for Ragnok Ironhide' })
     expect(logs).toHaveAttribute('href', 'https://forever.warcraftlogs.com/character/us/normal/ragnok%20ironhide')
     expect(logs.closest('td')).toBe(table.getByRole('link', { name: 'Ragnok Ironhide' }).closest('td'))
+  })
+
+  it('should show the Warcraft Logs logo as the Warcraft Logs link', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
+
+    renderWithProviders(<Roster />)
+
+    const logs = within(await screen.findByRole('table')).getByRole('link', { name: 'Warcraft Logs profile for Ragnok' })
+    expect(logs).toHaveTextContent(/^$/)
+    expect(within(logs).getByRole('presentation')).toHaveAttribute('src', expect.stringContaining('warcraft-logs.png'))
   })
 
   it('should open the Warcraft Logs link in a new tab', async () => {

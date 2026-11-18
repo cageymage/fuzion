@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import warcraftLogsLogo from '../../assets/warcraft-logs.png'
 import { LoadingPlaceholder, Skeleton } from '../../components/Skeleton/Skeleton'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { classColor } from '../../lib/classColor'
@@ -140,7 +141,7 @@ function WarcraftLogsLink({ character }: { character: Character }) {
       aria-label={`Warcraft Logs profile for ${fullName}`}
       title="Warcraft Logs"
     >
-      Logs
+      <img className={styles.logsLogo} src={warcraftLogsLogo} alt="" width={18} height={18} />
     </a>
   )
 }

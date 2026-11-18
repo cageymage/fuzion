@@ -129,18 +129,20 @@
 }
 
 .logsLink {
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-chip);
-  color: var(--muted);
-  font-size: var(--text-label);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  display: inline-flex;
+  border-radius: 50%;
+  opacity: 0.8;
 }
 
-.logsLink:hover {
-  border-color: var(--gold);
-  color: var(--gold-hover);
+.logsLink:hover,
+.logsLink:focus-visible {
+  opacity: 1;
+}
+
+.logsLogo {
+  display: block;
+  width: 18px;
+  height: 18px;
 }
 
 .professionIcons {
