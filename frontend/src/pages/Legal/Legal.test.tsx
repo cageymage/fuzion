@@ -162,7 +162,7 @@ describe('Legal', () => {
     renderWithProviders(<Legal />)
 
     expect(screen.getByRole('region', { name: 'Attributions' })).toHaveTextContent(
-      "Warcraft Logs and the Warcraft Logs logo: Warcraft Logs, shown only to link to each character's Warcraft Logs profile from the roster.",
+      "Warcraft Logs and the Warcraft Logs logo: trademarks of Warcraft Logs, shown only to link to each character's Warcraft Logs profile from the roster.",
     )
   })
 

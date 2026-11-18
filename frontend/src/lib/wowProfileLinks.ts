@@ -8,7 +8,7 @@ export function armoryUrl(name: string, secondaryName: string): string {
     .map((part) => part.trim().toLowerCase())
     .filter(Boolean)
     .join('-')
-  return `https://worldofwarcraft.blizzard.com/en-us/forever/${WOW_REGION}/armory/character/${encodeURIComponent(characterSlug)}`
+  return `https://worldofwarcraft.blizzard.com/en-us/forever/${WOW_REGION}/armory/character/${encodePathSegment(characterSlug)}`
 }
 
 // Forever's Warcraft Logs site has no realms: "normal" sits where a realm slug would, and
@@ -18,5 +18,11 @@ export function warcraftLogsUrl(name: string, secondaryName: string): string {
     .map((part) => part.trim().toLowerCase())
     .filter(Boolean)
     .join(' ')
-  return `https://forever.warcraftlogs.com/character/${WOW_REGION}/normal/${encodeURIComponent(characterName)}`
+  return `https://forever.warcraftlogs.com/character/${WOW_REGION}/normal/${encodePathSegment(characterName)}`
+}
+
+// encodeURIComponent leaves dots alone, and a segment of only dots ("." or "..") would make
+// the browser resolve the link to a different path on the profile site.
+function encodePathSegment(segment: string): string {
+  return encodeURIComponent(segment).replace(/\./g, '%2E')
 }

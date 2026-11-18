@@ -19,6 +19,10 @@ describe('armoryUrl', () => {
       'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/zulj%C3%AFn',
     )
   })
+
+  it('should percent-encode dots when the name is only dots', () => {
+    expect(armoryUrl('..', '')).toBe('https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/%2E%2E')
+  })
 })
 
 describe('warcraftLogsUrl', () => {
@@ -34,5 +38,9 @@ describe('warcraftLogsUrl', () => {
 
   it('should percent-encode the character name when it has accented letters', () => {
     expect(warcraftLogsUrl('Zuljïn', '')).toBe('https://forever.warcraftlogs.com/character/us/normal/zulj%C3%AFn')
+  })
+
+  it('should percent-encode dots when the name is only dots', () => {
+    expect(warcraftLogsUrl('..', '')).toBe('https://forever.warcraftlogs.com/character/us/normal/%2E%2E')
   })
 })

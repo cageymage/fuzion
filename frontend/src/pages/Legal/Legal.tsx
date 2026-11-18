@@ -135,8 +135,8 @@ export function Legal() {
             site&apos;s source code. Icon shape from Simple Icons (CC0).
           </li>
           <li>
-            Warcraft Logs and the Warcraft Logs logo: Warcraft Logs, shown only to link to each
-            character&apos;s Warcraft Logs profile from the roster.
+            Warcraft Logs and the Warcraft Logs logo: trademarks of Warcraft Logs, shown only to link
+            to each character&apos;s Warcraft Logs profile from the roster.
           </li>
         </ul>
       </section>

@@ -197,10 +197,11 @@ describe('Roster', () => {
 
     renderWithProviders(<Roster />)
 
-    const table = within(await screen.findByRole('table'))
-    const logs = table.getByRole('link', { name: 'Warcraft Logs profile for Ragnok Ironhide' })
-    expect(logs).toHaveAttribute('href', 'https://forever.warcraftlogs.com/character/us/normal/ragnok%20ironhide')
-    expect(logs.closest('td')).toBe(table.getByRole('link', { name: 'Ragnok Ironhide' }).closest('td'))
+    const nameCell = within(await screen.findByRole('table')).getByRole('cell', { name: /Ragnok Ironhide/ })
+    expect(within(nameCell).getByRole('link', { name: 'Warcraft Logs profile for Ragnok Ironhide' })).toHaveAttribute(
+      'href',
+      'https://forever.warcraftlogs.com/character/us/normal/ragnok%20ironhide',
+    )
   })
 
   it('should show the Warcraft Logs logo as the Warcraft Logs link', async () => {
@@ -467,7 +468,7 @@ describe('Roster sorting and search', () => {
     return screen
       .getAllByRole('row')
       .slice(1)
-      .map((row) => within(within(row).getAllByRole('cell')[1]).getAllByRole('link')[0].textContent)
+      .map((row) => within(row).getAllByRole('cell')[1].textContent)
   }
 
   it('should sort the table by level when the Level header is clicked', async () => {
