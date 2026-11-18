@@ -156,7 +156,8 @@ describe('Roster', () => {
     renderWithProviders(<Roster />)
 
     const table = within(await screen.findByRole('table'))
-    expect(table.getAllByRole('link').map((link) => link.textContent)).toEqual(['Ragnok Ironhide'])
+    expect(table.getByRole('link', { name: 'Ragnok Ironhide' })).toHaveTextContent(/^Ragnok Ironhide$/)
+    expect(table.queryByRole('link', { name: 'Ironhide' })).not.toBeInTheDocument()
     expect(table.getByRole('link', { name: 'Ragnok Ironhide' })).toHaveAttribute(
       'href',
       'https://worldofwarcraft.blizzard.com/en-us/forever/us/armory/character/ragnok-ironhide',
@@ -178,7 +179,7 @@ describe('Roster', () => {
     renderWithProviders(<Roster />)
 
     const table = within(await screen.findByRole('table'))
-    expect(table.getAllByRole('link').map((link) => link.textContent)).toEqual(['Ragnok'])
+    expect(table.getByRole('link', { name: 'Ragnok' })).toHaveTextContent(/^Ragnok$/)
   })
 
   it('should open the armory link in a new tab', async () => {
@@ -189,6 +190,38 @@ describe('Roster', () => {
     const link = within(await screen.findByRole('table')).getByRole('link', { name: 'Ragnok' })
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noreferrer')
+  })
+
+  it('should render a Warcraft Logs link next to the character name', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([{ ...ragnok, secondaryName: 'Ironhide' }])))
+
+    renderWithProviders(<Roster />)
+
+    const nameCell = within(await screen.findByRole('table')).getByRole('cell', { name: /Ragnok Ironhide/ })
+    expect(within(nameCell).getByRole('link', { name: 'Warcraft Logs profile for Ragnok Ironhide' })).toHaveAttribute(
+      'href',
+      'https://forever.warcraftlogs.com/character/us/normal/ragnok%20ironhide',
+    )
+  })
+
+  it('should show the Warcraft Logs logo as the Warcraft Logs link', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
+
+    renderWithProviders(<Roster />)
+
+    const logs = within(await screen.findByRole('table')).getByRole('link', { name: 'Warcraft Logs profile for Ragnok' })
+    expect(logs).toHaveTextContent(/^$/)
+    expect(within(logs).getByRole('presentation')).toHaveAttribute('src', expect.stringContaining('warcraft-logs.png'))
+  })
+
+  it('should open the Warcraft Logs link in a new tab', async () => {
+    server.use(http.get('/api/roster', () => HttpResponse.json([ragnok])))
+
+    renderWithProviders(<Roster />)
+
+    const logs = within(await screen.findByRole('table')).getByRole('link', { name: 'Warcraft Logs profile for Ragnok' })
+    expect(logs).toHaveAttribute('target', '_blank')
+    expect(logs).toHaveAttribute('rel', 'noreferrer')
   })
 
   it('should show both specs joined by a slash when the character has a second spec', async () => {

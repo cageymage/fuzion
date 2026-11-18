@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
+import warcraftLogsLogo from '../../assets/warcraft-logs.png'
 import { LoadingPlaceholder, Skeleton } from '../../components/Skeleton/Skeleton'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { classColor } from '../../lib/classColor'
 import { primaryProfessionIcons } from '../../lib/professionIcon'
 import { raceIcon } from '../../lib/raceIcon'
-import { armoryUrl } from '../../lib/wowProfileLinks'
+import { armoryUrl, warcraftLogsUrl } from '../../lib/wowProfileLinks'
 import { CharacterDialog } from './CharacterDialog'
 import { DeleteCharacterDialog } from './DeleteCharacterDialog'
 import { filterRoster, sortRoster, type RoleFilter, type RosterSort, type SortKey } from './filterRoster'
@@ -125,6 +126,22 @@ function ArmoryLink({ character }: { character: Character }) {
       style={{ color: classColor(character.class) }}
     >
       {[character.name, character.secondaryName].filter(Boolean).join(' ')}
+    </a>
+  )
+}
+
+function WarcraftLogsLink({ character }: { character: Character }) {
+  const fullName = `${character.name} ${character.secondaryName}`.trim()
+  return (
+    <a
+      className={styles.logsLink}
+      href={warcraftLogsUrl(character.name, character.secondaryName)}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`Warcraft Logs profile for ${fullName}`}
+      title="Warcraft Logs"
+    >
+      <img className={styles.logsLogo} src={warcraftLogsLogo} alt="" width={18} height={18} />
     </a>
   )
 }
@@ -291,7 +308,10 @@ export function Roster() {
                         <RaceCell race={character.race} gender={character.gender} />
                       </td>
                       <td>
-                        <ArmoryLink character={character} />
+                        <span className={styles.nameCell}>
+                          <ArmoryLink character={character} />
+                          <WarcraftLogsLink character={character} />
+                        </span>
                       </td>
                       <td>{character.level}</td>
                       <td style={{ color: classColor(character.class) }}>{character.class}</td>
