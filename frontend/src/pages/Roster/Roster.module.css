@@ -122,6 +122,29 @@
   filter: brightness(1.25);
 }
 
+.nameCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logsLink {
+  display: inline-flex;
+  border-radius: 50%;
+  opacity: 0.8;
+}
+
+.logsLink:hover,
+.logsLink:focus-visible {
+  opacity: 1;
+}
+
+.logsLogo {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
 .professionIcons {
   display: flex;
   gap: 6px;
