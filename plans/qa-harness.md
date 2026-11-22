@@ -67,7 +67,7 @@ The Discord and Battle.net authorize URLs are built from the same base URLs (`di
 
 The fakes are a small TypeScript server in `e2e/fakes`, not a reuse of `internal/testutil`. The Go fakes take a `*testing.T` and assert inside their handlers, so they cannot run as a standalone process without a refactor that would change every backend test. The E2E fakes:
 
-- Serve the OAuth, profile, roster, professions, stream and siteverify endpoints the clients call. They read their fixtures directly from `backend/internal/*/testdata` rather than keeping copies, so the Go and E2E fakes answer with the same data.
+- Serve the OAuth, profile, roster, professions, stream and siteverify endpoints the clients call. Where a Go package has a `testdata` folder (`blizzard` and `raidhelper`), they read those fixtures directly rather than keeping copies, so the Go and E2E fakes answer with the same data. Discord, Battle.net, YouTube and Turnstile responses live inline in `internal/testutil/fake*.go`, and Twitch has no Go fake at all, so PR 1 writes new fixtures for those under `e2e/fakes/fixtures`. Those are the fixtures that can drift from the Go fakes (see [Decision 1](#decisions-to-confirm-in-review)).
 - Record every request, webhook body and webhook edit they receive.
 - Expose a control API (`POST /_control/discord/users`, `GET /_control/webhooks`, and so on) so a test can set up a persona or assert on exactly what was sent to "Discord".
 
@@ -137,7 +137,7 @@ Test names follow the CLAUDE.md pattern, for example `test("application should p
    - Ask before committing and again before pushing, as CLAUDE.md requires.
    - On someone else's PR from a fork, pushing works only if "Allow edits by maintainers" is ticked. Otherwise, offer the fixes as draft suggested-change comments, posted only when asked.
 
-**Run record.** Each run saves its report and screenshots in a run folder under `.claude/qa-runs/` (gitignored). The report notes the `HEAD` commit it checked and a hash of `git diff HEAD` plus the contents of untracked files (`git ls-files --others --exclude-standard`), because `git diff` alone leaves out new files. That way a later session can tell whether the current changes have already been checked.
+**Run record.** Each run saves its report and screenshots in a run folder under `.claude/qa-runs/`. Both `.claude/qa-runs/` and the `.claude/worktrees/` folder from step 1 are gitignored. The report notes the `HEAD` commit it checked and a hash of `git diff HEAD` plus the contents of untracked files (`git ls-files --others --exclude-standard`), because `git diff` alone leaves out new files. That way a later session can tell whether the current changes have already been checked.
 
 **Changes to existing skills:**
 - `issue-workflow.md` step 7 (verify) also runs steps 3 and 4 of `qa-this` for the pages and journeys the issue touches. Step 8 is unchanged and still runs `review-pr`, so issue work is not reviewed twice.
@@ -150,6 +150,7 @@ A new rule in CLAUDE.md's Git workflow section: before Claude commits or pushes,
 - The rule prompts the user but doesn't block. If the user says to go ahead, Claude commits or pushes without running it.
 - Docs-only changes (only `plans/`, `*.md` or Legal wording) skip the prompt, because the checks would test nothing.
 - The prompt is part of the existing "ask before committing" and "ask before pushing" questions, so the user still answers one question, not two.
+- On a fork PR Claude can't push to (no "Allow edits by maintainers"), Claude doesn't commit to or push that branch, so the prompt never fires. The fixes go out as suggested-change comments instead (step 6), and those are posted only when the user asks.
 - Issue work through `next-issue` already runs the suites and the visual check in step 7, so its run record usually matches and the prompt doesn't fire.
 
 ## Build order
@@ -161,8 +162,10 @@ Phase 1. Each step is one stacked PR, per the stacked-PR rules in CLAUDE.md.
    - The `test:e2e` script, and the postinstall change.
    - The README "Running the tests" and Scripts tables.
    - project-structure.md's E2E section updated to the layout above.
+   - Global setup builds the `cmd/sync` binary, but no journey runs it until PR 2. PR 1 only proves the build works.
+   - This is the largest PR. If it gets too big to review, the fakes server and its fixtures split into their own PR below it, and the rest stacks on top.
 2. **`test(e2e): cover integration journeys`**: journeys 2 to 6 and the basics.
-3. **`chore(skills): add qa-this skill`**: the skill and its run record, the `.gitignore` entry for `.claude/qa-runs/`, the `issue-workflow.md` step 7 change, and the CLAUDE.md rule that prompts the user to run "qa this" before committing or pushing.
+3. **`chore(skills): add qa-this skill`**: the skill and its run record, the `.gitignore` entries for `.claude/qa-runs/` and `.claude/worktrees/`, the `issue-workflow.md` step 7 change, and the CLAUDE.md rule that prompts the user to run "qa this" before committing or pushing.
 
 The Legal pages do not change: no new data is collected and no new third party is involved.
 
@@ -182,7 +185,7 @@ Phase 2 needs decisions that Phase 1 doesn't: how Claude authenticates in Action
 
 ## Decisions to confirm in review
 
-1. **Fakes in TypeScript in `e2e/fakes`**, not a refactor of `internal/testutil` into a shared Go server. TypeScript keeps the backend untouched apart from the base-URL variables. The cost is that the Go and E2E fakes can drift apart.
+1. **Fakes in TypeScript in `e2e/fakes`**, not a refactor of `internal/testutil` into a shared Go server. TypeScript keeps the backend untouched apart from the base-URL variables. The cost is that the Go and E2E fakes can drift apart. The `blizzard` and `raidhelper` fixtures are shared and can't drift. The Discord, Battle.net, YouTube and Turnstile fixtures are copies of the inline responses in `internal/testutil`, and Twitch's are new, so a change to one of those providers' responses has to be made in both places.
 2. **Built frontend through `vite preview`** rather than the dev server, as project-structure.md describes. It is slower to start but tests what ships.
 3. **Separate ports and a throwaway database**, so QA can run while `npm run dev` is up.
 4. **Playwright stays out of CI until Phase 2.** Until then the repo doesn't match project-structure.md's plan to make it a required check.

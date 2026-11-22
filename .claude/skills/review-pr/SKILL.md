@@ -42,7 +42,7 @@ This is quick, so do it inline rather than spawning an agent:
 - **Commit subjects**: each starts with a Conventional Commits type, scope optional.
 - **Branch name**: `N-short-slug` for issue work.
 - **PR body**: has `Closes #N`; starts with `Stacked on #M` when the base is not `main`; says what was verified; mentions a changed migration number or a Legal page change if relevant.
-- **Trailers**: flag `Co-Authored-By` or Claude attribution lines in commits or the PR body as `should`, not `must`. The repo's own issue workflow still tells Claude to add them, so they are common in merged history. Also flag em dashes in the text.
+- **Trailers**: flag `Co-Authored-By` or Claude attribution lines in commits or the PR body as `should`, not `must`. They are common in older merged history, so don't flag commits already on `main`. Also flag em dashes in the text.
 
 ## 4. Merge and report
 
