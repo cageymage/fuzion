@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
@@ -6,7 +6,7 @@ import { server } from '../../mocks/server'
 import { renderWithProviders } from '../../testUtils'
 import type { AuthUser } from '../../types/auth'
 import type { RankRequest } from '../../types/rankRequests'
-import type { Character } from '../../types/roster'
+import type { Character, CharacterProfession } from '../../types/roster'
 import { Dashboard } from './Dashboard'
 
 const unlinkedMember: AuthUser = {
@@ -49,6 +49,18 @@ function ownedCharacter(id: string, name: string, secondaryName: string, isMain:
     createdAt: '2026-10-01T12:00:00Z',
     professions: [],
   }
+}
+
+const blacksmithing: CharacterProfession = {
+  id: 'prof-smith',
+  profession: 'Blacksmithing',
+  skillLevel: 300,
+  specialization: null,
+  specializationSource: null,
+}
+
+function smith(changes: Partial<CharacterProfession> = {}): Character {
+  return { ...ownedCharacter('char-a', 'Ragefist', 'Ironjaw', true), professions: [{ ...blacksmithing, ...changes }] }
 }
 
 function rankRequest(overrides: Partial<RankRequest>): RankRequest {
@@ -296,6 +308,110 @@ describe('Dashboard', () => {
     expect(await within(section).findByText('Mining 300')).toBeInTheDocument()
     expect(within(section).queryByRole('spinbutton')).not.toBeInTheDocument()
     expect(within(section).queryByRole('button', { name: /^(Add|Remove)/ })).not.toBeInTheDocument()
+  })
+
+  it('should show a specialization picker only for professions that have specializations', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([
+          { ...smith(), professions: [blacksmithing, { ...blacksmithing, id: 'prof-mine', profession: 'Mining' }] },
+        ]),
+      ),
+    )
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    const picker = await screen.findByRole('combobox', { name: 'Blacksmithing specialization' })
+    expect(within(picker).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'None',
+      'Armorsmith',
+      'Weaponsmith',
+    ])
+    expect(screen.queryByRole('combobox', { name: 'Mining specialization' })).not.toBeInTheDocument()
+  })
+
+  it('should send the chosen specialization when the picker is saved', async () => {
+    let character = smith()
+    let patchBody: unknown
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () => HttpResponse.json([character])),
+      http.patch('/api/professions/prof-smith/specialization', async ({ request }) => {
+        patchBody = await request.json()
+        character = smith({ specialization: 'Weaponsmith', specializationSource: 'manual' })
+        return HttpResponse.json({})
+      }),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    const form = await screen.findByRole('form', { name: 'Blacksmithing specialization for Ragefist Ironjaw' })
+    await userEvent.selectOptions(within(form).getByRole('combobox'), 'Weaponsmith')
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(patchBody).toEqual({ specialization: 'Weaponsmith' }))
+  })
+
+  it('should send null when the specialization is set back to None', async () => {
+    let patchBody: unknown
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([smith({ specialization: 'Weaponsmith', specializationSource: 'manual' })]),
+      ),
+      http.patch('/api/professions/prof-smith/specialization', async ({ request }) => {
+        patchBody = await request.json()
+        return HttpResponse.json({})
+      }),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    const form = await screen.findByRole('form', { name: 'Blacksmithing specialization for Ragefist Ironjaw' })
+    await userEvent.selectOptions(within(form).getByRole('combobox'), 'None')
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(patchBody).toEqual({ specialization: null }))
+  })
+
+  it('should show the specialization without a picker when it comes from Battle.net', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () =>
+        HttpResponse.json([smith({ specialization: 'Weaponsmith', specializationSource: 'blizzard' })]),
+      ),
+    )
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    expect(await screen.findByText('Blacksmithing specialization: Weaponsmith (from Battle.net)')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Blacksmithing specialization' })).not.toBeInTheDocument()
+  })
+
+  it("should show the server's message when saving the specialization fails", async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(linkedMember)),
+      http.get('/api/me/characters', () => HttpResponse.json([smith()])),
+      http.patch('/api/professions/prof-smith/specialization', () =>
+        HttpResponse.json({ error: 'specialization comes from Battle.net' }, { status: 409 }),
+      ),
+    )
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    const form = await screen.findByRole('form', { name: 'Blacksmithing specialization for Ragefist Ironjaw' })
+    await userEvent.selectOptions(within(form).getByRole('combobox'), 'Weaponsmith')
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }))
+
+    expect(await within(form).findByRole('alert')).toHaveTextContent('specialization comes from Battle.net')
+  })
+
+  it('should explain where specializations come from', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(linkedMember)))
+
+    renderWithProviders(<Dashboard />, '/dashboard')
+
+    expect(
+      await screen.findByText(/Specializations are set by hand, except where Battle\.net reports one\./),
+    ).toBeInTheDocument()
   })
 
   it('should show the specs as not set when the owner has not picked any', async () => {

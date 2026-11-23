@@ -13,6 +13,8 @@ function entry(
     id,
     profession,
     skillLevel,
+    specialization: null,
+    specializationSource: null,
     character: { id: `char-${name}`, name, secondaryName, class: 'Priest' },
   }
 }
@@ -50,6 +52,14 @@ describe('groupProfessions', () => {
   it('should ignore surrounding whitespace when the query has leading or trailing spaces', () => {
     expect(groupProfessions(rows, '  dawn  ')).toEqual([
       { profession: 'Alchemy', entries: [alchemyAeliana] },
+    ])
+  })
+
+  it("should keep only the profession's own row when the query matches a specialization", () => {
+    const armorsmithZephyrion: ProfessionEntry = { ...smithingZephyrion, specialization: 'Armorsmith', specializationSource: 'manual' }
+
+    expect(groupProfessions([alchemyAeliana, alchemyZephyrion, armorsmithZephyrion], 'ARMORSM')).toEqual([
+      { profession: 'Blacksmithing', entries: [armorsmithZephyrion] },
     ])
   })
 

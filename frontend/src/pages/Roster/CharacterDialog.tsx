@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Dialog } from '../../components/Dialog/Dialog'
-import { primaryProfessions, secondaryProfessions } from '../../lib/professions'
+import { primaryProfessions, secondaryProfessions, specializationsOf } from '../../lib/professions'
 import { maxLevel, races } from '../../lib/races'
 import { classSpecs, wowClasses, type WowClass } from '../../lib/wowClasses'
 import type { Character, Role } from '../../types/roster'
@@ -10,6 +10,8 @@ import {
   buildUpdateRequest,
   emptyCharacterForm,
   formValuesFor,
+  specializableProfessions,
+  specializationChanges,
   type CharacterFormValues,
 } from './characterForm'
 import styles from './Roster.module.css'
@@ -56,11 +58,12 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
       return
     }
     const request = buildUpdateRequest(initial, values)
-    if (Object.keys(request).length === 0) {
+    const specializations = specializationChanges(character, values)
+    if (Object.keys(request).length === 0 && specializations.length === 0) {
       onClose()
       return
     }
-    update.mutate({ id: character.id, request }, { onSuccess: onClose })
+    update.mutate({ id: character.id, request, specializations }, { onSuccess: onClose })
   }
 
   return (
@@ -217,6 +220,32 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
               ))}
           </select>
         </label>
+        {character &&
+          specializableProfessions(character, values).map(({ id, profession, specialization, specializationSource }) => (
+            <label key={id} className={styles.field}>
+              <span>
+                {profession} specialization{specializationSource === 'blizzard' && ' (from Battle.net)'}
+              </span>
+              <select
+                disabled={specializationSource === 'blizzard'}
+                value={
+                  specializationSource === 'blizzard'
+                    ? (specialization ?? '')
+                    : (values.specializations[profession] ?? specialization ?? '')
+                }
+                onChange={(event) =>
+                  change({ specializations: { ...values.specializations, [profession]: event.target.value } })
+                }
+              >
+                <option value="">None</option>
+                {specializationsOf(profession).map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
         <fieldset className={styles.checkboxGroup}>
           <legend>Secondary professions</legend>
           {secondaryProfessions.map((profession) => (

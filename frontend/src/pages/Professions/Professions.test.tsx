@@ -11,14 +11,14 @@ const aeliana = { id: 'char-1', name: 'Aeliana', secondaryName: 'Dawnsong', clas
 const zephyrion = { id: 'char-2', name: 'Zephyrion', secondaryName: 'Ironhide', class: 'Warrior' }
 
 const professions: ProfessionEntry[] = [
-  { id: 'p1', profession: 'Alchemy', skillLevel: 300, character: aeliana },
-  { id: 'p2', profession: 'Alchemy', skillLevel: 225, character: zephyrion },
-  { id: 'p3', profession: 'Blacksmithing', skillLevel: 300, character: zephyrion },
+  { id: 'p1', profession: 'Alchemy', skillLevel: 300, specialization: null, specializationSource: null, character: aeliana },
+  { id: 'p2', profession: 'Alchemy', skillLevel: 225, specialization: null, specializationSource: null, character: zephyrion },
+  { id: 'p3', profession: 'Blacksmithing', skillLevel: 300, specialization: null, specializationSource: null, character: zephyrion },
 ]
 
 const brannoch = { id: 'char-3', name: 'Brannoch', secondaryName: 'Stonefist', class: 'Paladin' }
-const smithingBrannoch: ProfessionEntry = { id: 'p6', profession: 'Blacksmithing', skillLevel: 275, character: brannoch }
-const cookingAeliana: ProfessionEntry ={ id: 'p4', profession: 'Cooking', skillLevel: 150, character: aeliana }
+const smithingBrannoch: ProfessionEntry = { id: 'p6', profession: 'Blacksmithing', skillLevel: 275, specialization: null, specializationSource: null, character: brannoch }
+const cookingAeliana: ProfessionEntry ={ id: 'p4', profession: 'Cooking', skillLevel: 150, specialization: null, specializationSource: null, character: aeliana }
 
 function respondWith(entries: ProfessionEntry[]) {
   server.use(http.get('/api/professions', () => HttpResponse.json(entries)))
@@ -104,7 +104,7 @@ describe('Professions', () => {
   })
 
   it('should name the first-aid tab after the whole profession when the profession has several words', async () => {
-    respondWith([{ id: 'p9', profession: 'First Aid', skillLevel: 150, character: aeliana }])
+    respondWith([{ id: 'p9', profession: 'First Aid', skillLevel: 150, specialization: null, specializationSource: null, character: aeliana }])
 
     renderWithProviders(<Professions />)
 
@@ -192,7 +192,7 @@ describe('Professions', () => {
   })
 
   it('should skip disabled tabs when the right arrow is pressed', async () => {
-    respondWith([...professions, { id: 'p5', profession: 'Tailoring', skillLevel: 100, character: aeliana }])
+    respondWith([...professions, { id: 'p5', profession: 'Tailoring', skillLevel: 100, specialization: null, specializationSource: null, character: aeliana }])
     const user = userEvent.setup()
     renderWithProviders(<Professions />)
     const blacksmithing = await screen.findByRole('tab', { name: 'Blacksmithing (1)' })
@@ -257,7 +257,7 @@ describe('Professions', () => {
 
   it('should color the secondary name with the class color when an entry is rendered', async () => {
     // given a Warrior whose secondary name is Ironhide
-    respondWith([{ id: 'p2', profession: 'Alchemy', skillLevel: 225, character: zephyrion }])
+    respondWith([{ id: 'p2', profession: 'Alchemy', skillLevel: 225, specialization: null, specializationSource: null, character: zephyrion }])
 
     // when the page renders the entry
     renderWithProviders(<Professions />)
@@ -268,8 +268,149 @@ describe('Professions', () => {
     expect(within(panel).getByText('Ironhide')).toHaveStyle({ color: '#C79C6E' })
   })
 
+  it('should show the specialization in parentheses after the name when the selected profession has one', async () => {
+    respondWith([{ ...smithingBrannoch, specialization: 'Weaponsmith', specializationSource: 'manual' }])
+
+    renderWithProviders(<Professions />)
+
+    const panel = await screen.findByRole('tabpanel', { name: 'Blacksmithing (1)' })
+    expect(within(panel).getByRole('listitem')).toHaveTextContent('Brannoch Stonefist (Weaponsmith)')
+  })
+
+  it('should show no parentheses after the name when the character has no specialization', async () => {
+    respondWith([smithingBrannoch])
+
+    renderWithProviders(<Professions />)
+
+    const panel = await screen.findByRole('tabpanel', { name: 'Blacksmithing (1)' })
+    expect(within(panel).getByRole('listitem')).not.toHaveTextContent('(')
+  })
+
+  it("should not show a character's specialization when another profession's tab is selected", async () => {
+    respondWith([
+      { ...smithingBrannoch, specialization: 'Weaponsmith', specializationSource: 'manual' },
+      { id: 'p7', profession: 'Tailoring', skillLevel: 120, specialization: null, specializationSource: null, character: brannoch },
+    ])
+    const user = userEvent.setup()
+    renderWithProviders(<Professions />)
+
+    await user.click(await screen.findByRole('tab', { name: 'Tailoring (1)' }))
+
+    const panel = screen.getByRole('tabpanel', { name: 'Tailoring (1)' })
+    expect(within(panel).getByText('Brannoch')).toBeInTheDocument()
+    expect(screen.queryByText('(Weaponsmith)')).not.toBeInTheDocument()
+  })
+
+  const weaponsmithBrannoch: ProfessionEntry = { ...smithingBrannoch, specialization: 'Weaponsmith', specializationSource: 'manual' }
+  const smithingZephyrion = professions[2]
+  const gnomishAeliana: ProfessionEntry = { id: 'p10', profession: 'Engineering', skillLevel: 268, specialization: 'Gnomish', specializationSource: 'blizzard', character: aeliana }
+
+  it('should show a filter with a count for each specialization when the selected profession has specializations', async () => {
+    respondWith([smithingZephyrion, weaponsmithBrannoch])
+
+    renderWithProviders(<Professions />)
+
+    const filter = await screen.findByRole('group', { name: 'Filter by specialization' })
+    expect(within(filter).getAllByRole('button').map((chip) => chip.textContent)).toEqual([
+      'All (2)',
+      'Armorsmith (0)',
+      'Weaponsmith (1)',
+    ])
+    expect(within(filter).getByRole('button', { name: 'All (2)' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('should disable a specialization filter when nobody has that specialization', async () => {
+    respondWith([weaponsmithBrannoch])
+
+    renderWithProviders(<Professions />)
+
+    expect(await screen.findByRole('button', { name: 'Armorsmith (0)' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Weaponsmith (1)' })).toBeEnabled()
+  })
+
+  it('should not show a specialization filter when the selected profession has no specializations', async () => {
+    respondWith(professions)
+
+    renderWithProviders(<Professions />)
+
+    await screen.findByRole('tabpanel', { name: 'Alchemy (2)' })
+    expect(screen.queryByRole('group', { name: 'Filter by specialization' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument()
+  })
+
+  it('should list only the characters with a specialization when its filter is clicked', async () => {
+    respondWith([smithingZephyrion, weaponsmithBrannoch])
+    const user = userEvent.setup()
+    renderWithProviders(<Professions />)
+
+    await user.click(await screen.findByRole('button', { name: 'Weaponsmith (1)' }))
+
+    const panel = screen.getByRole('tabpanel', { name: 'Blacksmithing (2)' })
+    expect(within(panel).getAllByRole('listitem')).toHaveLength(1)
+    expect(within(panel).getByText('Brannoch')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Weaponsmith (1)' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'All (2)' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('should list every character again when All is clicked after filtering by specialization', async () => {
+    respondWith([smithingZephyrion, weaponsmithBrannoch])
+    const user = userEvent.setup()
+    renderWithProviders(<Professions />)
+    await user.click(await screen.findByRole('button', { name: 'Weaponsmith (1)' }))
+
+    await user.click(screen.getByRole('button', { name: 'All (2)' }))
+
+    expect(within(screen.getByRole('tabpanel')).getAllByRole('listitem')).toHaveLength(2)
+  })
+
+  it('should clear the specialization filter when returning to the tab from another profession', async () => {
+    respondWith([smithingZephyrion, weaponsmithBrannoch, gnomishAeliana])
+    const user = userEvent.setup()
+    renderWithProviders(<Professions />)
+    await user.click(await screen.findByRole('button', { name: 'Weaponsmith (1)' }))
+    await user.click(screen.getByRole('tab', { name: 'Engineering (1)' }))
+
+    await user.click(screen.getByRole('tab', { name: 'Blacksmithing (2)' }))
+
+    expect(screen.getByRole('button', { name: 'All (2)' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(screen.getByRole('tabpanel')).getAllByRole('listitem')).toHaveLength(2)
+  })
+
+  it('should list every match when the search leaves nobody with the filtered specialization', async () => {
+    respondWith([smithingZephyrion, weaponsmithBrannoch])
+    const user = userEvent.setup()
+    renderWithProviders(<Professions />)
+    await user.click(await screen.findByRole('button', { name: 'Weaponsmith (1)' }))
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'zephyr')
+
+    expect(await screen.findByRole('button', { name: 'All (1)' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Weaponsmith (0)' })).toBeDisabled()
+    expect(within(screen.getByRole('tabpanel')).getByText('Zephyrion')).toBeInTheDocument()
+  })
+
+  it('should list only the characters with the specialization when the search text matches its name', async () => {
+    respondWith([smithingZephyrion, weaponsmithBrannoch])
+    const user = userEvent.setup()
+    renderWithProviders(<Professions />)
+    await screen.findByRole('tab', { name: 'Blacksmithing (2)' })
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'weaponsmith')
+
+    const panel = await screen.findByRole('tabpanel', { name: 'Blacksmithing (1)' })
+    expect(within(panel).getByText('Brannoch')).toBeInTheDocument()
+  })
+
+  it('should link to the dashboard for setting a specialization when the selected profession has specializations', async () => {
+    respondWith([smithingBrannoch])
+
+    renderWithProviders(<Professions />)
+
+    expect(await screen.findByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard')
+  })
+
   it('should show a dash instead of a skill level when none is recorded', async () => {
-    respondWith([{ id: 'p8', profession: 'Cooking', skillLevel: 0, character: aeliana }])
+    respondWith([{ id: 'p8', profession: 'Cooking', skillLevel: 0, specialization: null, specializationSource: null, character: aeliana }])
 
     renderWithProviders(<Professions />)
 

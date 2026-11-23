@@ -1,6 +1,7 @@
-import { isPrimaryProfession, isSecondaryProfession } from '../../lib/professions'
+import { isPrimaryProfession, isSecondaryProfession, specializationsOf } from '../../lib/professions'
 import type {
   Character,
+  CharacterProfession,
   CreateCharacterRequest,
   Role,
   UpdateCharacterRequest,
@@ -23,6 +24,8 @@ export interface CharacterFormValues {
   primaryProfession1: string
   primaryProfession2: string
   secondaryProfessions: string[]
+  // Only the ones edited here, keyed by profession name; an empty string clears it.
+  specializations: Record<string, string>
 }
 
 export const emptyCharacterForm: CharacterFormValues = {
@@ -41,6 +44,7 @@ export const emptyCharacterForm: CharacterFormValues = {
   primaryProfession1: '',
   primaryProfession2: '',
   secondaryProfessions: [],
+  specializations: {},
 }
 
 // Names a character has that the form no longer offers (or a third primary) are not shown.
@@ -60,6 +64,38 @@ function professionList(values: CharacterFormValues): string[] {
   )
 }
 
+export interface SpecializationChange {
+  professionId: string
+  specialization: string | null
+}
+
+export function specializableProfessions(
+  character: Character,
+  values: CharacterFormValues,
+): CharacterProfession[] {
+  const kept = professionList(values)
+  return character.professions.filter(
+    ({ profession }) => kept.includes(profession) && specializationsOf(profession).length > 0,
+  )
+}
+
+export function specializationChanges(
+  character: Character,
+  values: CharacterFormValues,
+): SpecializationChange[] {
+  return specializableProfessions(character, values)
+    .filter(({ profession, specialization, specializationSource }) => {
+      const edited = values.specializations[profession]
+      return (
+        edited !== undefined && edited !== (specialization ?? '') && specializationSource !== 'blizzard'
+      )
+    })
+    .map(({ id, profession }) => ({
+      professionId: id,
+      specialization: values.specializations[profession] || null,
+    }))
+}
+
 function sameProfessions(a: string[], b: string[]): boolean {
   return a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n')
 }
@@ -67,6 +103,7 @@ function sameProfessions(a: string[], b: string[]): boolean {
 export function formValuesFor(character: Character): CharacterFormValues {
   return {
     ...professionChoices(character),
+    specializations: {},
     name: character.name,
     secondaryName: character.secondaryName,
     realm: character.realm,

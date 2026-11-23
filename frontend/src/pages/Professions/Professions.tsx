@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { classColor } from '../../lib/classColor'
+import { specializationsOf } from '../../lib/professions'
 import type { ProfessionEntry } from '../../types/professions'
 import { CharacterRecipes } from './CharacterRecipes'
 import { CrafterResults } from './CrafterResults'
 import { crafterKey, groupProfessions } from './groupProfessions'
 import { professionPanelId, ProfessionTabs, professionTabId } from './ProfessionTabs'
+import { SpecializationFilter } from './SpecializationFilter'
 import { resolveSelectedTab, tabRows } from './tabSelection'
 import styles from './Professions.module.css'
 import { useProfessionsData } from './useProfessionsData'
@@ -32,12 +34,24 @@ export function Professions() {
 
   const counts = Object.fromEntries(groups.map((group) => [group.profession, group.entries.length]))
   const [selectedTab, setSelectedTab] = useState<string | null>(null)
+  const [specializationFilter, setSpecializationFilter] = useState<string | null>(null)
+
+  function selectTab(profession: string | null) {
+    setSelectedTab(profession)
+    setSpecializationFilter(null)
+  }
+
   const activeTab =
     waitingForRecipes && selectedTab !== null ? selectedTab : resolveSelectedTab(selectedTab, counts)
   if (!waitingForRecipes && professions.isSuccess && activeTab !== selectedTab) {
-    setSelectedTab(activeTab)
+    selectTab(activeTab)
   }
   const activeGroup = groups.find((group) => group.profession === activeTab)
+  const activeEntries = activeGroup?.entries ?? []
+  const activeSpecializations = activeTab === null ? [] : specializationsOf(activeTab)
+  const filteredEntries = activeEntries.filter((entry) => entry.specialization === specializationFilter)
+  const filtering = specializationFilter !== null && filteredEntries.length > 0
+  const shownEntries = filtering ? filteredEntries : activeEntries
 
   return (
     <section className={styles.page}>
@@ -49,7 +63,7 @@ export function Professions() {
           id="professions-search"
           type="search"
           className={styles.search}
-          placeholder="Character or recipe"
+          placeholder="Character, recipe or specialization"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -76,13 +90,21 @@ export function Professions() {
           rowLabels={tabRowLabels}
           counts={counts}
           selected={activeTab}
-          onSelect={setSelectedTab}
+          onSelect={selectTab}
         />
       )}
       {activeTab !== null && activeGroup && (
         <div role="tabpanel" id={professionPanelId} aria-labelledby={professionTabId(activeTab)}>
+          {activeSpecializations.length > 0 && (
+            <SpecializationFilter
+              specializations={activeSpecializations}
+              entries={activeEntries}
+              selected={filtering ? specializationFilter : null}
+              onSelect={setSpecializationFilter}
+            />
+          )}
           <ul className={styles.entries}>
-            {activeGroup.entries.map((entry) => (
+            {shownEntries.map((entry) => (
               <CharacterEntry key={entry.id} entry={entry} />
             ))}
           </ul>
@@ -112,6 +134,7 @@ function CharacterEntry({ entry }: { entry: ProfessionEntry }) {
             {entry.character.name}
           </span>{' '}
           <span style={{ color }}>{entry.character.secondaryName}</span>
+          {entry.specialization && <span className={styles.specialization}> ({entry.specialization})</span>}
         </span>
         <span className={styles.skill}>{entry.skillLevel > 0 ? entry.skillLevel : '—'}</span>
       </button>

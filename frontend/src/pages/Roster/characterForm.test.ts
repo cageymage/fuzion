@@ -126,9 +126,9 @@ describe('formValuesFor professions', () => {
     const values = formValuesFor({
       ...aeliana,
       professions: [
-        { profession: 'Mining', skillLevel: 300 },
-        { profession: 'Cooking', skillLevel: 150 },
-        { profession: 'Skinning', skillLevel: 100 },
+        { id: 'mining-row', profession: 'Mining', skillLevel: 300, specialization: null, specializationSource: null },
+        { id: 'cooking-row', profession: 'Cooking', skillLevel: 150, specialization: null, specializationSource: null },
+        { id: 'skinning-row', profession: 'Skinning', skillLevel: 100, specialization: null, specializationSource: null },
       ],
     })
 
@@ -138,7 +138,7 @@ describe('formValuesFor professions', () => {
   })
 
   it('should ignore a profession that is no longer offered when the character still has it stored', () => {
-    const values = formValuesFor({ ...aeliana, professions: [{ profession: 'Jewelcrafting', skillLevel: 300 }] })
+    const values = formValuesFor({ ...aeliana, professions: [{ id: 'jewelcrafting-row', profession: 'Jewelcrafting', skillLevel: 300, specialization: null, specializationSource: null }] })
 
     expect(values.primaryProfession1).toBe('')
     expect(values.primaryProfession2).toBe('')
@@ -168,7 +168,7 @@ describe('profession requests', () => {
   })
 
   it('should send the full professions list when a profession is added to a character', () => {
-    const initial = formValuesFor({ ...aeliana, professions: [{ profession: 'Mining', skillLevel: 300 }] })
+    const initial = formValuesFor({ ...aeliana, professions: [{ id: 'mining-row', profession: 'Mining', skillLevel: 300, specialization: null, specializationSource: null }] })
 
     const request = buildUpdateRequest(initial, { ...initial, primaryProfession2: 'Herbalism' })
 
@@ -176,7 +176,7 @@ describe('profession requests', () => {
   })
 
   it('should send an empty list when every profession is removed from a character', () => {
-    const initial = formValuesFor({ ...aeliana, professions: [{ profession: 'Mining', skillLevel: 300 }] })
+    const initial = formValuesFor({ ...aeliana, professions: [{ id: 'mining-row', profession: 'Mining', skillLevel: 300, specialization: null, specializationSource: null }] })
 
     const request = buildUpdateRequest(initial, { ...initial, primaryProfession1: '' })
 
@@ -187,8 +187,8 @@ describe('profession requests', () => {
     const initial = formValuesFor({
       ...aeliana,
       professions: [
-        { profession: 'Mining', skillLevel: 300 },
-        { profession: 'Herbalism', skillLevel: 200 },
+        { id: 'mining-row', profession: 'Mining', skillLevel: 300, specialization: null, specializationSource: null },
+        { id: 'herbalism-row', profession: 'Herbalism', skillLevel: 200, specialization: null, specializationSource: null },
       ],
     })
 

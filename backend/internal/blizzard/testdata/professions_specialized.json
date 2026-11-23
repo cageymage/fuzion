@@ -1,0 +1,27 @@
+{
+  "_links": { "self": { "href": "https://us.api.blizzard.com/profile/wow/character/thorns-star/professions?namespace=profile-forever-us" } },
+  "character": {
+    "key": { "href": "https://us.api.blizzard.com/profile/wow/character/thorns-star?namespace=profile-forever-us" },
+    "name": "Thorns",
+    "id": 7490592,
+    "surname": "Star",
+    "slug": "thorns-star"
+  },
+  "primaries": [
+    {
+      "profession": { "key": { "href": "https://us.api.blizzard.com/data/wow/profession/202" }, "name": "Engineering", "id": 202 },
+      "tiers": [
+        {
+          "skill_points": 268,
+          "max_skill_points": 300,
+          "tier": { "name": "Engineering", "id": 2941 },
+          "known_recipes": [
+            { "key": { "href": "https://us.api.blizzard.com/data/wow/recipe/5066" }, "name": "Gnomish Universal Remote", "id": 5066 }
+          ]
+        }
+      ],
+      "specialization": { "name": "Gnomish Engineer" }
+    }
+  ],
+  "secondaries": []
+}

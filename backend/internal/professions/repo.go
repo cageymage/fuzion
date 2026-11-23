@@ -19,16 +19,20 @@ type Character struct {
 }
 
 type Profession struct {
-	ID         uuid.UUID `json:"id"`
-	Profession string    `json:"profession"`
-	SkillLevel int       `json:"skillLevel"`
-	Character  Character `json:"character"`
+	ID                   uuid.UUID `json:"id"`
+	Profession           string    `json:"profession"`
+	SkillLevel           int       `json:"skillLevel"`
+	Specialization       *string   `json:"specialization"`
+	SpecializationSource *string   `json:"specializationSource"`
+	Character            Character `json:"character"`
 }
 
 type row struct {
 	ID                     uuid.UUID `db:"id"`
 	Profession             string    `db:"profession"`
 	SkillLevel             int       `db:"skill_level"`
+	Specialization         *string   `db:"specialization"`
+	SpecializationSource   *string   `db:"specialization_source"`
 	CharacterID            uuid.UUID `db:"character_id"`
 	CharacterName          string    `db:"character_name"`
 	CharacterSecondaryName string    `db:"character_secondary_name"`
@@ -37,9 +41,11 @@ type row struct {
 
 func (p row) toProfession() Profession {
 	return Profession{
-		ID:         p.ID,
-		Profession: p.Profession,
-		SkillLevel: p.SkillLevel,
+		ID:                   p.ID,
+		Profession:           p.Profession,
+		SkillLevel:           p.SkillLevel,
+		Specialization:       p.Specialization,
+		SpecializationSource: p.SpecializationSource,
 		Character: Character{
 			ID:            p.CharacterID,
 			Name:          p.CharacterName,
@@ -55,7 +61,7 @@ const (
 )
 
 const selectColumns = `
-	p.id, p.profession, p.skill_level,
+	p.id, p.profession, p.skill_level, p.specialization, p.specialization_source,
 	c.id AS character_id, c.name AS character_name,
 	c.secondary_name AS character_secondary_name, c.class AS character_class`
 
@@ -92,7 +98,7 @@ func (r *Repo) Create(ctx context.Context, id, characterID uuid.UUID, profession
 		WITH p AS (
 			INSERT INTO professions (id, character_id, profession, skill_level)
 			VALUES ($1, $2, $3, $4)
-			RETURNING id, character_id, profession, skill_level
+			RETURNING id, character_id, profession, skill_level, specialization, specialization_source
 		)
 		SELECT ` + selectColumns + `
 		FROM p
@@ -106,14 +112,17 @@ func (r *Repo) Create(ctx context.Context, id, characterID uuid.UUID, profession
 }
 
 // Update applies req with COALESCE semantics, so nil fields keep their stored value.
+// Changing the profession clears the specialization, which belongs to the old one.
 func (r *Repo) Update(ctx context.Context, id uuid.UUID, req UpdateRequest) (Profession, error) {
 	const query = `
 		WITH p AS (
 			UPDATE professions SET
 				profession  = COALESCE($2, profession),
-				skill_level = COALESCE($3, skill_level)
+				skill_level = COALESCE($3, skill_level),
+				specialization        = CASE WHEN profession = COALESCE($2, profession) THEN specialization END,
+				specialization_source = CASE WHEN profession = COALESCE($2, profession) THEN specialization_source END
 			WHERE id = $1
-			RETURNING id, character_id, profession, skill_level
+			RETURNING id, character_id, profession, skill_level, specialization, specialization_source
 		)
 		SELECT ` + selectColumns + `
 		FROM p

@@ -1,8 +1,12 @@
 import type { ProfessionEntry, Recipe } from '../types/professions'
-import { apiGet } from './client'
+import { apiGet, apiSend } from './client'
 
 export function fetchProfessions(): Promise<ProfessionEntry[]> {
   return apiGet<ProfessionEntry[]>('/professions')
+}
+
+export function setSpecialization(professionId: string, specialization: string | null): Promise<ProfessionEntry> {
+  return apiSend<ProfessionEntry>('PATCH', `/professions/${professionId}/specialization`, { specialization })
 }
 
 export interface RecipeFilter {
