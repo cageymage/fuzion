@@ -43,8 +43,8 @@ export function Legal() {
             you as the owner of those characters.
           </li>
           <li>
-            Your characters and rank requests: the specs and roles you pick for characters you own,
-            and any rank change request you send, with its optional note, when you sent it and the
+            Your characters and rank requests: the specs, roles and crafting specializations you
+            pick for characters you own, and any rank change request you send, with its optional note, when you sent it and the
             officer&apos;s reply. Officers can see your requests, and each new one is also posted,
             with your Discord username and note, to the officers&apos; channel on the guild&apos;s
             Discord server.

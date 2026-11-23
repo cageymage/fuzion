@@ -117,8 +117,10 @@ Battle.net link is needed) and is off until `SYNC_BLIZZARD_PROFESSIONS_ENABLED=t
 It uses the same `BLIZZARD_*` settings as the roster sync and skips characters who left
 the guild or still have the `Unset` secondary name. Blizzard wins per profession: each
 profession it reports is written with its skill level, replacing an officer's number,
-while professions it does not report keep the officer's row. Members cannot edit
-professions. A character Blizzard answers 404 for is skipped and counted
+while professions it does not report keep the officer's row. A specialization Blizzard
+reports is stored with source `blizzard` and replaces a manual one; when it reports none,
+only a `blizzard` specialization is cleared, and a name the site does not know is logged
+and ignored. Members cannot edit professions, except to set the specialization of their own. A character Blizzard answers 404 for is skipped and counted
 in the `sync_log` message; any other Blizzard error fails the run. The sync never
 removes a profession, so a profession a character drops stays until an officer removes it.
 
@@ -150,6 +152,7 @@ is no separate migrate step.
 | GET    | `/api/professions`  | crafting directory with each character embedded, leaving out characters that left the guild, sorted by profession, then skill; optional `?profession=` (case-insensitive, `[]` when nothing matches) |
 | POST   | `/api/professions`  | officer only: `{characterId, profession, skillLevel}`; 201 with the same shape the list returns; 400 for an unknown `characterId`, a blank `profession` or a negative `skillLevel`; 409 when the character already has that profession |
 | PATCH  | `/api/professions/{id}` | officer only: any of `profession`, `skillLevel`; 200 with the updated row; 404 for an unknown or malformed id; 409 when it would duplicate another of the character's professions |
+| PATCH  | `/api/professions/{id}/specialization` | the character's owner or an officer: `{specialization}`, a value valid for the profession or `null` to clear; 200 with the updated row, whose `specializationSource` is `manual` (or `blizzard` when the sync set it); 400 for a missing or invalid value; 403 when the character is not yours; 404 for an unknown or malformed id; 409 when the value comes from Battle.net |
 | DELETE | `/api/professions/{id}` | officer only: 204; 404 for an unknown or malformed id |
 | GET    | `/api/news`         | one page of news posts as HAL: `{total, _links: {self, first, last, prev?, next?}, _embedded: {news: [...]}}`, newest first (`news` is `[]` when none); `?limit=` 1 to 50 (default 10), `?offset=` 0 or more (default 0), `?category=raid-progress\|recruitment\|guild-news`, else 400; `total` counts the category matches, ignoring limit and offset; links keep the filters and leave out defaults (`offset=0` never appears, `limit` only when you sent it) |
 | GET    | `/api/raids/next`   | soonest upcoming raid, or `null` when none scheduled |

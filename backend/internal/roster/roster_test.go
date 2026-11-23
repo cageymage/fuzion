@@ -1003,6 +1003,48 @@ func TestListRoster_IncludesProfessions_ForCharacterWithPrimaryProfessions(t *te
 	}
 }
 
+func TestListRoster_IncludesSpecializations_WhenAProfessionHasOne(t *testing.T) {
+	// given a Weaponsmith who is also a miner
+	db := testutil.DB(t)
+	srv := testutil.NewServer(t, db)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, role)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Aeliana', 'Dawnsong', 'Emberreach', 'Priest', 'healer')`)
+	db.MustExec(`
+		INSERT INTO professions (id, character_id, profession, skill_level, specialization, specialization_source)
+		VALUES
+			('a1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'Blacksmithing', 300, 'Weaponsmith', 'manual'),
+			('a2222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Mining', 225, NULL, NULL)`)
+
+	// when I ask for the roster
+	resp := srv.Get(t, "/api/roster")
+
+	// then I expect the specialization and its source on Blacksmithing only
+	resp.RequireStatus(t, http.StatusOK)
+	type specializedJSON struct {
+		ID                   string  `json:"id"`
+		Profession           string  `json:"profession"`
+		SkillLevel           int     `json:"skillLevel"`
+		Specialization       *string `json:"specialization"`
+		SpecializationSource *string `json:"specializationSource"`
+	}
+	var characters []struct {
+		Professions []specializedJSON `json:"professions"`
+	}
+	resp.DecodeJSON(t, &characters)
+	weaponsmith, manual := "Weaponsmith", "manual"
+	want := []specializedJSON{
+		{ID: "a1111111-1111-1111-1111-111111111111", Profession: "Blacksmithing", SkillLevel: 300, Specialization: &weaponsmith, SpecializationSource: &manual},
+		{ID: "a2222222-2222-2222-2222-222222222222", Profession: "Mining", SkillLevel: 225},
+	}
+	if len(characters) != 1 {
+		t.Fatalf("got %d characters, want 1", len(characters))
+	}
+	if diff := cmp.Diff(want, characters[0].Professions); diff != "" {
+		t.Errorf("unexpected professions (-want +got):\n%s", diff)
+	}
+}
+
 func TestListRoster_ReturnsEmptyProfessionsArray_ForCharacterWithNoProfessions(t *testing.T) {
 	// given a character with no professions
 	db := testutil.DB(t)

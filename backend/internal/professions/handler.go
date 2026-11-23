@@ -27,6 +27,7 @@ func (h *Handler) Register(r chi.Router) {
 	r.Get("/recipes", h.listRecipes)
 	r.With(auth.RequireOfficer).Post("/professions", h.create)
 	r.With(auth.RequireOfficer).Patch("/professions/{id}", h.update)
+	r.With(auth.RequireUser).Patch("/professions/{id}/specialization", h.setSpecialization)
 	r.With(auth.RequireOfficer).Delete("/professions/{id}", h.delete)
 }
 
@@ -112,6 +113,10 @@ func writeError(w http.ResponseWriter, r *http.Request, action string, err error
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrNotFound.Error()})
 	case errors.Is(err, ErrConflict):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrConflict.Error()})
+	case errors.Is(err, ErrNotOwner):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": ErrNotOwner.Error()})
+	case errors.Is(err, ErrFromBlizzard):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrFromBlizzard.Error()})
 	case errors.Is(err, ErrUnknownCharacter):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrUnknownCharacter.Error()})
 	default:

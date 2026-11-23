@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { server } from '../../mocks/server'
 import { renderWithProviders } from '../../testUtils'
-import type { Character } from '../../types/roster'
+import type { Character, CharacterProfession } from '../../types/roster'
 import { Roster } from './Roster'
 
 const officer = { id: 'user-1', username: 'Officer', avatarUrl: null, isOfficer: true }
@@ -56,6 +56,14 @@ const zaldrix: Character = {
   rank: null,
   rankOrder: null,
   raidTeam: null,
+}
+
+const smithing: CharacterProfession = {
+  id: 'smith-row',
+  profession: 'Blacksmithing',
+  skillLevel: 300,
+  specialization: null,
+  specializationSource: null,
 }
 
 function signInAs(user: typeof officer) {
@@ -387,9 +395,9 @@ describe('Roster management', () => {
       {
         ...ragnok,
         professions: [
-          { profession: 'Mining', skillLevel: 300 },
-          { profession: 'Skinning', skillLevel: 200 },
-          { profession: 'Fishing', skillLevel: 75 },
+          { id: 'mining-row', profession: 'Mining', skillLevel: 300, specialization: null, specializationSource: null },
+          { id: 'skinning-row', profession: 'Skinning', skillLevel: 200, specialization: null, specializationSource: null },
+          { id: 'fishing-row', profession: 'Fishing', skillLevel: 75, specialization: null, specializationSource: null },
         ],
       },
     ])
@@ -431,7 +439,7 @@ describe('Roster management', () => {
 
   it('should send no professions when an officer edits a character without changing them', async () => {
     signInAs(officer)
-    const calls = serveRoster([{ ...ragnok, professions: [{ profession: 'Mining', skillLevel: 300 }] }])
+    const calls = serveRoster([{ ...ragnok, professions: [{ id: 'mining-row', profession: 'Mining', skillLevel: 300, specialization: null, specializationSource: null }] }])
     const user = userEvent.setup()
     renderWithProviders(<Roster />)
     const dialog = await openEditDialog(user, 'Ragnok')
@@ -446,7 +454,7 @@ describe('Roster management', () => {
 
   it('should send the new professions when an officer changes a primary profession', async () => {
     signInAs(officer)
-    const calls = serveRoster([{ ...ragnok, professions: [{ profession: 'Mining', skillLevel: 300 }] }])
+    const calls = serveRoster([{ ...ragnok, professions: [{ id: 'mining-row', profession: 'Mining', skillLevel: 300, specialization: null, specializationSource: null }] }])
     const user = userEvent.setup()
     renderWithProviders(<Roster />)
     const dialog = await openEditDialog(user, 'Ragnok')
@@ -538,5 +546,72 @@ describe('Roster management unset role', () => {
       'Healer',
       'DPS',
     ])
+  })
+
+  it('should save only the specialization when an officer changes nothing else', async () => {
+    signInAs(officer)
+    const calls = serveRoster([{ ...ragnok, professions: [smithing] }])
+    const sent: unknown[] = []
+    server.use(
+      http.patch('/api/professions/:id/specialization', async ({ request, params }) => {
+        sent.push({ id: params.id, body: await request.json() })
+        return HttpResponse.json({})
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    const dialog = await openEditDialog(user, 'Ragnok')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Blacksmithing specialization' }), 'Armorsmith')
+
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(sent).toEqual([{ id: 'smith-row', body: { specialization: 'Armorsmith' } }])
+    expect(calls.updated).toEqual([])
+  })
+
+  it('should keep the dialog open with the error when saving the specialization fails', async () => {
+    signInAs(officer)
+    serveRoster([{ ...ragnok, professions: [smithing] }])
+    server.use(
+      http.patch('/api/professions/:id/specialization', () =>
+        HttpResponse.json({ error: 'specialization comes from Battle.net' }, { status: 409 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    const dialog = await openEditDialog(user, 'Ragnok')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Blacksmithing specialization' }), 'Armorsmith')
+
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    expect(await dialog.findByRole('alert')).toHaveTextContent('specialization comes from Battle.net')
+  })
+
+  it('should disable the specialization picker when the value comes from Battle.net', async () => {
+    signInAs(officer)
+    serveRoster([
+      { ...ragnok, professions: [{ ...smithing, specialization: 'Weaponsmith', specializationSource: 'blizzard' }] },
+    ])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    const picker = dialog.getByRole('combobox', { name: 'Blacksmithing specialization (from Battle.net)' })
+    expect(picker).toBeDisabled()
+    expect(picker).toHaveValue('Weaponsmith')
+  })
+
+  it('should show no specialization picker when the profession is not saved on the character yet', async () => {
+    signInAs(officer)
+    serveRoster([ragnok])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Primary profession 1' }), 'Blacksmithing')
+
+    expect(dialog.queryByRole('combobox', { name: 'Blacksmithing specialization' })).not.toBeInTheDocument()
   })
 })

@@ -46,7 +46,7 @@ Guild name used throughout this spec: **Fuzion**, realm `Emberreach`, region `us
 | **Raid Progress**          | Current tier progress bar, boss kill order, linked WarcraftLogs parses                                                                                                                 | Public                                             |
 | **Calendar & Events**      | Mirrors Raid-Helper events & signups from Discord in real time; resolves signups to characters for raid comp view                                                                      | Public (view) · created via Raid-Helper in Discord |
 | **Applications**           | Recruiting form (class/role/playstyle/availability), with a required charter-agreement checkbox linking to the Charter page; submission posts a notification to a Discord recruiting channel; officer review queue                                                     | Public form / Officer review                       |
-| **Professions & Crafting** | Searchable directory: who crafts what, at what skill level — officer-entered at launch; synced from the Blizzard Profile API with the app token (§5) only if Forever's API exposes professions (#101) | Public                                             |
+| **Professions & Crafting** | Searchable directory: who crafts what, at what skill level and specialization (searchable and filterable) — officer-entered at launch; synced from the Blizzard Profile API with the app token (§5) only if Forever's API exposes professions (#101) | Public                                             |
 | **PvP**                    | Rated BG ratings pulled from the Blizzard API, guild leaderboard. Optional: may not be included, depending on guild interest                                                           | Public                                             |
 | **Streams**                | Grid of member Twitch/YouTube channels; featured "who's live" widget                                                                                                                   | Public                                             |
 | **Member Dashboard**       | Manage linked characters/alts, notification prefs, stream channel                                                                                                                      | Members                                            |
@@ -189,7 +189,7 @@ Core entities, kept deliberately simple for v1 and built fresh in this project's
 - **Post** — id, author_user_id, title, body (Markdown, may embed uploaded images by `/api/images/{id}` URL), pinned, published_at
 - **Image** — id, content_type, width, height, full_bytes, thumb_bytes, created_at — WebP variants stored in Postgres and served by the backend; referenced from Post bodies by `/api/images/{id}` (issue #7)
 - **Topic** — id, name — many-to-many with Post; doubles as the News category system
-- **Profession** — id, character_id, profession, skill_level
+- **Profession** — id, character_id, profession, skill_level, specialization, specialization_source
 - **StreamChannel** — id, user_id, platform, channel_id, is_manual_live
 - **SyncLog** — id, source, status, ran_at — tracks each API sync's health
 

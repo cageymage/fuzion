@@ -3,6 +3,7 @@ import { battlenetLinkUrl } from '../../api/auth'
 import { fetchMyRankRequests, myRankRequestsQueryKey } from '../../api/rankRequests'
 import { fetchMyCharacters } from '../../api/roster'
 import { classColor } from '../../lib/classColor'
+import { CharacterSpecializations } from './CharacterSpecializations'
 import { CharacterSpecs } from './CharacterSpecs'
 import styles from './Dashboard.module.css'
 import { myCharactersQueryKey } from './myCharactersQueryKey'
@@ -60,6 +61,7 @@ export function MyCharacters() {
                         .join(' · ')}
                     </p>
                   )}
+                  <CharacterSpecializations character={character} fullName={fullName} />
                   {rankRequests.isSuccess && (
                     <RankRequestControl
                       character={character}
@@ -78,7 +80,8 @@ export function MyCharacters() {
           )}
           <p className={styles.hint}>
             Main or alt follows your guild rank in game, so ask an officer with a rank request to
-            change it. Professions come from Battle.net and raid teams are set by officers.
+            change it. Professions come from Battle.net. Specializations are set by hand, except where
+            Battle.net reports one. Raid teams are set by officers.
           </p>
         </>
       )}

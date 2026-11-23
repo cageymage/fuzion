@@ -235,11 +235,14 @@ type Recipe struct {
 }
 
 // CharacterProfession is one profession a character knows. SkillPoints comes from the
-// highest tier, which on Forever is its only tier; Recipes spans all tiers.
+// highest tier, which on Forever is its only tier; Recipes spans all tiers. Specialization
+// is Blizzard's name for it and is empty when Blizzard reports none, which Forever appears
+// to do for some specialized crafters too.
 type CharacterProfession struct {
-	Name        string
-	SkillPoints int
-	Recipes     []Recipe
+	Name           string
+	SkillPoints    int
+	Specialization string
+	Recipes        []Recipe
 }
 
 // CharacterProfessions returns a character's primary then secondary professions.
@@ -274,6 +277,9 @@ func (c *Client) CharacterProfessions(ctx context.Context, characterSlug string)
 				Name string `json:"name"`
 			} `json:"known_recipes"`
 		} `json:"tiers"`
+		Specialization struct {
+			Name string `json:"name"`
+		} `json:"specialization"`
 	}
 	var body struct {
 		Primaries   []entry `json:"primaries"`
@@ -285,7 +291,7 @@ func (c *Client) CharacterProfessions(ctx context.Context, characterSlug string)
 
 	var professions []CharacterProfession
 	for _, e := range append(body.Primaries, body.Secondaries...) {
-		profession := CharacterProfession{Name: e.Profession.Name}
+		profession := CharacterProfession{Name: e.Profession.Name, Specialization: e.Specialization.Name}
 		for _, tier := range e.Tiers {
 			profession.SkillPoints = max(profession.SkillPoints, tier.SkillPoints)
 			for _, r := range tier.KnownRecipes {

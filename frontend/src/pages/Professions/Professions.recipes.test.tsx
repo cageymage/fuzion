@@ -11,9 +11,9 @@ const aeliana = { id: 'char-1', name: 'Aeliana', secondaryName: 'Dawnsong', clas
 const zephyrion = { id: 'char-2', name: 'Zephyrion', secondaryName: 'Ironhide', class: 'Warrior' }
 
 const professions: ProfessionEntry[] = [
-  { id: 'p1', profession: 'Alchemy', skillLevel: 300, character: aeliana },
-  { id: 'p2', profession: 'Alchemy', skillLevel: 225, character: zephyrion },
-  { id: 'p3', profession: 'Blacksmithing', skillLevel: 300, character: zephyrion },
+  { id: 'p1', profession: 'Alchemy', skillLevel: 300, specialization: null, specializationSource: null, character: aeliana },
+  { id: 'p2', profession: 'Alchemy', skillLevel: 225, specialization: null, specializationSource: null, character: zephyrion },
+  { id: 'p3', profession: 'Blacksmithing', skillLevel: 300, specialization: null, specializationSource: null, character: zephyrion },
 ]
 
 const elixir: Recipe = { id: 2329, name: "Elixir of Lion's Strength", profession: 'Alchemy', characters: [aeliana] }

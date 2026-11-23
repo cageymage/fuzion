@@ -18,7 +18,7 @@
 }
 
 .search {
-  min-width: 260px;
+  min-width: 300px;
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border-strong);
@@ -188,4 +188,51 @@
 .tabCount {
   color: var(--muted);
   font-size: var(--text-meta);
+}
+
+.specializationFilter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 12px 0;
+}
+
+.specializationChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.specializationChip {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-meta);
+  cursor: pointer;
+}
+
+.specializationChip[aria-pressed='true'] {
+  color: var(--gold);
+  background: var(--gold-soft);
+  border-color: var(--gold);
+}
+
+.specializationChip:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.specializationHint {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+
+.specialization {
+  color: var(--muted);
 }

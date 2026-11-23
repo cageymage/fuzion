@@ -5,10 +5,15 @@ export interface ProfessionCharacter {
   class: string
 }
 
+export type SpecializationSource = 'blizzard' | 'manual'
+
 export interface ProfessionEntry {
   id: string
   profession: string
   skillLevel: number
+  specialization: string | null
+  // null without a specialization; a 'blizzard' one cannot be changed by hand.
+  specializationSource: SpecializationSource | null
   character: ProfessionCharacter
 }
 

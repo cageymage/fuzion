@@ -307,8 +307,8 @@ describe('Roster', () => {
     const crafter: Character = {
       ...ragnok,
       professions: [
-        { profession: 'Mining', skillLevel: 300 },
-        { profession: 'Blacksmithing', skillLevel: 225 },
+        { id: 'mining-row', profession: 'Mining', skillLevel: 300, specialization: null, specializationSource: null },
+        { id: 'blacksmithing-row', profession: 'Blacksmithing', skillLevel: 225, specialization: null, specializationSource: null },
       ],
     }
     server.use(http.get('/api/roster', () => HttpResponse.json([crafter])))
@@ -325,7 +325,7 @@ describe('Roster', () => {
   })
 
   it('should show no profession icons when the character has only a secondary profession', async () => {
-    const cook: Character = { ...ragnok, professions: [{ profession: 'Cooking', skillLevel: 300 }] }
+    const cook: Character = { ...ragnok, professions: [{ id: 'cooking-row', profession: 'Cooking', skillLevel: 300, specialization: null, specializationSource: null }] }
     server.use(http.get('/api/roster', () => HttpResponse.json([cook])))
 
     renderWithProviders(<Roster />)

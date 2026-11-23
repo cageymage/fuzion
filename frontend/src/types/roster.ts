@@ -1,3 +1,5 @@
+import type { SpecializationSource } from './professions'
+
 export type Role = 'tank' | 'healer' | 'dps'
 
 export interface CreateCharacterRequest {
@@ -24,8 +26,12 @@ export type UpdateCharacterRequest = Partial<Omit<CreateCharacterRequest, 'role'
 }
 
 export interface CharacterProfession {
+  id: string
   profession: string
   skillLevel: number
+  specialization: string | null
+  // null without a specialization; a 'blizzard' one cannot be changed by hand.
+  specializationSource: SpecializationSource | null
 }
 
 export interface Character {

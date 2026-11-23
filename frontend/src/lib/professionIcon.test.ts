@@ -27,8 +27,8 @@ describe('professionIcon', () => {
 describe('primaryProfessionIcons', () => {
   it('should return an icon for each primary profession in the given order', () => {
     const icons = primaryProfessionIcons([
-      { profession: 'Herbalism', skillLevel: 300 },
-      { profession: 'Alchemy', skillLevel: 225 },
+      { id: 'herbalism-row', profession: 'Herbalism', skillLevel: 300, specialization: null, specializationSource: null },
+      { id: 'alchemy-row', profession: 'Alchemy', skillLevel: 225, specialization: null, specializationSource: null },
     ])
 
     expect(icons.map((icon) => icon.profession)).toEqual(['Herbalism', 'Alchemy'])
@@ -37,8 +37,8 @@ describe('primaryProfessionIcons', () => {
 
   it('should skip secondary professions when the character has both kinds', () => {
     const icons = primaryProfessionIcons([
-      { profession: 'Cooking', skillLevel: 300 },
-      { profession: 'Mining', skillLevel: 150 },
+      { id: 'cooking-row', profession: 'Cooking', skillLevel: 300, specialization: null, specializationSource: null },
+      { id: 'mining-row', profession: 'Mining', skillLevel: 150, specialization: null, specializationSource: null },
     ])
 
     expect(icons.map((icon) => icon.profession)).toEqual(['Mining'])
@@ -46,16 +46,16 @@ describe('primaryProfessionIcons', () => {
 
   it('should return at most two icons when the character has more than two primary professions', () => {
     const icons = primaryProfessionIcons([
-      { profession: 'Mining', skillLevel: 300 },
-      { profession: 'Skinning', skillLevel: 225 },
-      { profession: 'Tailoring', skillLevel: 100 },
+      { id: 'mining-row', profession: 'Mining', skillLevel: 300, specialization: null, specializationSource: null },
+      { id: 'skinning-row', profession: 'Skinning', skillLevel: 225, specialization: null, specializationSource: null },
+      { id: 'tailoring-row', profession: 'Tailoring', skillLevel: 100, specialization: null, specializationSource: null },
     ])
 
     expect(icons.map((icon) => icon.profession)).toEqual(['Mining', 'Skinning'])
   })
 
   it('should return no icons when the character has only secondary professions', () => {
-    expect(primaryProfessionIcons([{ profession: 'Fishing', skillLevel: 75 }])).toEqual([])
+    expect(primaryProfessionIcons([{ id: 'fishing-row', profession: 'Fishing', skillLevel: 75, specialization: null, specializationSource: null }])).toEqual([])
   })
 
   it('should return no icons when the character has no professions', () => {

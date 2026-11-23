@@ -91,12 +91,20 @@ func (r *Repo) syncableCharacters(ctx context.Context) ([]syncableCharacter, err
 }
 
 // upsertFromBlizzard lets Blizzard win for the professions it reports; professions it
-// does not report are left as an officer set them.
+// does not report are left as an officer set them. A specialization it reports replaces
+// the stored one; when it reports none, only one that came from Blizzard is cleared.
 func (r *Repo) upsertFromBlizzard(ctx context.Context, characterID uuid.UUID, known []blizzard.CharacterProfession) error {
 	const upsert = `
-		INSERT INTO professions (id, character_id, profession, skill_level)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (character_id, profession) DO UPDATE SET skill_level = EXCLUDED.skill_level`
+		INSERT INTO professions (id, character_id, profession, skill_level, specialization, specialization_source)
+		VALUES ($1, $2, $3, $4, $5, CASE WHEN $5::text IS NULL THEN NULL ELSE '` + sourceBlizzard + `' END)
+		ON CONFLICT (character_id, profession) DO UPDATE SET
+			skill_level = EXCLUDED.skill_level,
+			specialization = CASE
+				WHEN EXCLUDED.specialization IS NULL AND professions.specialization_source = '` + sourceManual + `'
+				THEN professions.specialization ELSE EXCLUDED.specialization END,
+			specialization_source = CASE
+				WHEN EXCLUDED.specialization IS NULL AND professions.specialization_source = '` + sourceManual + `'
+				THEN professions.specialization_source ELSE EXCLUDED.specialization_source END`
 
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -105,7 +113,7 @@ func (r *Repo) upsertFromBlizzard(ctx context.Context, characterID uuid.UUID, kn
 	defer func() { _ = tx.Rollback() }() // no-op once committed
 
 	for _, p := range known {
-		if _, err := tx.ExecContext(ctx, upsert, uuid.New(), characterID, p.Name, p.SkillPoints); err != nil {
+		if _, err := tx.ExecContext(ctx, upsert, uuid.New(), characterID, p.Name, p.SkillPoints, reportedSpecialization(characterID, p)); err != nil {
 			return fmt.Errorf("upsert profession %q: %w", p.Name, err)
 		}
 		if err := replaceRecipes(ctx, tx, characterID, p); err != nil {
@@ -116,6 +124,18 @@ func (r *Repo) upsertFromBlizzard(ctx context.Context, characterID uuid.UUID, kn
 		return fmt.Errorf("commit professions upsert: %w", err)
 	}
 	return nil
+}
+
+func reportedSpecialization(characterID uuid.UUID, p blizzard.CharacterProfession) *string {
+	if p.Specialization == "" {
+		return nil
+	}
+	name, ok := specializationFromBlizzard(p.Name, p.Specialization)
+	if !ok {
+		slog.Warn("blizzard reports an unknown specialization", "character_id", characterID, "profession", p.Name, "specialization", p.Specialization)
+		return nil
+	}
+	return &name
 }
 
 // replaceRecipes makes the character's recipes for one profession match what Blizzard

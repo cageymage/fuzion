@@ -186,7 +186,7 @@ describe('Legal', () => {
     renderWithProviders(<Legal />)
 
     expect(screen.getByRole('region', { name: 'Privacy policy' })).toHaveTextContent(
-      "Your characters and rank requests: the specs and roles you pick for characters you own, and any rank change request you send, with its optional note, when you sent it and the officer's reply. Officers can see your requests, and each new one is also posted, with your Discord username and note, to the officers' channel on the guild's Discord server.",
+      "Your characters and rank requests: the specs, roles and crafting specializations you pick for characters you own, and any rank change request you send, with its optional note, when you sent it and the officer's reply. Officers can see your requests, and each new one is also posted, with your Discord username and note, to the officers' channel on the guild's Discord server.",
     )
   })
 

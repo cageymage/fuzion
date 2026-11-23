@@ -67,6 +67,38 @@ func TestCharacterProfessions_ReturnsPrimariesAndSecondaries_WhenBlizzardRespond
 	}
 }
 
+func TestCharacterProfessions_ReturnsTheSpecialization_WhenBlizzardReportsOne(t *testing.T) {
+	// given a Blizzard that reports an engineer with a specialization
+	body, err := os.ReadFile("testdata/professions_specialized.json")
+	if err != nil {
+		t.Fatalf("read professions fixture: %v", err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"access_token":"app-token"}`))
+	})
+	mux.HandleFunc("GET /profile/wow/character/thorns-star/professions", func(w http.ResponseWriter, r *http.Request) {
+		w.Write(body)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	client := professionsClient(srv)
+
+	// when I ask for the professions of thorns-star
+	got, err := client.CharacterProfessions(context.Background(), "thorns-star")
+
+	// then I expect Engineering with the specialization as Blizzard names it
+	if err != nil {
+		t.Fatalf("CharacterProfessions: %v", err)
+	}
+	want := []blizzard.CharacterProfession{
+		{Name: "Engineering", SkillPoints: 268, Specialization: "Gnomish Engineer", Recipes: []blizzard.Recipe{{ID: 5066, Name: "Gnomish Universal Remote"}}},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected professions (-want +got):\n%s", diff)
+	}
+}
+
 func TestCharacterProfessions_RequestsTheCharacterSlugInTheConfiguredNamespace(t *testing.T) {
 	// given a Blizzard that records the request path
 	srv, gotPath := newFakeProfessions(t, http.StatusOK)

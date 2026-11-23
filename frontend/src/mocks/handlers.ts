@@ -209,7 +209,7 @@ const myCharacters: Character[] = [
     faction: 'Horde',
     gender: null,
     createdAt: '2026-10-01T12:00:00Z',
-    professions: [{ profession: 'Mining', skillLevel: 300 }],
+    professions: [{ id: 'mining-row', profession: 'Mining', skillLevel: 300, specialization: null, specializationSource: null }],
   },
   {
     id: 'mine-2',
@@ -287,7 +287,7 @@ const rosterCharacters: Character[] = [
     faction: 'Horde',
     gender: null,
     createdAt: new Date().toISOString(),
-    professions: [{ profession: 'Mining', skillLevel: 300 }, { profession: 'Blacksmithing', skillLevel: 275 }],
+    professions: [{ id: 'mining-row', profession: 'Mining', skillLevel: 300, specialization: null, specializationSource: null }, { id: 'blacksmithing-row', profession: 'Blacksmithing', skillLevel: 275, specialization: null, specializationSource: null }],
   },
   {
     id: 'char-2',
@@ -308,7 +308,7 @@ const rosterCharacters: Character[] = [
     faction: 'Horde',
     gender: null,
     createdAt: new Date().toISOString(),
-    professions: [{ profession: 'Herbalism', skillLevel: 225 }, { profession: 'Alchemy', skillLevel: 150 }],
+    professions: [{ id: 'herbalism-row', profession: 'Herbalism', skillLevel: 225, specialization: null, specializationSource: null }, { id: 'alchemy-row', profession: 'Alchemy', skillLevel: 150, specialization: null, specializationSource: null }],
   },
   {
     id: 'char-3',
@@ -441,12 +441,16 @@ const professionEntries: ProfessionEntry[] = [
     id: 'profession-1',
     profession: 'Alchemy',
     skillLevel: 300,
+    specialization: null,
+    specializationSource: null,
     character: { id: 'char-1', name: 'Aeliana', secondaryName: 'Dawnsong', class: 'Priest' },
   },
   {
     id: 'profession-2',
     profession: 'Blacksmithing',
     skillLevel: 225,
+    specialization: null,
+    specializationSource: null,
     character: { id: 'char-2', name: 'Zephyrion', secondaryName: 'Ironhide', class: 'Warrior' },
   },
 ]
@@ -634,6 +638,14 @@ export const handlers = [
   ),
   http.delete('/api/news/:id', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/professions', () => HttpResponse.json(professionEntries)),
+  http.patch('/api/professions/:id/specialization', async ({ request }) => {
+    const { specialization } = (await request.json()) as { specialization: string | null }
+    return HttpResponse.json({
+      ...professionEntries[1],
+      specialization,
+      specializationSource: specialization === null ? null : 'manual',
+    })
+  }),
   http.get('/api/recipes', ({ request }) => {
     const params = new URL(request.url).searchParams
     const q = (params.get('q') ?? '').toLowerCase()

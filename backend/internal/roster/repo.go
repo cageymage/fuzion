@@ -36,9 +36,12 @@ type Character struct {
 }
 
 type CharacterProfession struct {
-	ID         uuid.UUID `json:"id"`
-	Profession string    `json:"profession"`
-	SkillLevel int       `json:"skillLevel"`
+	ID             uuid.UUID `json:"id"`
+	Profession     string    `json:"profession"`
+	SkillLevel     int       `json:"skillLevel"`
+	Specialization *string   `json:"specialization"`
+	// "blizzard" or "manual"; nil without a specialization.
+	SpecializationSource *string `json:"specializationSource"`
 }
 
 type Repo struct {
@@ -87,16 +90,18 @@ func (r *Repo) list(ctx context.Context, owner *uuid.UUID) ([]Character, error) 
 // Characters without any are absent from the map, so callers get empty slices.
 func (r *Repo) professionsByCharacter(ctx context.Context, only *uuid.UUID) (map[uuid.UUID][]CharacterProfession, error) {
 	const query = `
-		SELECT id, character_id, profession, skill_level
+		SELECT id, character_id, profession, skill_level, specialization, specialization_source
 		FROM professions
 		WHERE $1::uuid IS NULL OR character_id = $1
 		ORDER BY skill_level DESC, profession ASC`
 
 	var rows []struct {
-		ID          uuid.UUID `db:"id"`
-		CharacterID uuid.UUID `db:"character_id"`
-		Profession  string    `db:"profession"`
-		SkillLevel  int       `db:"skill_level"`
+		ID                   uuid.UUID `db:"id"`
+		CharacterID          uuid.UUID `db:"character_id"`
+		Profession           string    `db:"profession"`
+		SkillLevel           int       `db:"skill_level"`
+		Specialization       *string   `db:"specialization"`
+		SpecializationSource *string   `db:"specialization_source"`
 	}
 	if err := r.db.SelectContext(ctx, &rows, query, only); err != nil {
 		return nil, fmt.Errorf("select professions: %w", err)
@@ -104,7 +109,10 @@ func (r *Repo) professionsByCharacter(ctx context.Context, only *uuid.UUID) (map
 
 	byCharacter := make(map[uuid.UUID][]CharacterProfession)
 	for _, row := range rows {
-		byCharacter[row.CharacterID] = append(byCharacter[row.CharacterID], CharacterProfession{ID: row.ID, Profession: row.Profession, SkillLevel: row.SkillLevel})
+		byCharacter[row.CharacterID] = append(byCharacter[row.CharacterID], CharacterProfession{
+			ID: row.ID, Profession: row.Profession, SkillLevel: row.SkillLevel,
+			Specialization: row.Specialization, SpecializationSource: row.SpecializationSource,
+		})
 	}
 	return byCharacter, nil
 }
