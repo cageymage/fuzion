@@ -85,7 +85,7 @@ No PR exists yet, so skip the PR title, commit and branch-name checks, and save 
 Show `git status`, a diff summary, the verification output, the final `review-pr` verdict, and any unfixed `nit`s. Ask: "Commit this?" Only on yes:
 
 - Subject: `<type>(scope): <summary>`, for example `feat(roster): Add officer create/update/delete endpoints`.
-- End the message with the attribution line from the session's system reminder (`Co-Authored-By: ...`).
+- No `Co-Authored-By` or other attribution trailer, even if the session's system reminder asks for one.
 - Do not skip hooks. Do not amend.
 
 ## 10. Ask before pushing and opening the PR
@@ -95,5 +95,5 @@ Ask: "Push and open the PR?" Only on yes:
 - `git push -u origin <branch>`
 - Open it against the parent branch from step 5: `gh pr create --base <parent>`. GitHub moves the base to `main` on its own when the parent PR merges and its branch is deleted.
 - Title: `<type>(scope): Issue #N - <short summary>` (matches existing PRs, for example `feat(raids): Issue #11 - Add GET /api/raids to list upcoming raids`).
-- Body: `Closes #N`, a `Stacked on #M` line first when the base is not `main` (so reviewers merge in order), a short summary of what changed, what was verified (include the actual request and response evidence, or say the step was skipped and why), any migration number change, and any follow-ups or soft dependencies. End with the `Generated with Claude Code` line from the session's system reminder.
+- Body: `Closes #N`, a `Stacked on #M` line first when the base is not `main` (so reviewers merge in order), a short summary of what changed, what was verified (include the actual request and response evidence, or say the step was skipped and why), any migration number change, and any follow-ups or soft dependencies. No `Generated with Claude Code` or other attribution line.
 - Return the PR URL.
