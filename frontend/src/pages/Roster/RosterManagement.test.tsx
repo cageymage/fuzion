@@ -588,6 +588,62 @@ describe('Roster management unset role', () => {
     expect(await dialog.findByRole('alert')).toHaveTextContent('specialization comes from Battle.net')
   })
 
+  it('should save the character before its specialization when an officer changes both', async () => {
+    signInAs(officer)
+    serveRoster([{ ...ragnok, professions: [smithing] }])
+    const sent: unknown[] = []
+    server.use(
+      http.patch('/api/roster/:id', async ({ request, params }) => {
+        sent.push({ character: params.id, body: await request.json() })
+        return HttpResponse.json(ragnok)
+      }),
+      http.patch('/api/professions/:id/specialization', async ({ request, params }) => {
+        sent.push({ profession: params.id, body: await request.json() })
+        return HttpResponse.json({})
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    const dialog = await openEditDialog(user, 'Ragnok')
+    await user.clear(dialog.getByLabelText('Raid team'))
+    await user.type(dialog.getByLabelText('Raid team'), 'Team Beta')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Blacksmithing specialization' }), 'Armorsmith')
+
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(sent).toEqual([
+      { character: 'char-1', body: { raidTeam: 'Team Beta' } },
+      { profession: 'smith-row', body: { specialization: 'Armorsmith' } },
+    ])
+  })
+
+  it('should show the saved character in the roster when only its specialization fails to save', async () => {
+    signInAs(officer)
+    let stored: Character = { ...ragnok, professions: [smithing] }
+    server.use(
+      http.get('/api/roster', () => HttpResponse.json([stored])),
+      http.patch('/api/roster/:id', () => {
+        stored = { ...stored, raidTeam: 'Team Beta' }
+        return HttpResponse.json(stored)
+      }),
+      http.patch('/api/professions/:id/specialization', () =>
+        HttpResponse.json({ error: 'specialization comes from Battle.net' }, { status: 409 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    const dialog = await openEditDialog(user, 'Ragnok')
+    await user.clear(dialog.getByLabelText('Raid team'))
+    await user.type(dialog.getByLabelText('Raid team'), 'Team Beta')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Blacksmithing specialization' }), 'Armorsmith')
+
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    expect(await dialog.findByRole('alert')).toHaveTextContent('specialization comes from Battle.net')
+    expect(await screen.findByText('Team Beta')).toBeInTheDocument()
+  })
+
   it('should disable the specialization picker when the value comes from Battle.net', async () => {
     signInAs(officer)
     serveRoster([

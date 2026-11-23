@@ -417,6 +417,25 @@ func TestSyncBlizzardProfessions_ClearsTheBlizzardSpecialization_WhenBlizzardSto
 	}
 }
 
+func TestSyncBlizzardProfessions_ClearsTheBlizzardSpecialization_WhenBlizzardReportsAnUnknownOne(t *testing.T) {
+	// given a specialization from an earlier sync and a Blizzard reporting a name the site does not know
+	db := testutil.DB(t)
+	seedEngineer(db)
+	setSpecialization(db, terrorskullEngineering, "Goblin", "blizzard")
+	srv := newFakeBlizzardEngineer(t, "Titan Engineer")
+
+	// when the professions sync runs
+	err := runProfessionsSync(db, srv)
+
+	// then I expect no error and the value cleared
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if diff := cmp.Diff(storedSpecialization{}, specializationOf(t, db, terrorskullEngineering)); diff != "" {
+		t.Errorf("unexpected stored specialization (-want +got):\n%s", diff)
+	}
+}
+
 func TestSyncBlizzardProfessions_KeepsTheManualSpecialization_WhenBlizzardReportsAnUnknownOne(t *testing.T) {
 	// given a Goblin specialization set by hand and a Blizzard reporting a name the site does not know
 	db := testutil.DB(t)

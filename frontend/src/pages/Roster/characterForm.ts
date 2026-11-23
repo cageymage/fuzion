@@ -24,8 +24,7 @@ export interface CharacterFormValues {
   primaryProfession1: string
   primaryProfession2: string
   secondaryProfessions: string[]
-  // Only the ones edited here, keyed by profession name; an empty string clears it. Stored
-  // values are not copied in, so a refetch while editing cannot turn them into changes.
+  // Only the ones edited here, keyed by profession name; an empty string clears it.
   specializations: Record<string, string>
 }
 

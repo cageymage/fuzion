@@ -18,6 +18,7 @@ import (
 var (
 	ErrNotOwner     = errors.New("character is not yours")
 	ErrFromBlizzard = errors.New("specialization comes from Battle.net")
+	ErrChanged      = errors.New("profession changed while saving, try again")
 )
 
 const (
@@ -67,6 +68,9 @@ func (s *Service) SetSpecialization(ctx context.Context, user auth.User, id uuid
 	if err != nil {
 		return Profession{}, err
 	}
+	if target.Source != nil && *target.Source == sourceBlizzard {
+		return Profession{}, ErrFromBlizzard
+	}
 	updated, err := s.repo.setManualSpecialization(ctx, id, target.Profession, specialization)
 	if err != nil {
 		return Profession{}, fmt.Errorf("set specialization of %s: %w", id, err)
@@ -94,12 +98,13 @@ func parseSpecialization(profession string, raw json.RawMessage) (*string, error
 
 type specializationTarget struct {
 	Profession string     `db:"profession"`
+	Source     *string    `db:"specialization_source"`
 	OwnerID    *uuid.UUID `db:"user_id"`
 }
 
 func (r *Repo) specializationTarget(ctx context.Context, id uuid.UUID) (specializationTarget, error) {
 	const query = `
-		SELECT p.profession, c.user_id
+		SELECT p.profession, p.specialization_source, c.user_id
 		FROM professions p
 		JOIN characters c ON c.id = p.character_id
 		WHERE p.id = $1`
@@ -133,7 +138,7 @@ func (r *Repo) setManualSpecialization(ctx context.Context, id uuid.UUID, profes
 	var updated row
 	if err := r.db.GetContext(ctx, &updated, query, id, profession, specialization); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return Profession{}, ErrFromBlizzard
+			return Profession{}, ErrChanged
 		}
 		return Profession{}, fmt.Errorf("write specialization: %w", err)
 	}

@@ -117,6 +117,8 @@ func writeError(w http.ResponseWriter, r *http.Request, action string, err error
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": ErrNotOwner.Error()})
 	case errors.Is(err, ErrFromBlizzard):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrFromBlizzard.Error()})
+	case errors.Is(err, ErrChanged):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": ErrChanged.Error()})
 	case errors.Is(err, ErrUnknownCharacter):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ErrUnknownCharacter.Error()})
 	default:

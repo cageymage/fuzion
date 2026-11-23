@@ -18,7 +18,7 @@
 }
 
 .search {
-  min-width: 300px;
+  width: min(300px, 100%);
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border-strong);
