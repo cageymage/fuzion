@@ -234,11 +234,11 @@ describe('Professions', () => {
     renderWithProviders(<Professions />)
 
     const alchemy = await screen.findByRole('tab', { name: 'Alchemy (2)' })
-    expect(alchemy.querySelector('img')).toHaveAttribute(
+    expect(within(alchemy).getByRole('presentation')).toHaveAttribute(
       'src',
       'https://render.worldofwarcraft.com/us/icons/36/trade_alchemy.jpg',
     )
-    expect(screen.getByRole('tab', { name: 'Cooking (1)' }).querySelector('img')).toHaveAttribute(
+    expect(within(screen.getByRole('tab', { name: 'Cooking (1)' })).getByRole('presentation')).toHaveAttribute(
       'src',
       'https://render.worldofwarcraft.com/us/icons/36/inv_misc_food_15.jpg',
     )

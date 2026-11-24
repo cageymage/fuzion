@@ -89,7 +89,7 @@ export function ProfessionTabs({ rows, rowLabels, dividerBefore, counts, selecte
                     if (!disabled) onSelect(profession)
                   }}
                 >
-                  {icon && <img className={styles.tabIcon} src={icon} alt="" width={20} height={20} />}
+                  {icon && <img className={styles.tabIcon} src={icon} alt="" width={20} height={20} loading="lazy" />}
                   {profession} <span className={styles.tabCount}>({count})</span>
                 </button>
               </Fragment>
