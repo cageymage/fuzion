@@ -43,25 +43,25 @@ describe('Professions', () => {
     expect(await screen.findByRole('tab', { name: 'Cooking (1)' })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('should list primary and secondary professions in separate tab rows', async () => {
+  it('should list crafting professions in their own row and gathering and secondary professions in the next row', async () => {
     respondWith([...professions, cookingAeliana])
 
     renderWithProviders(<Professions />)
 
-    const primary = await screen.findByRole('tablist', { name: 'Primary professions' })
-    const secondary = screen.getByRole('tablist', { name: 'Secondary professions' })
-    expect(within(primary).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+    const crafting = await screen.findByRole('tablist', { name: 'Crafting professions' })
+    const secondary = screen.getByRole('tablist', { name: 'Gathering and secondary professions' })
+    expect(within(crafting).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Alchemy (2)',
       'Blacksmithing (1)',
       'Enchanting (0)',
       'Engineering (0)',
-      'Herbalism (0)',
       'Leatherworking (0)',
-      'Mining (0)',
-      'Skinning (0)',
       'Tailoring (0)',
     ])
     expect(within(secondary).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Herbalism (0)',
+      'Mining (0)',
+      'Skinning (0)',
       'Cooking (1)',
       'Fishing (0)',
       'First Aid (0)',
@@ -215,6 +215,33 @@ describe('Professions', () => {
     await user.keyboard('{ArrowLeft}')
 
     expect(screen.getByRole('tab', { name: 'Blacksmithing (1)' })).toHaveFocus()
+  })
+
+  it('should show a divider between gathering and secondary professions when the tabs render', async () => {
+    respondWith([...professions, cookingAeliana])
+
+    renderWithProviders(<Professions />)
+
+    const secondary = await screen.findByRole('tablist', { name: 'Gathering and secondary professions' })
+    const divider = secondary.querySelector('[aria-hidden="true"]')
+    expect(divider?.previousElementSibling).toHaveTextContent('Skinning (0)')
+    expect(divider?.nextElementSibling).toHaveTextContent('Cooking (1)')
+  })
+
+  it('should show the Blizzard profession icon inside each tab without changing its accessible name', async () => {
+    respondWith([...professions, cookingAeliana])
+
+    renderWithProviders(<Professions />)
+
+    const alchemy = await screen.findByRole('tab', { name: 'Alchemy (2)' })
+    expect(alchemy.querySelector('img')).toHaveAttribute(
+      'src',
+      'https://render.worldofwarcraft.com/us/icons/36/trade_alchemy.jpg',
+    )
+    expect(screen.getByRole('tab', { name: 'Cooking (1)' }).querySelector('img')).toHaveAttribute(
+      'src',
+      'https://render.worldofwarcraft.com/us/icons/36/inv_misc_food_15.jpg',
+    )
   })
 
   it('should make the first enabled secondary tab a tab stop when the selection is in the primary row', async () => {

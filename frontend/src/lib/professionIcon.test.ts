@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { primaryProfessionIcons, professionIcon } from './professionIcon'
+import { anyProfessionIcon, primaryProfessionIcons, professionIcon } from './professionIcon'
+
+describe('anyProfessionIcon', () => {
+  it('should return the Blizzard icon url when the profession is a secondary profession', () => {
+    expect(anyProfessionIcon('First Aid')).toBe(
+      'https://render.worldofwarcraft.com/us/icons/36/spell_holy_sealofsacrifice.jpg',
+    )
+  })
+
+  it('should return the Blizzard icon url when the profession is a primary profession', () => {
+    expect(anyProfessionIcon('Mining')).toBe('https://render.worldofwarcraft.com/us/icons/36/trade_mining.jpg')
+  })
+
+  it('should return null when the profession is not known', () => {
+    expect(anyProfessionIcon('Basket Weaving')).toBeNull()
+  })
+})
 
 describe('professionIcon', () => {
   it('should return the Blizzard icon url when the profession is a primary trade profession', () => {

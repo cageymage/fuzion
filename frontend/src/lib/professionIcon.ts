@@ -16,6 +16,17 @@ const primaryIconNames: Record<PrimaryProfession, string> = {
   Tailoring: 'trade_tailoring',
 }
 
+const secondaryIconNames: Record<string, string> = {
+  Cooking: 'inv_misc_food_15',
+  Fishing: 'trade_fishing',
+  'First Aid': 'spell_holy_sealofsacrifice',
+}
+
+export function anyProfessionIcon(profession: string): string | null {
+  const name = secondaryIconNames[profession]
+  return name ? `${iconBaseUrl}/${name}.jpg` : professionIcon(profession)
+}
+
 export interface ProfessionIcon {
   profession: string
   iconUrl: string

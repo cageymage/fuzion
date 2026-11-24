@@ -1,4 +1,5 @@
-import { useRef, type KeyboardEvent } from 'react'
+import { Fragment, useRef, type KeyboardEvent } from 'react'
+import { anyProfessionIcon } from '../../lib/professionIcon'
 import styles from './Professions.module.css'
 
 export const professionPanelId = 'professions-panel'
@@ -10,12 +11,13 @@ export function professionTabId(profession: string): string {
 interface ProfessionTabsProps {
   rows: readonly (readonly string[])[]
   rowLabels: readonly string[]
+  dividerBefore?: string
   counts: Readonly<Record<string, number>>
   selected: string | null
   onSelect: (profession: string) => void
 }
 
-export function ProfessionTabs({ rows, rowLabels, counts, selected, onSelect }: ProfessionTabsProps) {
+export function ProfessionTabs({ rows, rowLabels, dividerBefore, counts, selected, onSelect }:ProfessionTabsProps) {
   const tabs = useRef(new Map<string, HTMLButtonElement>())
 
   function moveWithinRow(row: readonly string[], event: KeyboardEvent<HTMLDivElement>) {
@@ -53,11 +55,12 @@ export function ProfessionTabs({ rows, rowLabels, counts, selected, onSelect }: 
           key={rowLabels[index]}
           role="tablist"
           aria-label={rowLabels[index]}
-          className={styles.tabRow}
+          className={index === rows.length - 1 ? `${styles.tabRow} ${styles.tabRowLast}` : styles.tabRow}
           onKeyDown={(event) => moveWithinRow(row, event)}
         >
           {row.map((profession) => {
             const count = counts[profession] ?? 0
+            const icon = anyProfessionIcon(profession)
             const disabled = count === 0
             const isSelected = profession === selected
             const rowHasSelection = selected !== null && row.includes(selected)
@@ -65,26 +68,31 @@ export function ProfessionTabs({ rows, rowLabels, counts, selected, onSelect }: 
               ? isSelected
               : profession === row.find((candidate) => (counts[candidate] ?? 0) > 0)
             return (
-              <button
-                key={profession}
-                ref={(element) => {
-                  if (element) tabs.current.set(profession, element)
-                  else tabs.current.delete(profession)
-                }}
-                type="button"
-                role="tab"
-                id={professionTabId(profession)}
-                aria-selected={isSelected}
-                aria-controls={isSelected ? professionPanelId : undefined}
-                aria-disabled={disabled}
-                tabIndex={isRowStop ? 0 : -1}
-                className={styles.tab}
-                onClick={() => {
-                  if (!disabled) onSelect(profession)
-                }}
-              >
-                {profession} <span className={styles.tabCount}>({count})</span>
-              </button>
+              <Fragment key={profession}>
+                {profession === dividerBefore && (
+                  <span aria-hidden="true" className={styles.tabDivider} />
+                )}
+                <button
+                  ref={(element) => {
+                    if (element) tabs.current.set(profession, element)
+                    else tabs.current.delete(profession)
+                  }}
+                  type="button"
+                  role="tab"
+                  id={professionTabId(profession)}
+                  aria-selected={isSelected}
+                  aria-controls={isSelected ? professionPanelId : undefined}
+                  aria-disabled={disabled}
+                  tabIndex={isRowStop ? 0 : -1}
+                  className={styles.tab}
+                  onClick={() => {
+                    if (!disabled) onSelect(profession)
+                  }}
+                >
+                  {icon && <img className={styles.tabIcon} src={icon} alt="" width={20} height={20} />}
+                  {profession} <span className={styles.tabCount}>({count})</span>
+                </button>
+              </Fragment>
             )
           })}
         </div>
