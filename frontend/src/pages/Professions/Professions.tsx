@@ -7,13 +7,13 @@ import { CrafterResults } from './CrafterResults'
 import { crafterKey, groupProfessions } from './groupProfessions'
 import { professionPanelId, ProfessionTabs, professionTabId } from './ProfessionTabs'
 import { SpecializationFilter } from './SpecializationFilter'
-import { resolveSelectedTab, tabRows } from './tabSelection'
+import { resolveSelectedTab, secondaryDividerBefore, tabRows } from './tabSelection'
 import styles from './Professions.module.css'
 import { useProfessionsData } from './useProfessionsData'
 import { useRecipes } from './useRecipes'
 
 const minRecipeSearchLength = 2
-const tabRowLabels = ['Primary professions', 'Secondary professions']
+const tabRowLabels = ['Crafting professions', 'Gathering and secondary professions']
 
 export function Professions() {
   const professions = useProfessionsData()
@@ -88,6 +88,7 @@ export function Professions() {
         <ProfessionTabs
           rows={tabRows}
           rowLabels={tabRowLabels}
+          dividerBefore={secondaryDividerBefore}
           counts={counts}
           selected={activeTab}
           onSelect={selectTab}

@@ -11,7 +11,18 @@ export const primaryProfessions = [
   'Tailoring',
 ] as const
 
-export const secondaryProfessions = ['Cooking', 'Fishing', 'First Aid'] as const
+export const craftingProfessions = [
+  'Alchemy',
+  'Blacksmithing',
+  'Enchanting',
+  'Engineering',
+  'Leatherworking',
+  'Tailoring',
+] as const
+
+export const gatheringProfessions = ['Herbalism', 'Mining', 'Skinning'] as const
+
+export const secondaryProfessions =['Cooking', 'Fishing', 'First Aid'] as const
 
 export type PrimaryProfession = (typeof primaryProfessions)[number]
 
