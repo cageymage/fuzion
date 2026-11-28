@@ -88,11 +88,11 @@ func TestGuildRoster_ParsesMembers_WhenBlizzardResponds(t *testing.T) {
 		t.Fatalf("GuildRoster: %v", err)
 	}
 	want := []blizzard.RosterMember{
-		{Name: "Mosshorn", Surname: "Rebelfist", Level: 7, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 6, Race: "Tauren"},
-		{Name: "Terrorskull", Surname: "Gloomstep", Level: 14, Rank: 1, ClassID: 4, Class: "Rogue", RaceID: 5, Race: "Undead"},
-		{Name: "Kirk", Surname: "Bear", Level: 1, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 96, Race: "Skyborne (Windshaper)"},
-		{Name: "Kirk", Surname: "Fel", Level: 11, Rank: 3, ClassID: 9, Class: "Warlock", RaceID: 2, Race: "Orc"},
-		{Name: "Testdk", Surname: "Grave", Level: 90, Rank: 5, ClassID: 6, Class: "", RaceID: 1, Race: "Human"},
+		{ID: 135038, Name: "Mosshorn", Surname: "Rebelfist", Level: 7, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 6, Race: "Tauren"},
+		{ID: 163709, Name: "Terrorskull", Surname: "Gloomstep", Level: 14, Rank: 1, ClassID: 4, Class: "Rogue", RaceID: 5, Race: "Undead"},
+		{ID: 3675173, Name: "Kirk", Surname: "Bear", Level: 1, Rank: 3, ClassID: 11, Class: "Druid", RaceID: 96, Race: "Skyborne (Windshaper)"},
+		{ID: 6741966, Name: "Kirk", Surname: "Fel", Level: 11, Rank: 3, ClassID: 9, Class: "Warlock", RaceID: 2, Race: "Orc"},
+		{ID: 9999, Name: "Testdk", Surname: "Grave", Level: 90, Rank: 5, ClassID: 6, Class: "", RaceID: 1, Race: "Human"},
 	}
 	if diff := cmp.Diff(want, members); diff != "" {
 		t.Errorf("unexpected members (-want +got):\n%s", diff)

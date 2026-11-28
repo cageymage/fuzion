@@ -52,6 +52,8 @@ type Config struct {
 // RosterMember is one guild member. Class is empty when the class id is not one the
 // site supports; ClassID is kept so a caller can say which one it skipped.
 type RosterMember struct {
+	// ID is Blizzard's character ID, which is expected to stay the same through a rename.
+	ID      int64
 	Name    string
 	Surname string
 	Level   int
@@ -104,6 +106,7 @@ func (c *Client) GuildRoster(ctx context.Context, guildSlug string) ([]RosterMem
 	var body struct {
 		Members []struct {
 			Character struct {
+				ID            int64  `json:"id"`
 				Name          string `json:"name"`
 				Level         int    `json:"level"`
 				Surname       string `json:"surname"`
@@ -124,6 +127,7 @@ func (c *Client) GuildRoster(ctx context.Context, guildSlug string) ([]RosterMem
 	members := make([]RosterMember, 0, len(body.Members))
 	for _, m := range body.Members {
 		members = append(members, RosterMember{
+			ID:      m.Character.ID,
 			Name:    m.Character.Name,
 			Surname: m.Character.Surname,
 			Level:   m.Character.Level,

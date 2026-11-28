@@ -81,7 +81,15 @@ then run `npx dotenv -e .env -e .env.example -- go run -C backend ./cmd/sync you
 `sync blizzard-roster` pulls the guild roster from Blizzard once an hour and
 is off until `SYNC_BLIZZARD_ROSTER_ENABLED=true`. For each member it adds the
 character if the roster lacks it, or refreshes class, level, race and guild rank if
-it exists (matched on name and surname, ignoring case; Forever has no realms). A row left
+it exists. Every member is first matched on Blizzard's character ID, which is expected to
+stay the same through a rename (not yet confirmed against a real rename), so a renamed
+character keeps its row with its owner, specs, raid team and rank requests, and the new
+name replaces the old one (counted as `N renamed` in the `sync_log` message). If another
+row already has the new name, the rename is skipped and listed as
+`N rename skipped (Old Name to New Name)` for an officer to sort out. A member whose ID
+matches no row is then matched on name and surname, ignoring case (Forever has no realms),
+which stores the ID or replaces an old one; a row whose ID belongs to another member in
+the same roster is never taken over this way. A row left
 with the secondary name `Unset` by an earlier sync takes the surname on first match.
 Race is set from the
 roster when its id is known (Classic races and Skyborne (Windshaper), id 96; Skyborne
