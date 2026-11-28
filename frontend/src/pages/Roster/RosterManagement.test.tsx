@@ -671,3 +671,75 @@ describe('Roster management unset role', () => {
     expect(dialog.queryByRole('combobox', { name: 'Blacksmithing specialization' })).not.toBeInTheDocument()
   })
 })
+
+describe('Roster management optional spec', () => {
+  it('should save another field without sending a spec when an officer edits a character that has none', async () => {
+    signInAs(officer)
+    const calls = serveRoster([{ ...ragnok, spec: null }])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    const dialog = await openEditDialog(user, 'Ragnok')
+
+    await user.clear(dialog.getByLabelText('Raid team'))
+    await user.type(dialog.getByLabelText('Raid team'), 'Team Beta')
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(calls.updated).toEqual([{ id: 'char-1', body: { raidTeam: 'Team Beta' } }])
+  })
+
+  it('should save a crafting specialization when an officer edits a character that has no spec', async () => {
+    signInAs(officer)
+    const calls = serveRoster([{ ...ragnok, spec: null, professions: [smithing] }])
+    const sent: unknown[] = []
+    server.use(
+      http.patch('/api/professions/:id/specialization', async ({ request, params }) => {
+        sent.push({ id: params.id, body: await request.json() })
+        return HttpResponse.json({})
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    const dialog = await openEditDialog(user, 'Ragnok')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Blacksmithing specialization' }), 'Armorsmith')
+
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(sent).toEqual([{ id: 'smith-row', body: { specialization: 'Armorsmith' } }])
+    expect(calls.updated).toEqual([])
+  })
+
+  it('should keep the dialog open without saving when an officer clears the spec of a character that has one', async () => {
+    signInAs(officer)
+    const calls = serveRoster([ragnok])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    const dialog = await openEditDialog(user, 'Ragnok')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Spec' }), 'Select spec')
+
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    expect(screen.getByRole('dialog', { name: 'Edit Ragnok' })).toBeInTheDocument()
+    expect(dialog.getByRole('combobox', { name: 'Spec' })).toBeInvalid()
+    expect(calls.updated).toEqual([])
+  })
+
+  it('should keep the add dialog open without saving when an officer adds a character with no spec', async () => {
+    signInAs(officer)
+    const calls = serveRoster([ragnok])
+    const user = userEvent.setup()
+    renderWithProviders(<Roster />)
+    const dialog = await openAddDialog(user)
+    await user.type(dialog.getByLabelText('Name'), 'Aeliana')
+    await user.type(dialog.getByLabelText('Secondary name'), 'Stormwind')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Class' }), 'Priest')
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Role' }), 'healer')
+
+    await user.click(dialog.getByRole('button', { name: 'Save character' }))
+
+    expect(screen.getByRole('dialog', { name: 'Add character' })).toBeInTheDocument()
+    expect(dialog.getByRole('combobox', { name: 'Spec' })).toBeInvalid()
+    expect(calls.created).toEqual([])
+  })
+})
