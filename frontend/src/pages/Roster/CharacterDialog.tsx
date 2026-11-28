@@ -34,6 +34,9 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
   const [values, setValues] = useState<CharacterFormValues>(initial)
   const mutation = character ? update : create
   const specs = specsFor(values.class)
+  // The roster sync creates characters with no spec, so editing one must not demand a spec
+  // first; a character that has one still cannot have it blanked by accident.
+  const specRequired = !character || initial.spec !== ''
 
   function change(changes: Partial<CharacterFormValues>) {
     setValues({ ...values, ...changes })
@@ -128,7 +131,7 @@ export function CharacterDialog({ character, onClose }: CharacterDialogProps) {
         <label className={styles.field}>
           <span>Spec</span>
           <select
-            required
+            required={specRequired}
             disabled={specs.length === 0}
             value={values.spec}
             onChange={(event) => change({ spec: event.target.value })}
