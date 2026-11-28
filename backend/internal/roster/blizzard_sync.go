@@ -2,6 +2,7 @@ package roster
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"maps"
@@ -36,11 +37,18 @@ type UpsertResult struct {
 	// RankRequestsClosed counts open rank change requests the run found already carried
 	// out in game.
 	RankRequestsClosed int
+	// Renamed counts characters Blizzard renamed, matched by their Blizzard ID.
+	Renamed int
+	// RenamesSkipped names renames that were not applied because another character already
+	// has the new name, as "Old Name to New Name", for an officer to sort out.
+	RenamesSkipped []string
 }
 
-// UpsertFromBlizzard makes the guild's members match Blizzard's list. Characters are
-// matched on name and surname, ignoring case. For existing characters only class, level,
-// race, guild rank and left_guild_at are written; role, spec, raid team and owner
+// UpsertFromBlizzard makes the guild's members match Blizzard's list. Every member is
+// first matched on Blizzard's character ID, which is expected to survive a rename, so a
+// renamed character keeps its row and takes the new name. Members whose ID matches no row
+// are then matched on name and surname, ignoring case, which stores or replaces the ID.
+// For existing characters only class, level, race, guild rank and left_guild_at are written; role, spec, raid team and owner
 // belong to officers and members, and new characters start with no role or spec for
 // their owner to choose. Main/alt always follows the guild rank, so a rank change in
 // game moves the character and closes an open rank change request it carries out. A
@@ -55,19 +63,40 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 			is_main       = $7,
 			left_guild_at = NULL`
 
-	const update = `UPDATE characters SET ` + setFromBlizzard + `
-		WHERE lower(name) = lower($1) AND lower(secondary_name) = lower($2)`
+	const findByBlizzardID = `SELECT id, name, secondary_name FROM characters WHERE blizzard_id = $1`
 
-	const fillInSurname = `UPDATE characters SET secondary_name = $2, ` + setFromBlizzard + `
+	const nameTakenByAnother = `
+		SELECT EXISTS (
+			SELECT 1 FROM characters
+			WHERE id <> $1 AND lower(name) = lower($2) AND lower(secondary_name) = lower($3)
+		)`
+
+	const updateByID = `UPDATE characters SET name = $1, secondary_name = $2, ` + setFromBlizzard + `
+		WHERE id = $8`
+
+	// A row whose stored ID belongs to someone in this roster is that member's character,
+	// so a name match must not take it over. Updating one row, preferring the exact
+	// casing, keeps two rows that differ only in case from both claiming the same ID.
+	const notClaimedByRoster = `(blizzard_id IS NULL OR NOT (blizzard_id = ANY($9::bigint[])))`
+
+	const update = `UPDATE characters SET blizzard_id = COALESCE($8, blizzard_id), ` + setFromBlizzard + `
 		WHERE id = (
 			SELECT id FROM characters
-			WHERE lower(name) = lower($1) AND secondary_name = '` + placeholderSecondaryName + `'
+			WHERE lower(name) = lower($1) AND lower(secondary_name) = lower($2) AND ` + notClaimedByRoster + `
+			ORDER BY (name = $1 AND secondary_name = $2) DESC
+			LIMIT 1
+		)`
+
+	const fillInSurname = `UPDATE characters SET secondary_name = $2, blizzard_id = COALESCE($8, blizzard_id), ` + setFromBlizzard + `
+		WHERE id = (
+			SELECT id FROM characters
+			WHERE lower(name) = lower($1) AND secondary_name = '` + placeholderSecondaryName + `' AND ` + notClaimedByRoster + `
 			LIMIT 1
 		)`
 
 	const insert = `
-		INSERT INTO characters (id, name, secondary_name, class, is_main, level, guild_rank, race)
-		VALUES ($1, $2, $3, $4, $8, $5, $6, $7)
+		INSERT INTO characters (id, name, secondary_name, class, is_main, level, guild_rank, race, blizzard_id)
+		VALUES ($1, $2, $3, $4, $8, $5, $6, $7, $9)
 		ON CONFLICT (name, secondary_name) DO NOTHING`
 
 	const closeCarriedOutRequests = `
@@ -92,6 +121,24 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 	result := UpsertResult{UnsupportedClasses: map[int]int{}, UnmappedRaces: map[int]int{}}
 	seenNames := make([]string, 0, len(members))
 	seenSurnames := make([]string, 0, len(members))
+	rosterIDs := make([]int64, 0, len(members))
+	for _, m := range members {
+		if m.ID != 0 {
+			rosterIDs = append(rosterIDs, m.ID)
+		}
+	}
+
+	type unmatchedMember struct {
+		blizzard.RosterMember
+		level      *int
+		race       *string
+		isMain     bool
+		blizzardID *int64
+	}
+	var byName []unmatchedMember
+
+	// IDs are matched for the whole list before any name, so a renamed character has
+	// already moved off its old name when a new member with that name is looked up.
 	for _, m := range members {
 		seenNames = append(seenNames, strings.ToLower(m.Name))
 		seenSurnames = append(seenSurnames, strings.ToLower(m.Surname))
@@ -102,16 +149,54 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 			continue
 		}
 
-		level := validLevel(m.Level)
-		race := raceOrNil(m)
-		if race == nil {
+		member := unmatchedMember{RosterMember: m, level: validLevel(m.Level), race: raceOrNil(m), isMain: !isAltRank(m.Rank), blizzardID: blizzardIDOrNil(m.ID)}
+		if member.race == nil {
 			result.UnmappedRaces[m.RaceID]++
 		}
-		isMain := !isAltRank(m.Rank)
+		if member.blizzardID == nil {
+			byName = append(byName, member)
+			continue
+		}
 
+		var stored struct {
+			ID            uuid.UUID `db:"id"`
+			Name          string    `db:"name"`
+			SecondaryName string    `db:"secondary_name"`
+		}
+		err := tx.GetContext(ctx, &stored, findByBlizzardID, *member.blizzardID)
+		if errors.Is(err, sql.ErrNoRows) {
+			byName = append(byName, member)
+			continue
+		}
+		if err != nil {
+			return UpsertResult{}, fmt.Errorf("find character with blizzard id %d: %w", m.ID, err)
+		}
+
+		name, surname := stored.Name, stored.SecondaryName
+		if !strings.EqualFold(name, m.Name) || !strings.EqualFold(surname, m.Surname) {
+			var taken bool
+			if err := tx.GetContext(ctx, &taken, nameTakenByAnother, stored.ID, m.Name, m.Surname); err != nil {
+				return UpsertResult{}, fmt.Errorf("check new name %s %s: %w", m.Name, m.Surname, err)
+			}
+			if taken {
+				result.RenamesSkipped = append(result.RenamesSkipped, fmt.Sprintf("%s %s to %s %s", name, surname, m.Name, m.Surname))
+				seenNames = append(seenNames, strings.ToLower(name))
+				seenSurnames = append(seenSurnames, strings.ToLower(surname))
+			} else {
+				name, surname = m.Name, m.Surname
+				result.Renamed++
+			}
+		}
+		if _, err := tx.ExecContext(ctx, updateByID, name, surname, m.Class, member.level, m.Rank, member.race, member.isMain, stored.ID); err != nil {
+			return UpsertResult{}, fmt.Errorf("update character with blizzard id %d: %w", m.ID, err)
+		}
+		result.Updated++
+	}
+
+	for _, m := range byName {
 		found := false
 		for _, query := range []string{update, fillInSurname} {
-			updated, err := tx.ExecContext(ctx, query, m.Name, m.Surname, m.Class, level, m.Rank, race, isMain)
+			updated, err := tx.ExecContext(ctx, query, m.Name, m.Surname, m.Class, m.level, m.Rank, m.race, m.isMain, m.blizzardID, rosterIDs)
 			if err != nil {
 				return UpsertResult{}, fmt.Errorf("update character %s %s: %w", m.Name, m.Surname, err)
 			}
@@ -129,7 +214,7 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 			continue
 		}
 
-		inserted, err := tx.ExecContext(ctx, insert, uuid.New(), m.Name, m.Surname, m.Class, level, m.Rank, race, isMain)
+		inserted, err := tx.ExecContext(ctx, insert, uuid.New(), m.Name, m.Surname, m.Class, m.level, m.Rank, m.race, m.isMain, m.blizzardID)
 		if err != nil {
 			return UpsertResult{}, fmt.Errorf("insert character %s %s: %w", m.Name, m.Surname, err)
 		}
@@ -166,6 +251,14 @@ func (r *Repo) UpsertFromBlizzard(ctx context.Context, members []blizzard.Roster
 		return UpsertResult{}, fmt.Errorf("commit blizzard upsert: %w", err)
 	}
 	return result, nil
+}
+
+// A zero ID means Blizzard sent none, which must not be stored: the column is unique.
+func blizzardIDOrNil(id int64) *int64 {
+	if id == 0 {
+		return nil
+	}
+	return &id
 }
 
 // A level outside what the table accepts is treated as unknown rather than failing the
@@ -265,9 +358,20 @@ func (j *SyncBlizzardRoster) sync(ctx context.Context) (string, error) {
 	if result.RankRequestsClosed > 0 {
 		requestsNote = fmt.Sprintf(", %d rank requests closed", result.RankRequestsClosed)
 	}
-	return fmt.Sprintf("%d members: %d added, %d updated, %d left, %d skipped%s%s%s%s",
+	renamesNote := ""
+	if result.Renamed > 0 {
+		renamesNote = fmt.Sprintf(", %d renamed", result.Renamed)
+	}
+	if skipped := len(result.RenamesSkipped); skipped > 0 {
+		noun := "renames"
+		if skipped == 1 {
+			noun = "rename"
+		}
+		renamesNote += fmt.Sprintf(", %d %s skipped (%s)", skipped, noun, strings.Join(result.RenamesSkipped, ", "))
+	}
+	return fmt.Sprintf("%d members: %d added, %d updated, %d left, %d skipped%s%s%s%s%s",
 		len(members), result.Inserted, result.Updated, result.Left, result.Skipped,
-		describeCounts("class", result.UnsupportedClasses), describeCounts("unmapped race", result.UnmappedRaces), genderNote, requestsNote), nil
+		describeCounts("class", result.UnsupportedClasses), describeCounts("unmapped race", result.UnmappedRaces), genderNote, requestsNote, renamesNote), nil
 }
 
 func raceOrNil(m blizzard.RosterMember) *string {

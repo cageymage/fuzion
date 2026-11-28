@@ -17,6 +17,7 @@ import (
 )
 
 type fakeMember struct {
+	id      int64
 	name    string
 	surname string
 	class   int
@@ -53,6 +54,7 @@ func newFakeBlizzardRoster(t *testing.T, members ...fakeMember) *fakeBlizzardRos
 		for _, m := range f.members {
 			list = append(list, map[string]any{
 				"character": map[string]any{
+					"id":             m.id,
 					"name":           m.name,
 					"level":          m.level,
 					"surname":        m.surname,
@@ -836,5 +838,305 @@ func TestSyncRoster_LeavesRankRequestOpen_WhenTheCharacterIsStillInItsOldRank(t 
 	want := []rankRequestRow{{Direction: "to_main", Status: "open"}}
 	if diff := cmp.Diff(want, rankRequestRows(t, db)); diff != "" {
 		t.Errorf("unexpected rank requests (-want +got):\n%s", diff)
+	}
+}
+
+type blizzardIDRow struct {
+	Name          string `db:"name"`
+	SecondaryName string `db:"secondary_name"`
+	BlizzardID    *int64 `db:"blizzard_id"`
+	Left          bool   `db:"left"`
+}
+
+func blizzardIDs(t *testing.T, db *sqlx.DB) []blizzardIDRow {
+	t.Helper()
+	var rows []blizzardIDRow
+	if err := db.Select(&rows, `
+		SELECT name, secondary_name, blizzard_id, left_guild_at IS NOT NULL AS "left"
+		FROM characters ORDER BY name, secondary_name`); err != nil {
+		t.Fatalf("select blizzard ids: %v", err)
+	}
+	return rows
+}
+
+func int64Ptr(n int64) *int64 { return &n }
+
+type keptRow struct {
+	ID            string  `db:"id"`
+	Name          string  `db:"name"`
+	SecondaryName string  `db:"secondary_name"`
+	RaidTeam      *string `db:"raid_team"`
+	BlizzardID    *int64  `db:"blizzard_id"`
+	Left          bool    `db:"left"`
+}
+
+// keptRows shows which stored row each character ended up on, with the raid team as officer data that must follow it.
+func keptRows(t *testing.T, db *sqlx.DB) []keptRow {
+	t.Helper()
+	var rows []keptRow
+	if err := db.Select(&rows, `
+		SELECT id, name, secondary_name, raid_team, blizzard_id, left_guild_at IS NOT NULL AS "left"
+		FROM characters ORDER BY name, secondary_name`); err != nil {
+		t.Fatalf("select characters: %v", err)
+	}
+	return rows
+}
+
+func TestSyncRoster_RenamesTheCharacterInPlace_WhenItsBlizzardIDMatchesACharacterWithAnotherName(t *testing.T) {
+	// given Ronnie Jeremy, synced before with Blizzard ID 42, owned by a member who set its spec, role and raid team
+	// and has an open rank request on it, and Blizzard now listing ID 42 as Thorns Star
+	db := testutil.DB(t)
+	db.MustExec(`INSERT INTO users (id, discord_id, username) VALUES ('88888888-8888-8888-8888-888888888888', 'owner', 'owner')`)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, realm, class, spec, role, is_main, raid_team, level, guild_rank, blizzard_id, user_id)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Ronnie', 'Jeremy', 'Emberreach', 'Warrior', 'Protection', 'tank', true,
+		        'Team Alpha', 60, $1, 42, '88888888-8888-8888-8888-888888888888')`, memberRank)
+	insertRankRequest(t, db, "11111111-1111-1111-1111-111111111111", "to_alt")
+	fake := newFakeBlizzardRoster(t, fakeMember{id: 42, name: "Thorns", surname: "Star", class: warrior, race: 1, level: 60, rank: memberRank})
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect the same row renamed to Thorns Star, still in the guild, keeping its owner, spec, role, raid team
+	// and rank request, and the rename counted in the sync log
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	type renamedRow struct {
+		ID            string  `db:"id"`
+		Name          string  `db:"name"`
+		SecondaryName string  `db:"secondary_name"`
+		Spec          *string `db:"spec"`
+		Role          *string `db:"role"`
+		RaidTeam      *string `db:"raid_team"`
+		Owner         *string `db:"user_id"`
+		BlizzardID    *int64  `db:"blizzard_id"`
+		Left          bool    `db:"left"`
+		OpenRequests  int     `db:"open_requests"`
+	}
+	var got []renamedRow
+	if err := db.Select(&got, `
+		SELECT c.id, c.name, c.secondary_name, c.spec, c.role, c.raid_team, c.user_id::text AS user_id, c.blizzard_id,
+		       c.left_guild_at IS NOT NULL AS "left",
+		       (SELECT count(*) FROM rank_change_requests r WHERE r.character_id = c.id AND r.status = 'open') AS open_requests
+		FROM characters c ORDER BY c.name`); err != nil {
+		t.Fatalf("select characters: %v", err)
+	}
+	want := []renamedRow{{
+		ID: "11111111-1111-1111-1111-111111111111", Name: "Thorns", SecondaryName: "Star",
+		Spec: strPtr("Protection"), Role: strPtr("tank"), RaidTeam: strPtr("Team Alpha"),
+		Owner: strPtr("88888888-8888-8888-8888-888888888888"), BlizzardID: int64Ptr(42), OpenRequests: 1,
+	}}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected characters (-want +got):\n%s", diff)
+	}
+	wantLog := []syncLogEntry{{Source: "blizzard-roster", Status: "ok", Message: "1 members: 0 added, 1 updated, 0 left, 0 skipped, 1 renamed"}}
+	if diff := cmp.Diff(wantLog, syncLogEntries(t, db)); diff != "" {
+		t.Errorf("unexpected sync log (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncRoster_StoresTheBlizzardID_WhenACharacterWithoutOneMatchesByName(t *testing.T) {
+	// given Tankard Ironhide with no Blizzard ID, as a hand-entered or earlier-synced row has, and Blizzard listing it with ID 7
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, class, is_main, guild_rank)
+		VALUES (gen_random_uuid(), 'Tankard', 'Ironhide', 'Warrior', true, $1)`, memberRank)
+	fake := newFakeBlizzardRoster(t, fakeMember{id: 7, name: "Tankard", surname: "Ironhide", class: warrior, race: 1, level: 60, rank: memberRank})
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect Tankard Ironhide to have Blizzard ID 7
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := []blizzardIDRow{{Name: "Tankard", SecondaryName: "Ironhide", BlizzardID: int64Ptr(7)}}
+	if diff := cmp.Diff(want, blizzardIDs(t, db)); diff != "" {
+		t.Errorf("unexpected characters (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncRoster_InsertsTheCharacterWithItsBlizzardID_WhenNeitherItsIDNorItsNameIsStored(t *testing.T) {
+	// given an empty roster and Blizzard listing Newbie Rookie with ID 9
+	db := testutil.DB(t)
+	fake := newFakeBlizzardRoster(t, fakeMember{id: 9, name: "Newbie", surname: "Rookie", class: warrior, race: 1, level: 10, rank: memberRank})
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect Newbie Rookie added with Blizzard ID 9
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := []blizzardIDRow{{Name: "Newbie", SecondaryName: "Rookie", BlizzardID: int64Ptr(9)}}
+	if diff := cmp.Diff(want, blizzardIDs(t, db)); diff != "" {
+		t.Errorf("unexpected characters (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncRoster_MarksTheCharacterAsLeft_WhenItsBlizzardIDNoLongerAppears(t *testing.T) {
+	// given Tankard Ironhide with Blizzard ID 7, and Blizzard listing only a different character
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, class, is_main, guild_rank, blizzard_id)
+		VALUES (gen_random_uuid(), 'Tankard', 'Ironhide', 'Warrior', true, $1, 7)`, memberRank)
+	fake := newFakeBlizzardRoster(t, fakeMember{id: 9, name: "Newbie", surname: "Rookie", class: warrior, race: 1, level: 10, rank: memberRank})
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect Tankard Ironhide marked as left and Newbie Rookie added
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := []blizzardIDRow{
+		{Name: "Newbie", SecondaryName: "Rookie", BlizzardID: int64Ptr(9)},
+		{Name: "Tankard", SecondaryName: "Ironhide", BlizzardID: int64Ptr(7), Left: true},
+	}
+	if diff := cmp.Diff(want, blizzardIDs(t, db)); diff != "" {
+		t.Errorf("unexpected characters (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncRoster_ReplacesTheBlizzardID_WhenACharacterWithTheSameNameHasANewID(t *testing.T) {
+	// given Tankard Ironhide with Blizzard ID 7 and a raid team, and Blizzard listing Tankard Ironhide with ID 8,
+	// as when a player deletes a character and makes a new one with the same name
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, class, raid_team, is_main, guild_rank, blizzard_id)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Tankard', 'Ironhide', 'Warrior', 'Team Alpha', true, $1, 7)`, memberRank)
+	fake := newFakeBlizzardRoster(t, fakeMember{id: 8, name: "Tankard", surname: "Ironhide", class: warrior, race: 1, level: 60, rank: memberRank})
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect the same row, keeping its raid team and still in the guild, now with Blizzard ID 8
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := []keptRow{{ID: "11111111-1111-1111-1111-111111111111", Name: "Tankard", SecondaryName: "Ironhide", RaidTeam: strPtr("Team Alpha"), BlizzardID: int64Ptr(8)}}
+	if diff := cmp.Diff(want, keptRows(t, db)); diff != "" {
+		t.Errorf("unexpected characters (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncRoster_SkipsTheRename_WhenAnotherCharacterAlreadyHasTheNewName(t *testing.T) {
+	// given Ronnie Jeremy with Blizzard ID 42, a hand-entered Thorns Star, and Blizzard listing ID 42 as Thorns Star
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, class, is_main, guild_rank, blizzard_id)
+		VALUES (gen_random_uuid(), 'Ronnie', 'Jeremy', 'Warrior', true, $1, 42)`, memberRank)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, class, is_main)
+		VALUES (gen_random_uuid(), 'Thorns', 'Star', 'Warrior', true)`)
+	fake := newFakeBlizzardRoster(t, fakeMember{id: 42, name: "Thorns", surname: "Star", class: warrior, race: 1, level: 60, rank: memberRank})
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect both rows left as they are, neither marked as left, and the skipped rename counted in the sync log
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := []blizzardIDRow{
+		{Name: "Ronnie", SecondaryName: "Jeremy", BlizzardID: int64Ptr(42)},
+		{Name: "Thorns", SecondaryName: "Star"},
+	}
+	if diff := cmp.Diff(want, blizzardIDs(t, db)); diff != "" {
+		t.Errorf("unexpected characters (-want +got):\n%s", diff)
+	}
+	wantLog := []syncLogEntry{{Source: "blizzard-roster", Status: "ok", Message: "1 members: 0 added, 1 updated, 0 left, 0 skipped, 1 rename skipped (Ronnie Jeremy to Thorns Star)"}}
+	if diff := cmp.Diff(wantLog, syncLogEntries(t, db)); diff != "" {
+		t.Errorf("unexpected sync log (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncRoster_KeepsTheRenamedCharactersRow_WhenANewCharacterWithItsOldNameIsListedFirst(t *testing.T) {
+	// given Bob Stone with Blizzard ID 1 and a raid team, and Blizzard listing a new Bob Stone (ID 2) before
+	// ID 1 renamed to Robert Stone
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, class, raid_team, is_main, guild_rank, blizzard_id)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Bob', 'Stone', 'Warrior', 'Team Alpha', true, $1, 1)`, memberRank)
+	fake := newFakeBlizzardRoster(t,
+		fakeMember{id: 2, name: "Bob", surname: "Stone", class: warrior, race: 1, level: 10, rank: memberRank},
+		fakeMember{id: 1, name: "Robert", surname: "Stone", class: warrior, race: 1, level: 60, rank: memberRank},
+	)
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect the stored row renamed to Robert Stone with its raid team, and the new Bob Stone added as its own row
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	got := keptRows(t, db)
+	if len(got) == 2 && got[0].ID != "" {
+		got[0].ID = "new"
+	}
+	want := []keptRow{
+		{ID: "new", Name: "Bob", SecondaryName: "Stone", BlizzardID: int64Ptr(2)},
+		{ID: "11111111-1111-1111-1111-111111111111", Name: "Robert", SecondaryName: "Stone", RaidTeam: strPtr("Team Alpha"), BlizzardID: int64Ptr(1)},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected characters (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncRoster_KeepsTheRenamedCharactersRow_WhenANewCharacterWithItsOldNameIsListedLast(t *testing.T) {
+	// given Bob Stone with Blizzard ID 1 and a raid team, and Blizzard listing ID 1 renamed to Robert Stone before
+	// a new Bob Stone (ID 2)
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, class, raid_team, is_main, guild_rank, blizzard_id)
+		VALUES ('11111111-1111-1111-1111-111111111111', 'Bob', 'Stone', 'Warrior', 'Team Alpha', true, $1, 1)`, memberRank)
+	fake := newFakeBlizzardRoster(t,
+		fakeMember{id: 1, name: "Robert", surname: "Stone", class: warrior, race: 1, level: 60, rank: memberRank},
+		fakeMember{id: 2, name: "Bob", surname: "Stone", class: warrior, race: 1, level: 10, rank: memberRank},
+	)
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect the stored row renamed to Robert Stone with its raid team, and the new Bob Stone added as its own row
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	got := keptRows(t, db)
+	if len(got) == 2 && got[0].ID != "" {
+		got[0].ID = "new"
+	}
+	want := []keptRow{
+		{ID: "new", Name: "Bob", SecondaryName: "Stone", BlizzardID: int64Ptr(2)},
+		{ID: "11111111-1111-1111-1111-111111111111", Name: "Robert", SecondaryName: "Stone", RaidTeam: strPtr("Team Alpha"), BlizzardID: int64Ptr(1)},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected characters (-want +got):\n%s", diff)
+	}
+}
+
+func TestSyncRoster_StoresTheBlizzardIDOnTheExactlyCasedRow_WhenTwoRowsDifferOnlyInCase(t *testing.T) {
+	// given Tankard Ironhide and tankard ironhide with no Blizzard ID, and Blizzard listing Tankard Ironhide with ID 7
+	db := testutil.DB(t)
+	db.MustExec(`
+		INSERT INTO characters (id, name, secondary_name, class, is_main, guild_rank)
+		VALUES (gen_random_uuid(), 'Tankard', 'Ironhide', 'Warrior', true, $1),
+		       (gen_random_uuid(), 'tankard', 'ironhide', 'Warrior', true, $1)`, memberRank)
+	fake := newFakeBlizzardRoster(t, fakeMember{id: 7, name: "Tankard", surname: "Ironhide", class: warrior, race: 1, level: 60, rank: memberRank})
+
+	// when the roster sync runs
+	err := fake.runSync(db)
+
+	// then I expect the sync to succeed with ID 7 on the row cased as Blizzard sends it, and none on the other
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := []blizzardIDRow{
+		{Name: "Tankard", SecondaryName: "Ironhide", BlizzardID: int64Ptr(7)},
+		{Name: "tankard", SecondaryName: "ironhide"},
+	}
+	if diff := cmp.Diff(want, blizzardIDs(t, db)); diff != "" {
+		t.Errorf("unexpected characters (-want +got):\n%s", diff)
 	}
 }
